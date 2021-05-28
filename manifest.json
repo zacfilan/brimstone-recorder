@@ -1,0 +1,18 @@
+{
+  "name": "Brimstone Recorder",
+  "description": "Record user actions to create a Brimstone script",
+  "version": "1.0",
+  "manifest_version": 3,
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "tabs",
+    "storage", 
+    "activeTab", 
+    "scripting"
+  ],
+  "action" : {
+    "default_title": "Click to open window"
+  }
+}
