@@ -9,7 +9,7 @@
   "permissions": [
     "tabs",
     "storage", 
-    "activeTab", 
+    "activeTab",
     "scripting"
   ],
   "action" : {
