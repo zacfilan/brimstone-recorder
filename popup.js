@@ -108,7 +108,8 @@ class Card {
         let html = `<div class='user-events'>`;
         if (this.userEvents) {
             this.userEvents.forEach(userEvent => {
-                html += `<div class='user-event' data-uid='${userEvent.guid}'>${userEvent.type} element ${userEvent.css}</div>`;
+                userEvent.value = userEvent.value ? `value to '${userEvent.value}' `: ''; 
+                html += `<div class='user-event' data-uid='${userEvent.guid}'>${userEvent.type} element ${userEvent.value}${userEvent.css}</div>`;
             });
         }
         html += '</div>';
@@ -175,6 +176,7 @@ chrome.runtime.onConnect.addListener(function (port) {
         let card;
         switch (userEvent.type) {
             case 'click':
+            case 'change':
                 let dataUrl = await chrome.tabs.captureVisibleTab(parentWindowId, {
                     format: 'png'
                 });
@@ -389,18 +391,21 @@ function forwardUserActionsToRecorder() {
         // when the popup sends messages to the context of the app that's being recorded they come in here
         if(msg.screenshotTaken) {
             brimstoneScreenshotRequired = false;
-            pendingClickEventElement.click();
+            pendingEventElement[pendingEventType](); // click/change etc
         }
     });
 
     var brimstoneScreenshotRequired = true;
-    var pendingClickEventElement;
-    function onclick(e) {
+    var pendingEventElement;
+    var pendingEventType;
+
+    function onevent(e, parms) {
         if(brimstoneScreenshotRequired) {
             e.stopPropagation();
             e.preventDefault();
-            pendingClickEventElement = e.target;
-        
+            pendingEventElement = e.target;
+            pendingEventType = e.type;
+
             // JSON.stringify bails as soon as it hits a circular reference, so we must project out a subset of the properties
             // rather than just augment the e object.
             port.postMessage({
@@ -411,21 +416,23 @@ function forwardUserActionsToRecorder() {
                 clientY: e.clientY,
                 screenX: e.screenX,
                 screenY: e.screenY,
-                boundingClientRect: e.target.getBoundingClientRect()
+                boundingClientRect: e.target.getBoundingClientRect(),
+                value: e.type === 'change' ? e.target.value: undefined
             }); 
         }
         brimstoneScreenshotRequired = true;
     }
 
-    window.addEventListener('click', onclick, { capture: true });
+    window.addEventListener('click', onevent, { capture: true });
+    // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event
+    window.addEventListener('change', onevent, { capture: true });
+    //window.addEventListener('input', onevent, { capture: true });
 }
 
 chrome.scripting.executeScript({
     target: { tabId },
     function: forwardUserActionsToRecorder
 });
-
-
 
 // /**
 //  * Injected into the app to store the screenshot into localstorage for the current domain
