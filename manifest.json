@@ -10,7 +10,12 @@
     "tabs",
     "storage", 
     "activeTab",
-    "scripting"
+    "scripting",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "*://*/",
+    "<all_urls>"
   ],
   "action" : {
     "default_title": "Click to open window"
