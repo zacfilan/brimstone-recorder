@@ -4,6 +4,12 @@ const urlParams = new URLSearchParams(window.location.search);
 const contentWindowId = parseInt(urlParams.get('parent'), 10);
 const tabId = parseInt(urlParams.get('tab'), 10);
 var uiCardsElement = document.getElementById('cards');
+var zip = new JSZip();
+var screenshotsExpected = zip.folder("screenshots_expected");
+var screenshotNumber = 0;
+/** @type Card[] */
+var cards = [];
+
 //var currentUrl;
 
 // /** Take a data url for a PNG and save it to users filesystem */
@@ -50,10 +56,14 @@ var uiCardsElement = document.getElementById('cards');
 
 
 class UserEvent {
-    /** @type string */
-    type;
-    /** @type string */
-    css;
+    /** A string identifier of the type of event, 'click', 'change' , ... */
+    type = '';
+    /** A CSS selector that should identify the element this event occurrd on */
+    css = ''
+    /** The y-offset of the element the event occurred on */
+    top = 0;
+    /** The x-offset of the element this event occured on */
+    left = 0;
 }
 
 class Card {
@@ -125,13 +135,6 @@ Card.uuidv4 = function () {
     });
 }
 
-// chrome.storage.local.set({ brimstoneScreenshot: dataUrl});
-// await chrome.scripting.executeScript({
-//     target: { tabId: tab.id },
-//     function: writeScreenShotToLocalStorage,
-// });
-
-
 /** highlist the element that was acted on in the screenshot
  * when the user hovers over the text of a user-event
  */
@@ -139,32 +142,25 @@ $('#cards').on('mouseenter mouseleave', '.user-event', function (e) {
     $(`.overlay[data-uid='${e.target.dataset.uid}']`).toggle();
 });
 
-/*
-// obsolete manually add a screenshot
-$('#cards').on('click', '#shutterButton', async function (e) {
-    let dataUrl = await chrome.tabs.captureVisibleTab(parentWindowId, {
-        format: 'png'
-    }); // e.g. dataUrl === 'data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...'
-    // let userActions = [new UserAction()];
-
-    // remove the shutter and replace it with a screenshot
-    let blankCard = $('#shutterButton').closest('.card');
-    let screenShotCard = $(cardHtml({
-        dataUrl,
-        overlays: [
-            { height: '30%', width: '30%', top: '0%', left: '0%' }
+$('#saveButton').click(async () => {
+    await screenshot(); // take last state since we are ending the recording
+    console.log('writing zip file to disk I hope');
+    // make the 'test'.
+    zip.file('test.json', JSON.stringify(cards.map(card => card.userEvents[0]), null, 2));
+    let blob = await zip.generateAsync({ type: "blob" });
+    const handle = await window.showSaveFilePicker({
+        suggestedName: `test.zip`,
+        types: [
+            {
+                description: 'A ZIP archive that can be run by Brimstone',
+                accept: { 'application/zip': ['.zip'] }
+            }
         ]
-    }));
-
-    screenShotCard.find('img').on('load', function (e) {
-        blankCard = $('#shutterButton').closest('.card'); // it moved
-        let position = blankCard.position();
-        uiCardsElement.scrollBy(position.left, 0);
     });
-
-    screenShotCard.insertBefore(blankCard);117
+    const writable = await handle.createWritable();
+    await writable.write(blob);  // Write the contents of the file to the stream.    
+    await writable.close(); // Close the file and write the contents to disk.
 });
-*/
 
 // The application being recorded will have a content script injected into it
 // that will establish the socket, and send a message.
@@ -427,7 +423,7 @@ function injectScript(url) {
 
     // workarond until https://bugs.chromium.org/p/chromium/issues/detail?id=1166720
     // is fixed
-    chrome.storage.sync.set({ injectedArgs: {url} }, () => {
+    chrome.storage.sync.set({ injectedArgs: { url } }, () => {
         chrome.scripting.executeScript(
             {
                 target: { tabId },
@@ -442,6 +438,17 @@ function injectScript(url) {
     });
 }
 
+async function screenshot() {
+    let dataUrl = await chrome.tabs.captureVisibleTab(contentWindowId, {
+        format: 'png'
+    });
+    let response = await fetch(dataUrl);
+    let blob = await response.blob();
+    ++screenshotNumber;
+    screenshotsExpected.file(`screenshot${screenshotNumber}.png`, blob, { base64: true });
+    return dataUrl;
+}
+
 var contentPort = false;
 
 /** Set up  */
@@ -454,13 +461,11 @@ function replaceOnConnectListener(url) {
         console.log('PORT CONNECTED', port);
         contentPort.onMessage.addListener(async function (userEvent) {
             console.log(`RX: ${userEvent.type}`, userEvent);
-            let card;
             switch (userEvent.type) {
                 case 'click':
                 case 'change':
-                    let dataUrl = await chrome.tabs.captureVisibleTab(contentWindowId, {
-                        format: 'png'
-                    });
+                    let dataUrl = await screenshot();
+ 
                     let tab = await chrome.tabs.get(tabId);
                     let element = userEvent.boundingClientRect;
                     userEvent.overlay = {
@@ -469,10 +474,12 @@ function replaceOnConnectListener(url) {
                         top: `${element.top * 100 / tab.height}%`,
                         left: `${element.left * 100 / tab.width}%`
                     };
-                    card = new Card({
+                    userEvent.step = screenshotNumber; 
+                    let card = new Card({
                         dataUrl,
                         userEvents: [userEvent]
                     });
+                    cards.push(card);
                     card = $(card.toHtml());
                     card.find('img').on('load', function (e) {
                         uiCardsElement.scrollBy(100000000, 0);
@@ -510,6 +517,17 @@ chrome.webNavigation.onBeforeNavigate.addListener(function (obj) {
     let tab = await chrome.tabs.get(tabId);
     replaceOnConnectListener(tab.url);
 })();
+
+
+function saveTest() {
+    zip.file("test.js", "Hello World\n");
+
+
+    zip.generateAsync({ type: "blob" }).then(function (content) {
+        // see FileSaver.js
+        saveAs(content, "example.zip");
+    });
+}
 
 // /**
 //  * Injected into the app to store the screenshot into localstorage for the current domain
