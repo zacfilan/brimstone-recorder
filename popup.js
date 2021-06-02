@@ -162,6 +162,35 @@ $('#saveButton').click(async () => {
     await writable.close(); // Close the file and write the contents to disk.
 });
 
+$('#loadButton').click(async () => {
+    let [fileHandle] = await window.showOpenFilePicker({
+        suggestedName: `test.zip`,
+        types: [
+            {
+                description: 'A ZIP archive that can be run by Brimstone',
+                accept: { 'application/zip': ['.zip'] }
+            }
+        ]
+    });
+    const blob = await fileHandle.getFile();
+    var zip = await (new JSZip()).loadAsync(blob);
+    let stepPaths = [];
+    let userEvents = JSON.parse(await zip.file("test.json").async("string"));
+    zip.folder('screenshots_expected').forEach((relativePath, file) =>
+        stepPaths.push(file.name));
+    console.log(stepPaths);
+    console.log(userEvents);
+    for (let i = 0; i < stepPaths.length; ++i) {
+        let stepPath = stepPaths[i];
+        let dataUrl = 'data:image/png;base64,' + await zip.file(stepPath).async('base64');
+        addCard(new Card({
+            dataUrl,
+            userEvents: [userEvents[i]]
+        }));
+    }
+    //zip.file("hello.txt").async("string"); // a promise of "Hello World\n"
+});
+
 // The application being recorded will have a content script injected into it
 // that will establish the socket, and send a message.
 // The content-script (CS) lives in this function. This can't use all the chrome api's :( 
@@ -445,11 +474,20 @@ async function screenshot() {
     let response = await fetch(dataUrl);
     let blob = await response.blob();
     ++screenshotNumber;
-    screenshotsExpected.file(`screenshot${screenshotNumber}.png`, blob, { base64: true });
+    screenshotsExpected.file(`step${screenshotNumber}.png`, blob, { base64: true });
     return dataUrl;
 }
 
 var contentPort = false;
+
+function addCard(card) {
+    cards.push(card);
+    card = $(card.toHtml());
+    card.find('img').on('load', function (e) {
+        uiCardsElement.scrollBy(100000000, 0);
+    });
+    uiCardsElement.appendChild(card[0]);
+}
 
 /** Set up  */
 function replaceOnConnectListener(url) {
@@ -465,7 +503,7 @@ function replaceOnConnectListener(url) {
                 case 'click':
                 case 'change':
                     let dataUrl = await screenshot();
- 
+
                     let tab = await chrome.tabs.get(tabId);
                     let element = userEvent.boundingClientRect;
                     userEvent.overlay = {
@@ -474,17 +512,12 @@ function replaceOnConnectListener(url) {
                         top: `${element.top * 100 / tab.height}%`,
                         left: `${element.left * 100 / tab.width}%`
                     };
-                    userEvent.step = screenshotNumber; 
+                    userEvent.step = screenshotNumber;
                     let card = new Card({
                         dataUrl,
                         userEvents: [userEvent]
                     });
-                    cards.push(card);
-                    card = $(card.toHtml());
-                    card.find('img').on('load', function (e) {
-                        uiCardsElement.scrollBy(100000000, 0);
-                    });
-                    uiCardsElement.appendChild(card[0]);
+                    addCard(card);
                     console.log('TX: screenshotTaken');
                     port.postMessage({ type: 'screenshotTaken', screenshotTaken: true });
                     break;
