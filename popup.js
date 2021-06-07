@@ -20,12 +20,10 @@ class UserEvent {
 
 /** Fixme not used */
 class UserAction extends UserEvent {
-    /** A CSS selector that should identify the element this event occurrd on */
-    css = ''
     /** The y-offset of the element the event occurred on */
-    top = 0;
+    clientX = 0;
     /** The x-offset of the element this event occured on */
-    left = 0;
+    clientY = 0;
 }
 
 class Card {
@@ -95,7 +93,7 @@ class VerifiedStepCard extends Card {
                 <img src='${this.diffScreenshot}'>
             </div>
             <div class='user-events'>
-                <div class='user-event' data-uid='${this.uid}'>${this.type} element ${value}${this.css}</div>
+                <div class='user-event' data-uid='${this.uid}'>${this.type} element ${value}</div>
             </div>
         </div>`;
     }
@@ -185,330 +183,7 @@ $('#loadButton').click(async () => {
     }
 });
 
-// The application being recorded will have a content script injected into it
-// that will establish the socket, and send a message.
-// The content-script (CS) lives in this function. This can't use all the chrome api's :( 
-// https://developer.chrome.com/docs/extensions/mv3/content_scripts/
-function forwardUserActionsToRecorder(/*injectedArgs*/) {
-    let lastKeydown = '';
-    // until chrome fixes the bug, we pass args this way
-    chrome.storage.sync.get(["injectedArgs"], (result) => {
-        console.log('got', result);
-        let expectedUrl = result.injectedArgs.url;
-        let actualUrl = window.location.href;//;chrome.runtime.getURL('');
 
-        if (expectedUrl !== actualUrl) {
-            console.error(`NOT injecting script, expected url to be\n${expectedUrl}\nactual\n${actualUrl}`);
-            return;
-        }
-
-        var TopLevelObject = {}
-        TopLevelObject.DOMNodePathStep = function (value, optimized) {
-            this.value = value;
-            this.optimized = optimized || false;
-        }
-        TopLevelObject.DOMNodePathStep.prototype = {
-            /**
-             * @override
-             * @return {string}
-             */
-            toString: function () {
-                return this.value;
-            }
-        }
-        TopLevelObject.DOMPresentationUtils = {}
-
-        TopLevelObject.DOMPresentationUtils.cssPath = function (node, optimized) {
-            if (node.nodeType !== Node.ELEMENT_NODE)
-                return "";
-            var steps = [];
-            var contextNode = node;
-            while (contextNode) {
-                var step = TopLevelObject.DOMPresentationUtils._cssPathStep(contextNode, !!optimized, contextNode === node);
-                if (!step)
-                    break; // Error - bail out early.
-                steps.push(step);
-                if (step.optimized)
-                    break;
-                contextNode = contextNode.parentNode;
-            }
-            steps.reverse();
-            return steps.join(" > ");
-        }
-
-        TopLevelObject.DOMPresentationUtils._cssPathStep = function (node, optimized, isTargetNode) {
-            if (node.nodeType !== Node.ELEMENT_NODE)
-                return null;
-            var id = node.getAttribute("id");
-            if (optimized) {
-                if (id)
-                    return new TopLevelObject.DOMNodePathStep(idSelector(id), true);
-                var nodeNameLower = node.nodeName.toLowerCase();
-                if (nodeNameLower === "body" || nodeNameLower === "head" || nodeNameLower === "html")
-                    return new TopLevelObject.DOMNodePathStep(node.tagName.toLowerCase(), true);
-            }
-            var nodeName = node.tagName.toLowerCase();
-            if (id)
-                return new TopLevelObject.DOMNodePathStep(nodeName + idSelector(id), true);
-            var parent = node.parentNode;
-            if (!parent || parent.nodeType === Node.DOCUMENT_NODE)
-                return new TopLevelObject.DOMNodePathStep(nodeName, true);
-            /**
-             * @param {!TopLevelObject.DOMNode} node
-             * @return {!Array.<string>}
-             */
-            function prefixedElementClassNames(node) {
-                var classAttribute = node.getAttribute("class");
-                if (!classAttribute)
-                    return [];
-                return classAttribute.split(/\s+/g).filter(Boolean).map(function (name) {
-                    // The prefix is required to store "__proto__" in a object-based map.
-                    return "$" + name;
-                });
-            }
-            /**
-             * @param {string} id
-             * @return {string}
-             */
-            function idSelector(id) {
-                return "#" + escapeIdentifierIfNeeded(id);
-            }
-            /**
-             * @param {string} ident
-             * @return {string}
-             */
-            function escapeIdentifierIfNeeded(ident) {
-                if (isCSSIdentifier(ident))
-                    return ident;
-                var shouldEscapeFirst = /^(?:[0-9]|-[0-9-]?)/.test(ident);
-                var lastIndex = ident.length - 1;
-                return ident.replace(/./g, function (c, i) {
-                    return ((shouldEscapeFirst && i === 0) || !isCSSIdentChar(c)) ? escapeAsciiChar(c, i === lastIndex) : c;
-                });
-            }
-            /**
-             * @param {string} c
-             * @param {boolean} isLast
-             * @return {string}
-             */
-            function escapeAsciiChar(c, isLast) {
-                return "\\" + toHexByte(c) + (isLast ? "" : " ");
-            }
-            /**
-             * @param {string} c
-             */
-            function toHexByte(c) {
-                var hexByte = c.charCodeAt(0).toString(16);
-                if (hexByte.length === 1)
-                    hexByte = "0" + hexByte;
-                return hexByte;
-            }
-            /**
-             * @param {string} c
-             * @return {boolean}
-             */
-            function isCSSIdentChar(c) {
-                if (/[a-zA-Z0-9_-]/.test(c))
-                    return true;
-                return c.charCodeAt(0) >= 0xA0;
-            }
-            /**
-             * @param {string} value
-             * @return {boolean}
-             */
-            function isCSSIdentifier(value) {
-                return /^-?[a-zA-Z_][a-zA-Z0-9_-]*$/.test(value);
-            }
-            var prefixedOwnClassNamesArray = prefixedElementClassNames(node);
-            var needsClassNames = false;
-            var needsNthChild = false;
-            var ownIndex = -1;
-            var elementIndex = -1;
-            var siblings = parent.children;
-            for (var i = 0; (ownIndex === -1 || !needsNthChild) && i < siblings.length; ++i) {
-                var sibling = siblings[i];
-                if (sibling.nodeType !== Node.ELEMENT_NODE)
-                    continue;
-                elementIndex += 1;
-                if (sibling === node) {
-                    ownIndex = elementIndex;
-                    continue;
-                }
-                if (needsNthChild)
-                    continue;
-                if (sibling.tagName.toLowerCase() !== nodeName)
-                    continue;
-                needsClassNames = true;
-                var ownClassNames = prefixedOwnClassNamesArray.values();
-                var ownClassNameCount = 0;
-                for (var name in ownClassNames)
-                    ++ownClassNameCount;
-                if (ownClassNameCount === 0) {
-                    needsNthChild = true;
-                    continue;
-                }
-                var siblingClassNamesArray = prefixedElementClassNames(sibling);
-                for (var j = 0; j < siblingClassNamesArray.length; ++j) {
-                    var siblingClass = siblingClassNamesArray[j];
-                    if (!ownClassNames.hasOwnProperty(siblingClass))
-                        continue;
-                    delete ownClassNames[siblingClass];
-                    if (!--ownClassNameCount) {
-                        needsNthChild = true;
-                        break;
-                    }
-                }
-            }
-            var result = nodeName;
-            if (isTargetNode && nodeName.toLowerCase() === "input" && node.getAttribute("type") && !node.getAttribute("id") && !node.getAttribute("class"))
-                result += "[type=\"" + node.getAttribute("type") + "\"]";
-            if (needsNthChild) {
-                result += ":nth-child(" + (ownIndex + 1) + ")";
-            } else if (needsClassNames) {
-                for (var prefixedName in prefixedOwnClassNamesArray.values())
-                    result += "." + escapeIdentifierIfNeeded(prefixedName.substr(1));
-            }
-            return new TopLevelObject.DOMNodePathStep(result, false);
-        }
-
-        console.log('connecting port');
-        var port = chrome.runtime.connect({ name: "knockknock" });
-        port.postMessage({ type: 'connect' });
-
-        port.onMessage.addListener(function (msg) {
-            console.log(`RX: ${msg.type}`, msg);
-            // when the popup sends messages to the context of the app that's being recorded they come in here
-            if (msg.screenshotTaken) {
-                //debugger;
-                switch (pendingEventType) {
-                    case 'click':
-                        queueEvents.click = false; // the next dispatch will not be queued
-                        pendingEventElement.dispatchEvent(new Event(pendingEventType, { bubbles: true }));
-                        //pendingEventElement.click();
-                        break;
-                    case 'beforeinput':
-                        console.log(`simulating the keypress of ${pendingEvent.data} now`);
-                        pendingEventElement.value += pendingEvent.data;
-                        let keyDown = new KeyboardEvent('keydown', {
-                            key: pendingEvent.data
-                        });
-                        pendingEventElement.dispatchEvent(keyDown);
-                        break;
-                }
-            }
-            if (msg.type === 'disconnect') {
-                port.disconnect();
-            }
-        });
-
-        /** Used in the event handlers to control event queuing. If true the event is thrown out, 
-         * the UI gets a post message to do something (e.g. take a screenshot) then the UI will
-         * post back and set this to false, and then recreate the original event, now the event 
-         * will flow through normally, since it is false, then it's set back to true and we start over.
-         */
-        var queueEvents = {
-            click: true
-        };
-
-        var pendingEvent;
-        var pendingEventElement;
-        var pendingEventType;
-
-        function buildMsg(e) {
-            pendingEventElement = e.target;
-            pendingEventType = e.type;
-            pendingEvent = e;
-
-            // JSON.stringify bails as soon as it hits a circular reference, so we must project out a subset of the properties
-            // rather than just augment the e object.
-            let msg = {
-                type: e.type,
-                // https://blog.davidvassallo.me/2019/09/20/a-javascript-reverse-css-selector/
-                css: TopLevelObject.DOMPresentationUtils.cssPath(e.target), // reverse engineer css from dom element
-                clientX: e.clientX,
-                clientY: e.clientY,
-                screenX: e.screenX,
-                screenY: e.screenY,
-                boundingClientRect: e.target.getBoundingClientRect(),
-            };
-            return msg;
-        }
-
-        function queueEventUntilScreenshotReceived(e, parms) {
-            if (queueEvents[e.type]) {
-                e.stopPropagation();
-                e.preventDefault();
-                let msg = buildMsg(e);
-                port.postMessage(msg);
-            }
-            queueEvents[e.type] = true;
-        }
-
-        function onChange(e, parms) {
-            console.log('event: change');
-            let msg = buildMsg(e);
-            msg.value = e.target.value;
-            if (lastKeydown === 'Tab') {
-                msg.value += '\t';  // pass that along to the driver
-            }
-            console.log(`change msg will be ${msg.value}`);
-            lastKeydown = null;
-            port.postMessage(msg);
-        }
-
-        function onClick(e, parms) {
-            console.log('event: click');
-            queueEventUntilScreenshotReceived(e, parms);
-        }
-
-        function onKeydown(e, parms) {
-            lastKeydown = e.key; // remember the last key we press
-            console.log(`event: keydown <${lastKeydown}>`); // track when the user clicks <TAB> or <ENTER> in text boxes that do stuff
-        }
-
-        /** This signals that the screen is ready, and the user wants to update an input.
-        * e.g. The first keypress in a text input.
-        */
-        function onBeforeInput(e, parms) {
-            console.log('event: beforeinput');
-            // here I don't really need to queue the events, just catch the first to snag a screen shot
-            if (e.target !== pendingEventElement || pendingEventType !== 'beforeinput') {
-                e.stopPropagation();
-                e.preventDefault();
-                let msg = buildMsg(e);
-                port.postMessage(msg);
-            }
-        }
-
-        window.removeEventListener('click', onClick, { capture: true });
-        window.addEventListener('click', onClick, { capture: true });
-
-        // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event
-        // fired when the input value is different, not on every keystroke, but when the input "sees" the
-        // change. On blur or enter.
-        window.removeEventListener('beforeinput', onBeforeInput, { capture: true });
-        window.addEventListener('beforeinput', onBeforeInput, { capture: true });
-
-
-        window.removeEventListener('keydown', onKeydown, { capture: true });
-        window.addEventListener('keydown', onKeydown, { capture: true });
-
-        window.removeEventListener('change', onChange, { capture: true });
-        window.addEventListener('change', onChange, { capture: true })
-
-        // before the users first keystroke in a input is proessed we should take a snapshot
-        function removeEventListeners() {
-            window.removeEventListener('click', onClick, { capture: true });
-            window.removeEventListener('beforeinput', onBeforeInput, { capture: true });
-            window.removeEventListener('change', onChange, { capture: true });
-            window.removeEventListener('keydown', onKeydown, { capture: true });
-        }
-
-        port.onDisconnect.addListener(function (port) {
-            removeEventListeners();
-        });
-    });
-}
 
 function injectScript(url) {
     console.log('injecting script');
@@ -519,8 +194,9 @@ function injectScript(url) {
         chrome.scripting.executeScript(
             {
                 target: { tabId },
-                function: forwardUserActionsToRecorder
+                //function: forwardUserActionsToRecorder
                 //args: [url] //https://bugs.chromium.org/p/chromium/issues/detail?id=1166720
+                files: ['contentScript.js']
             },
             (injectionResults) => {
                 for (const frameResult of injectionResults)
@@ -572,9 +248,10 @@ async function userEventToCardModel(userEvent) {
     }
     cardModel.uid = uuidv4(); // FIXME: this was a uid because once upon a time I would let there be several useractions per card/step. now with auto screen shot capture that is not needed.
     cardModel.description =
-        cardModel.type === 'change' ? `${userEvent.type} element value to ${cardModel.value} ${cardModel.css}` :
-            cardModel.type === 'click' ? `${userEvent.type} element ${cardModel.css}` :
-                cardModel.type === 'beforeinput' ? `${userEvent.type} element ${cardModel.css}` :
+        cardModel.type === 'change' ? `type ${cardModel.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
+        cardModel.type === 'mousedown' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
+        cardModel.type === 'click' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
+        cardModel.type === 'beforeinput' ? `beforeinput at location (${userEvent.clientX}, ${userEvent.clientY})` :
                     'Unknown!';
     return cardModel;
 }
@@ -592,6 +269,7 @@ async function replaceOnConnectListener(url) {
             let card;
             switch (userEvent.type) {
                 case 'click':
+                case 'mousedown':
                 case 'beforeinput':
                     card = await userEventToCardModel(userEvent);
                     card = new ScreenshotCard(card);
@@ -599,7 +277,7 @@ async function replaceOnConnectListener(url) {
                     cards.push(card);
                     addCardToView(card);
                     console.log('TX: screenshotTaken');
-                    port.postMessage({ type: 'screenshotTaken', screenshotTaken: true });
+                    port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'change':
                     let cardModel = await userEventToCardModel(userEvent);
@@ -612,7 +290,7 @@ async function replaceOnConnectListener(url) {
                             `<div class='user-event' data-uid='${card.uid}'>${card.description}</div>`
                         );
                     console.log('TX: card-updated');
-                    port.postMessage({ type: 'card-updated' });
+                    port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'connect':
                     console.log('got a new connection msg from injected content script');
