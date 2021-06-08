@@ -12,6 +12,9 @@ var screenshots = zip.folder("screenshots");
 /** @type Card[] */
 var cards = [];
 
+// the last screen shot we took
+var lastScreenshot; 
+
 /** Fixme not used. The struct returned from the content script is used directly  */
 class UserEvent {
     /** A string identifier of the type of event, 'click', 'change' , ... */
@@ -64,15 +67,10 @@ class ScreenshotCard extends Card {
         return html;
     }
 
-    async addScreenshot() {
-        let dataUrl = await chrome.tabs.captureVisibleTab(contentWindowId, {
-            format: 'png'
-        });
-        let response = await fetch(dataUrl);
-        let blob = await response.blob();
+    addScreenshot() {
         let fileName = `step${this.step}_expected.png`;
-        screenshots.file(fileName, blob, { base64: true });
-        this.expectedScreenshot = { fileName: `screenshots/${fileName}`, dataUrl };
+        screenshots.file(fileName, lastScreenshot.blob, { base64: true });
+        this.expectedScreenshot = { fileName: `screenshots/${fileName}`, dataUrl: lastScreenshot.dataUrl };
     }
 }
 
@@ -129,7 +127,8 @@ $('#saveButton').click(async () => {
         type: 'stop', // stop recording
         description: `stop recording`
     });
-    await card.addScreenshot();
+    await screenshot();
+    card.addScreenshot();
     addCardToView(card);
 
     console.log('writing zip file to disk I hope');
@@ -248,12 +247,24 @@ async function userEventToCardModel(userEvent) {
     }
     cardModel.uid = uuidv4(); // FIXME: this was a uid because once upon a time I would let there be several useractions per card/step. now with auto screen shot capture that is not needed.
     cardModel.description =
-        cardModel.type === 'change' ? `type ${cardModel.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
-        cardModel.type === 'mousedown' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
-        cardModel.type === 'click' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
+    //ardModel.type === 'change' ? `change text to ${cardModel.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
+    cardModel.type === 'keydown' ? `keydown ${userEvent.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
+    cardModel.type === 'mousedown' ? `mousedown at location (${userEvent.clientX}, ${userEvent.clientY})` :
+        //cardModel.type === 'click' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
         cardModel.type === 'beforeinput' ? `beforeinput at location (${userEvent.clientX}, ${userEvent.clientY})` :
                     'Unknown!';
     return cardModel;
+}
+
+async function screenshot() {
+    let dataUrl = await chrome.tabs.captureVisibleTab(contentWindowId, {
+        format: 'png'
+    });
+    let response = await fetch(dataUrl);
+    lastScreenshot = {
+        blob: await response.blob(),
+        dataUrl
+    };
 }
 
 /** Set up  */
@@ -268,32 +279,24 @@ async function replaceOnConnectListener(url) {
             console.log(`RX: ${userEvent.type}`, userEvent);
             let card;
             switch (userEvent.type) {
-                case 'click':
                 case 'mousedown':
-                case 'beforeinput':
+                case 'keydown': 
+                    await screenshot();
                     card = await userEventToCardModel(userEvent);
                     card = new ScreenshotCard(card);
-                    await card.addScreenshot();
+                    card.addScreenshot();
                     cards.push(card);
                     addCardToView(card);
-                    console.log('TX: screenshotTaken');
                     port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'change':
-                    let cardModel = await userEventToCardModel(userEvent);
-                    card = cards[cards.length - 1]; // current card
-                    card.type = 'change';
-                    card.description = cardModel.description;
-                    card.value = cardModel.value;
-                    $(`.user-event[data-uid=${card.uid}]`)
-                        .closest('.user-events').append(
-                            `<div class='user-event' data-uid='${card.uid}'>${card.description}</div>`
-                        );
-                    console.log('TX: card-updated');
                     port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'connect':
                     console.log('got a new connection msg from injected content script');
+                    break;
+                default:
+                    console.error(`unexpected userEvent received <${userEvent.type}>`);
                     break;
             }
         });
