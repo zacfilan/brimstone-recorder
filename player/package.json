@@ -1,0 +1,18 @@
+{
+  "name": "player",
+  "version": "1.0.0",
+  "description": "player",
+  "main": "play.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chromedriver": "^91.0.0",
+    "pixelmatch": "^5.2.1",
+    "pngjs": "^6.0.0",
+    "selenium-webdriver": "^4.0.0-beta.4",
+    "unzipper": "^0.10.11"
+  }
+}

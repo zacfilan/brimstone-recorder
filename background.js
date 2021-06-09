@@ -4,7 +4,7 @@ chrome.action.onClicked.addListener(async function (tab) {
     // create the Recording Window
     let currentWindow = await chrome.windows.getCurrent();
     let childWindow = await chrome.windows.create({
-      url: chrome.runtime.getURL(`popup.html?parent=${currentWindow.id}&tab=${tab.id}`),
+      url: chrome.runtime.getURL(`ui.html?parent=${currentWindow.id}&tab=${tab.id}`),
       type: "popup",
       focused: false,
       width: Math.floor(currentWindow.width * .75),

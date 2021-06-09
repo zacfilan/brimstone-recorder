@@ -5,12 +5,15 @@
     <title>Brimstone Recorder</title>
     <script src="jquery-1.12.4.min.js"></script>
     <script src="jszip.min.js"></script>
-    <link rel="stylesheet" href="popup.css">
+    <!-- This is a browserfied version of pngjs, that exposes the PNG module in global variable png -->
+    <script src="browser.js"></script>
+    <script src="buffer.js"></script>
+    <link rel="stylesheet" href="ui.css">
   </head>
   <body>
     <button id="saveButton">Save</button>
     <button id="loadButton">Load</button>
-   <div id="cards" class="scrolling-wrapper"></div>
-   <script type="module" src="popup.js"></script>
+   <div id="cards"></div>
+   <script type="module" src="ui.js"></script>
   </body>
 </html>

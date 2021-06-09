@@ -1,5 +1,8 @@
 import { uuidv4 } from "./uuidv4.js"
 import { Rectangle } from "./rectangle.js"
+import { pixelmatch } from "./pixelmatch.js"
+const PNG = png.PNG;
+const Buffer = buffer.Buffer;
 
 var screenshotCounter = 0;
 // grab the parent window id from the query parameter
@@ -13,7 +16,7 @@ var screenshots = zip.folder("screenshots");
 var cards = [];
 
 // the last screen shot we took
-var lastScreenshot; 
+var lastScreenshot;
 
 /** Fixme not used. The struct returned from the content script is used directly  */
 class UserEvent {
@@ -61,7 +64,7 @@ class ScreenshotCard extends Card {
         html += `
             </div>
             <div class='user-events'>
-                <div class='user-event' data-uid='${this.uid}'>${this.description}</div>
+                <div class='user-event' data-uid='${this.uid}'>next action: ${this.description}</div>
             </div>
         </div>`;
         return html;
@@ -74,28 +77,90 @@ class ScreenshotCard extends Card {
     }
 }
 
-class VerifiedStepCard extends Card {
+class FailedStepCard extends Card {
     constructor(args = {}) {
         super(args);
     }
+    //        this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(this.expectedScreenshot.fileName).async('base64');
+
+    async loadImages() {
+        let expectedFilename = this.expectedScreenshot.fileName;
+        this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(expectedFilename).async('base64');
+        let actualFilename = `screenshots/step${this.step}_actual.png`;
+        this.actualScreenshot = {
+            fileName: actualFilename,
+            dataUrl: 'data:image/png;base64,' + await zip.file(actualFilename).async('base64')
+        };
+    }
+
+    async pixelDiff(zip) {
+        this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(this.expectedScreenshot.fileName).async('base64');
+        let actualFilename = `screenshots/step${this.step}_actual.png`;
+        this.actualScreenshot = {
+            dataUrl: 'data:image/png;base64,' + await zip.file(actualFilename).async('base64'),
+            fileName: actualFilename
+        };
+        // HACk
+        this.diffDataUrl = this.expectedScreenshot.dataUrl;
+        /*
+                const expected = PNG.sync.read(this._expectedBuffer);
+                var actual = PNG.sync.read(this._actualBuffer); // FIXME: replace actual with the id of the run
+                const { width, height } = expected;
+                if (actual.width !== width || actual.height !== height) {
+                    actua = new PNG({ width, height });
+                }
+                const diff = new PNG({ width, height });
+            
+                this._numDiffPixels = pixelmatch(expected.data, actual.data, diff.data, width, height, { threshold: 0.5 });
+                let UiPercentDelta = (numDiffPixels * 100) / (width * height);
+                this._percentDiffPixels = UiPercentDelta.toFixed(2);
+                this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diff).toString('base64');*/
+    }
 
     toHtml() {
-        let nHtml = `
-        <div class='card'>
-            <div class='screenshot'>
-                <img class='expected' src='${this.expectedScreenshot.dataUrl}'>
-                <img class='actual' src='${this.actualScreenshot.dataUrl}'>
-                <div class='overlay' data-uid=${this.uid} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>
+        let o = this.overlay;
+        let html = `
+        <div class='failed-step'>
+            <div class='card fail expected' data-uid=${this.uid}>
+                <div class='title'>Expected current screen (click image to toggle)</div>
+                <div class='screenshot'>
+                    <img src='${this.expectedScreenshot.dataUrl}'>
+                    <div class='overlay' data-uid=${this.uid} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>
+                </div>
+                <div class='user-events'>
+                    <div class='user-event' data-uid='${this.uid}'>next action: ${this.description}</div>
+                </div>
             </div>
-            <div class='screenshot'>
-                <img src='${this.diffScreenshot}'>
-            </div>
-            <div class='user-events'>
-                <div class='user-event' data-uid='${this.uid}'>${this.type} element ${value}</div>
+            <div class='card'>
+                <div class='title'>Difference (red pixels). ${this.numDiffPixels} pixels, ${this.percentDiffPixels}% different</div>
+                <div class='screenshot'>
+                    <img src='${this.diffDataUrl}'>
+                </div>
+                <div class='user-events'>
+                    <button>Ignore</button>
+                </div>
             </div>
         </div>`;
+        return html;
     }
 }
+
+$('#cards').on('click', '.card.fail .screenshot', function (e) {
+    // flip the image
+    let $card = $(e.currentTarget).closest('.card');
+    let uid = $card.attr('data-uid');
+    let cardModel = cards.find(card => card.uid === uid);
+    if ($card.hasClass('expected')) {
+        $card.removeClass('expected').addClass('actual');
+        $card.find('img').attr('src', cardModel.actualScreenshot.dataUrl);
+        $card.find('.title').text('Actual current screen (click image to toggle)');
+    }
+    else {
+        $card.removeClass('actual').addClass('expected');
+        $card.find('img').attr('src', cardModel.expectedScreenshot.dataUrl);
+        $card.find('.title').text('Expected current screen (click image to toggle)');
+    }
+});
 
 class TextCard extends Card {
     constructor(args = {}) {
@@ -133,7 +198,7 @@ $('#saveButton').click(async () => {
 
     console.log('writing zip file to disk I hope');
     // make the 'test'.
-    zip.file('test.json', JSON.stringify(cards, null, 2));
+    zip.file('test.json', JSON.stringify({ actions: cards }, null, 2));
     let blob = await zip.generateAsync({ type: "blob" });
     const handle = await window.showSaveFilePicker({
         suggestedName: `test.zip`,
@@ -160,29 +225,56 @@ $('#loadButton').click(async () => {
         ]
     });
     const blob = await fileHandle.getFile();
-    var zip = await (new JSZip()).loadAsync(blob);
-    let screenshotFilenames = [];
-    let userEvents = JSON.parse(await zip.file("test.json").async("string"));
-    console.log(userEvents);
-    for (let i = 0; i < userEvents.length; ++i) {
-        let card;
-        let userEvent = userEvents[i];
-        if (userEvent.expectedScreenshot) {
-            userEvent.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(userEvent.expectedScreenshot.fileName).async('base64');
-            if (userEvent.actualScreenshot?.fileName) {
-                userEvent.actualScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(userEvent.actualScreenshot.fileName).async('base64');
-            }
-            card = new ScreenshotCard(userEvent);
-        }
-        else {
-            card = new TextCard(userEvent);
-        }
+    let zip = await (new JSZip()).loadAsync(blob);
+    var test = JSON.parse(await zip.file("test.json").async("string"));
+    let userEvents = test.actions;
+    let failedOnStep = test?.player?.failedOnStep;
+    // just show the one failure, and allow for editing, and rerun.
+    if (failedOnStep) {
+        let userEvent = userEvents[failedOnStep];
+        userEvent.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(userEvent.expectedScreenshot.fileName).async('base64');
 
+        let expected_uint8array = await zip.file(userEvent.expectedScreenshot.fileName).async('uint8array');
+        let actualFilename = `screenshots/step${userEvent.step}_actual.png`;
+        userEvent.actualScreenshot = {
+            dataUrl: 'data:image/png;base64,' + await zip.file(actualFilename).async('base64'),
+            fileName: actualFilename
+        };
+        let actual_uint8array = await zip.file(actualFilename).async('uint8array');
+        debugger;
+        const img1 = PNG.sync.read(Buffer.from(expected_uint8array));
+        var img2 = PNG.sync.read(Buffer.from(actual_uint8array)); // FIXME: replace actual with the id of the run
+        const { width, height } = img1;
+        if (img2.width !== width || img2.height !== height) {
+            img2 = new PNG({ width, height });
+        }
+        const diff = new PNG({ width, height });
+
+        userEvent.numDiffPixels = pixelmatch(img1.data, img2.data, diff.data, width, height, { threshold: 0.5 });
+        let UiPercentDelta = (userEvent.numDiffPixels * 100) / (width * height);
+        userEvent.percentDiffPixels = UiPercentDelta.toFixed(2);
+
+        userEvent.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diff).toString('base64');
+
+        let card = new FailedStepCard(userEvent);
+        //await card.pixelDiff(zip);
         addCardToView(card);
     }
+    else {
+        for (let i = 0; i < userEvents.length; ++i) {
+            let card;
+            let userEvent = userEvents[i];
+            if (userEvent.expectedScreenshot) {
+                userEvent.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(userEvent.expectedScreenshot.fileName).async('base64');
+                card = new ScreenshotCard(userEvent);
+            }
+            else {
+                card = new TextCard(userEvent);
+            }
+            addCardToView(card);
+        }
+    }
 });
-
-
 
 function injectScript(url) {
     console.log('injecting script');
@@ -195,7 +287,7 @@ function injectScript(url) {
                 target: { tabId },
                 //function: forwardUserActionsToRecorder
                 //args: [url] //https://bugs.chromium.org/p/chromium/issues/detail?id=1166720
-                files: ['contentScript.js']
+                files: ['content-recorder.js']
             },
             (injectionResults) => {
                 for (const frameResult of injectionResults)
@@ -210,22 +302,8 @@ var contentPort = false;
 /** Take the user event, use it as a viewmodel (data) to create the model (ui) */
 function addCardToView(card) {
     let $card = $(card.toHtml());
-    $card.find('img').on('load', function (e) {
-        uiCardsElement.scrollBy(100000000, 0);
-        Rectangle.setContainer(
-            $card.find('.screenshot')[0],
-            addMask => {
-                if (!card.screenshotMasks) {
-                    card.screenshotMasks = [];
-                }
-                card.screenshotMasks.push(addMask);
-            },
-            delMask => {
-                card.screenshotMasks = card.screenshotMasks.filter(mask => mask.uid !== delMask.uid);
-            }
-        );
-    });
-    uiCardsElement.appendChild($card[0]);
+    cards.push(card);
+    uiCardsElement.appendChild($card[0], $card[0]);
 }
 
 /** Process a user event received from the content script
@@ -247,11 +325,11 @@ async function userEventToCardModel(userEvent) {
     }
     cardModel.uid = uuidv4(); // FIXME: this was a uid because once upon a time I would let there be several useractions per card/step. now with auto screen shot capture that is not needed.
     cardModel.description =
-    //ardModel.type === 'change' ? `change text to ${cardModel.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
-    cardModel.type === 'keydown' ? `keydown ${userEvent.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
-    cardModel.type === 'mousedown' ? `mousedown at location (${userEvent.clientX}, ${userEvent.clientY})` :
-        //cardModel.type === 'click' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
-        cardModel.type === 'beforeinput' ? `beforeinput at location (${userEvent.clientX}, ${userEvent.clientY})` :
+        //ardModel.type === 'change' ? `change text to ${cardModel.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
+        cardModel.type === 'keydown' ? `keydown ${userEvent.value} in element at location (${userEvent.clientX}, ${userEvent.clientY})` :
+            cardModel.type === 'mousedown' ? `mousedown at location (${userEvent.clientX}, ${userEvent.clientY})` :
+                //cardModel.type === 'click' ? `click at location (${userEvent.clientX}, ${userEvent.clientY})` :
+                //cardModel.type === 'beforeinput' ? `next: beforeinput at location (${userEvent.clientX}, ${userEvent.clientY})` :
                     'Unknown!';
     return cardModel;
 }
@@ -280,12 +358,11 @@ async function replaceOnConnectListener(url) {
             let card;
             switch (userEvent.type) {
                 case 'mousedown':
-                case 'keydown': 
+                case 'keydown':
                     await screenshot();
                     card = await userEventToCardModel(userEvent);
                     card = new ScreenshotCard(card);
                     card.addScreenshot();
-                    cards.push(card);
                     addCardToView(card);
                     port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
@@ -330,7 +407,6 @@ chrome.webNavigation.onBeforeNavigate.addListener(function (obj) {
         tabHeight: tab.height,
         tabWidth: tab.width
     });
-    cards.push(card);
     addCardToView(card);
 
     // inject into page

@@ -1,0 +1,51 @@
+.card {
+    width: 50%;
+    height: 50%;
+    display: flex;
+    flex-direction: column;
+    border-left: 1em solid #7474bf;
+    border-right: 1em solid#348ac7;
+    margin-right: 2em;
+    margin-bottom: 1em;
+    border-radius: .6em;
+    box-shadow: 10px 5px 5px grey;
+}
+
+.card .screenshot {
+    position: relative; /* for the overlay to be absole positioned */
+    border: 1px solid white;
+    padding: none;
+}
+
+.card .screenshot:hover {
+    cursor: pointer;
+}
+
+.card .title {
+    background-image: linear-gradient(to right, #7474bf, #348ac7);
+    color: white;
+    padding: 1em 1em 1em 0;
+}
+
+.card .screenshot img {
+    width: 100%;
+}
+
+.card .screenshot .overlay {
+    position: absolute;
+    background: red;
+    opacity: .3;
+    display: none; /* initially hidden */
+}
+
+.card .user-events {
+    /* border: 1px solid black; */
+    background: linear-gradient(to right, #7474bf, #348ac7);
+    color: white;
+    border-top: 1px solid black;
+    padding: 1em 1em 1em 0;
+}
+
+.failed-step {
+    display: flex;
+}
