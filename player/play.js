@@ -32,7 +32,7 @@ var chromeCapabilities = webdriver.Capabilities.chrome()
     .set('chromeOptions', {args})
     .set('acceptInsecureCerts', true);
 
-const serviceBuilder = new ServiceBuilder('./node_modules/chromedriver/lib/chromedriver/chromedriver.exe');
+const serviceBuilder = new ServiceBuilder('../node_modules/chromedriver/lib/chromedriver/chromedriver.exe');
 
 const driver = new webdriver.Builder()
     .forBrowser('chrome')
