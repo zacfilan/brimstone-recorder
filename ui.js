@@ -1,4 +1,3 @@
-import { Rectangle } from "./rectangle.js"
 import { Player } from "./playerclass.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer;
@@ -345,11 +344,11 @@ $('#loadButton').on('click', async () => {
 
 });
 
-function injectScript(url) {
+ function injectScript(url) {
     console.log(`injecting script into ${url}`);
-
+    
     chrome.storage.sync.set({ injectedArgs: { url } }, () => {
-        chrome.scripting.executeScript(
+         chrome.scripting.executeScript(
             {
                 target: { tabId },
                 files: ['content-recorder.js']
@@ -438,11 +437,11 @@ async function userEventToAction(userEvent) {
 
     switch(userEvent.type) {
         case 'keydown':
-            cardModel.description = `keydown ${userEvent.value} at location (${userEvent.clientX}, ${userEvent.clientY})`;
+            cardModel.description = `keydown ${userEvent.event.key} at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
             break;
         case 'mousedown':
-            cardModel.description = `mousedown at location (${userEvent.clientX}, ${userEvent.clientY})`;
+            cardModel.description = `mousedown at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
             break;
         case 'stop':

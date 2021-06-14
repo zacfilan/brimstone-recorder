@@ -27,6 +27,18 @@ export class Player {
             this.tab = await chrome.tabs.create({ windowId: this.windowId });
         }
         this.tabId = this.tab.id;
+
+        // // https://developer.chrome.com/docs/extensions/reference/windows/#method-create
+        // this.window = await chrome.windows.create({
+        //     focused: true,
+        //     url: steps[0].url,
+        //     height: steps[0].tabHeight,
+        //     width: steps[0].tabWidth
+        // });
+
+        // this.tab = this.window.tabs[0];
+        // this.tabId = this.tab.id;
+
         // start timer
         let start;
         let stop;
@@ -64,36 +76,78 @@ export class Player {
             url: this.actionStep.url
         });
 
-        await this.setViewport(this.actionStep.tabWidth, this.actionStep.tabHeight);
         await chrome.debugger.attach({ tabId: this.tab.id }, "1.3"); // FIXME: tbd
+        await Player.sleep(3000);
+        await this.setViewport(this.actionStep.tabWidth, this.actionStep.tabHeight); // that debug banner needs to be figured into the size too.
     }
 
     async keydown() {
-        console.log('Not implemented!');
-        return;
-        // let key = this.actionStep.value === 'Tab' ? webdriver.Key.TAB : this.actionStep.value;
-        // return driver.actions({ async: true })
-        //     .move({ origin: 'viewport', x: this.actionStep.clientX, y: this.actionStep.clientY })
-        //     .sendKeys(key)
-        //     .perform();
+        // simulate a keypress https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchKeyEvent
+        let keycode = this.actionStep.event.keyCode;
 
+        chrome.debugger.sendCommand({tabId: this.tab.id}, 'Input.dispatchKeyEvent', {
+            type: 'keyDown',
+            code: this.actionStep.event.code,
+            key: this.actionStep.event.key,
+            windowsVirtualKeyCode: keycode,
+            nativeVirtualKeyCode: keycode
+        });
+        var printable = 
+            (keycode > 47 && keycode < 58)   || // number keys
+            keycode == 32 || keycode == 13   || // spacebar & return key(s) (if you want to allow carriage returns)
+            (keycode > 64 && keycode < 91)   || // letter keys
+            (keycode > 95 && keycode < 112)  || // numpad keys
+            (keycode > 185 && keycode < 193) || // ;=,-./` (in order)
+            (keycode > 218 && keycode < 223);   // [\]' (in order)
+        if(printable) {
+            chrome.debugger.sendCommand({tabId: this.tab.id}, 'Input.dispatchKeyEvent', {
+                type: 'char',
+                code: this.actionStep.event.code,
+                key: this.actionStep.event.key,
+                text: this.actionStep.event.key,
+                unmodifiedtext: this.actionStep.event.key,
+                windowsVirtualKeyCode: keycode,
+                nativeVirtualKeyCode: keycode
+            });
+        }
+        chrome.debugger.sendCommand({tabId: this.tab.id}, 'Input.dispatchKeyEvent', {
+            type: 'keyUp',
+            code: this.actionStep.event.code,
+            key: this.actionStep.event.key,
+            windowsVirtualKeyCode: this.actionStep.event.keyCode,
+            nativeVirtualKeyCode: this.actionStep.event.keyCode
+        });
     }
 
     async mousedown() {
-        //console.log('Not implemented!');
-        return;
-        //                chrome.debugger.sendCommand({tabId}, 'Input.dispatchKeyEvent');
-        //                chrome.debugger.sendCommand({tabId}, 'Input.dispatchKeyEvent'); 
-        //     await expectedScreenshot(this.actionStep);
-        //     console.log(`click at location (${this.actionStep.clientX}, ${this.actionStep.clientY})`);
-        //     return driver.actions({ async: true })
-        //         .move({ origin: 'viewport', x: this.actionStep.clientX, y: this.actionStep.clientY })
-        //         .click()
-        //         .perform();
+        // simulate a click https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchMouseEvent
+        chrome.debugger.sendCommand({tabId: this.tab.id}, 'Input.dispatchMouseEvent', {
+            type: 'mousePressed',
+            x: this.actionStep.x,
+            y: this.actionStep.y,
+            button: 'left',
+            buttons: 1,
+            clickCount: 1,
+            pointerType: 'mouse'
+        });
+        chrome.debugger.sendCommand({tabId: this.tab.id}, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased',
+            x: this.actionStep.x,
+            y: this.actionStep.y,
+            button: 'left',
+            buttons: 1,
+            clickCount: 1,
+            pointerType: 'mouse'
+        });
     }
 
     async move(x, y) {
-        //console.log('Not implemented!');
+        chrome.debugger.sendCommand({tabId: this.tab.id}, 'Input.dispatchMouseEvent', {
+            type: 'mouseMoved',
+            x,
+            y,
+            pointerType: 'mouse'
+        });
         return;
     }
 
