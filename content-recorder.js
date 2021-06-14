@@ -199,7 +199,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
             /** Add event listeners to the window, some events will be passed*/
             addEventListeners() {
-                console.log('adding event listeners');
+                console.log('removing + adding event listeners');
                 Recorder.events.forEach(event => {
                     window.removeEventListener(event, this, { capture: true });
                     window.addEventListener(event, this, { capture: true });

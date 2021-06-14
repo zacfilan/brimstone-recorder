@@ -46,6 +46,6 @@
     padding: 1em 1em 1em 0;
 }
 
-.failed-step {
+.step {
     display: flex;
 }
