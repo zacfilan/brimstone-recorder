@@ -9,7 +9,8 @@ const defaultOptions = {
     aaColor: [255, 255, 0], // color of anti-aliased pixels in diff output
     diffColor: [255, 0, 0], // color of different pixels in diff output
     diffColorAlt: null,     // whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two
-    diffMask: false         // draw the diff over a transparent background (a mask)
+    diffMask: false,         // draw the diff over a transparent background (a mask)
+    ignoreMask: false
 };
 
 export function pixelmatch(img1, img2, output, width, height, options) {
@@ -66,9 +67,24 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                 } else {
                     // found substantial difference not caused by anti-aliasing; draw it as such
                     if (output) {
-                        drawPixel(output, pos, ...(delta < 0 && options.diffColorAlt || options.diffColor));
+                        // before I draw a red one, see if that one is 'ok' due to the mask, and then draw it green
+                        if(options.ignoreMask) {
+                            let red = options.ignoreMask[pos + 0];
+                            let green = options.ignoreMask[pos + 1];
+                            // let blue = options.ignoreMask[pos + 2];
+                            // let alpha = options.ignoreMask[pos + 3];
+                            if(red === 255 || green === 255) {
+                                drawPixel(output, pos, 0, 255, 0, 1); // green pixel
+                            }
+                        }
+                        else {
+                            drawPixel(output, pos, ...(delta < 0 && options.diffColorAlt || options.diffColor));
+                            diff++;
+                        }
+                    } 
+                    else {
+                        diff++;
                     }
-                    diff++;
                 }
 
             } else if (output) {

@@ -8,6 +8,7 @@ const contentWindowId = parseInt(urlParams.get('parent'), 10);
 const tabId = parseInt(urlParams.get('tab'), 10);
 var uiCardsElement = document.getElementById('cards');
 var currentUrl;
+var lastScreenshotTaken;
 
 /* Some globals */
 
@@ -41,6 +42,9 @@ class UserAction extends UserEvent {
 class Step {
     constructor(args = {}) {
         Object.assign(this, args);
+        if(!this.status) {
+            this.status = 'recorded';// // see ui.css
+        }
     }  
 }
 Step.instancesCreated = 0;
@@ -60,7 +64,7 @@ class ScreenshotStep extends Step {
         let o = this.overlay;
         let html = `
         <div class='step' data-index=${this.index}>
-          <div class='card' data-index=${this.index}>
+          <div class='card ${this.status}' data-index=${this.index}>
               <div class='title'>[${this.index}]</div>
               <div class='screenshot'>
                   <img draggable='false' class='expected' src='${this.expectedScreenshot.dataUrl}'>`;
@@ -90,11 +94,23 @@ class FailedStep extends Step {
         let clone = Object.assign({}, this);
         clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
         clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
+        if(clone.acceptablePixelDifferences) {
+            clone.acceptablePixelDifferences = {fileName: this.acceptablePixelDifferences.fileName};
+        }
+        delete clone.diffDataUrl;
         return clone;
     }
 
-    addMask() {
-        console.log('i hear you!');
+    /** 
+     * When the user clicks the button, I want the current red pixels to all turn green, and the step to pass.
+     * 
+     */
+    async addMask() {
+        if(!this.acceptablePixelDifferences) {
+            this.acceptablePixelDifferences = {};
+        }
+        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl;
+        this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
     }
 
     /** (Re)calculate the difference between the expected screenshot
@@ -103,7 +119,11 @@ class FailedStep extends Step {
     async pixelDiff() {
         let {png: expectedPng} = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
         let {png: actualPng} = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
-        let {numDiffPixels, diffPng} = Player.pngDiff(expectedPng, actualPng);
+        let acceptableErrorsPng;
+        if(this.acceptablePixelDifferences?.dataUrl) {
+            acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png;
+        }
+        let {numDiffPixels, diffPng} = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
         
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
@@ -115,11 +135,14 @@ class FailedStep extends Step {
         let o = this.overlay;
         let html = `
           <div class='step failed' data-index=${this.index}>
-              <div class='card fail expected' data-index=${this.index}>
+              <div class='card expected ${this.status}' data-index=${this.index}>
                   <div class='title'>[${this.index}]: Expected current screen (click image to toggle)</div>
                   <div class='screenshot'>
-                      <img src='${this.expectedScreenshot.dataUrl}'>
-                      <div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>
+                      <img src='${this.expectedScreenshot.dataUrl}'>`;
+            if(o) {
+             html += `<div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
+            }
+            html += `
                   </div>
                   <div class='user-events'>
                       <div class='user-event' data-index='${this.index}'>next action: ${this.description}</div>
@@ -139,6 +162,13 @@ class FailedStep extends Step {
     }
 }
 
+function getStep(element) {
+    let view = $(element).closest('.step');
+    let index = view.attr('data-index');
+    let model = cards[index];
+    return { view, model };
+}
+
 function getCard(element) {
     let view = $(element).closest('.card');
     let index = view.attr('data-index');
@@ -146,13 +176,14 @@ function getCard(element) {
     return { view, model };
 }
 
-$('#cards').on('click', 'button.ignore', function (e) {
+$('#cards').on('click', 'button.ignore', async function (e) {
     // add a mask to the 
-    const { model } = getCard(e.currentTarget);
-    model.addDiffMask();
+    const { model } = getStep(e.currentTarget);
+    await model.addMask();
+    await updateStepInView(model);
 });
 
-$('#cards').on('click', '.card.fail .screenshot', function (e) {
+$('#cards').on('click', '.card.failed .screenshot', function (e) {
     // flip the image
     const { view, model } = getCard(e.currentTarget);
     if (view.hasClass('expected')) {
@@ -175,7 +206,7 @@ class TextStep extends Step {
     toHtml() {
         let oHtml = `
         <div class='step' data-index=${this.index}>
-          <div class='card'>
+          <div class='card ${this.status}'>
               <div class='title'>[${this.index}]</div>
               <div class='screenshot'>
               </div>
@@ -195,31 +226,27 @@ $('#cards').on('mouseenter mouseleave', '.user-event[data-index]', function (e) 
     $(`.overlay[data-index='${e.target.dataset.index}']`).toggle();
 });
 
-function injectOnNavigation(obj) {
+async function injectOnNavigation(obj) {
     console.log('GOT NAV in Recording Window', obj);
     if (obj.url !== currentUrl) {
         currentUrl = obj.url;
-        injectScript(obj.url);
+        await injectScript(obj.url);
     }
 }
 
 $('#playButton').on('click', async () => {
     try {
         let player = new Player(contentWindowId, tabId);
+        cards.forEach( card => {
+            card.status = 'notrun';
+            updateStepInView(card);
+        });
         await player.play(cards); // players gotta play...
     }
     catch (e) {
         if (e?.message !== 'screenshots do not match') {
             throw e;
         }
-
-        // write the actual screenshot into the zip in the correct step
-        var screenshots = zip.folder("screenshots");
-        // FIXME: why must I convert it to a blob, it's already in an array buffer and a PNG format, write the PNG directly as base64?
-        let response = await fetch(e.failingStep.actualScreenshot.dataUrl);
-        let blob = await response.blob();
-        screenshots.file(e.failingStep.fileName, blob, { base64: true });
-
         await updateStepInView(e.failingStep); // update the UI with the pixel diff information
     }
 });
@@ -243,21 +270,7 @@ $('#recordButton').on('click', async () => {
     };
     let action = await userEventToAction(userEvent);
     await updateStepInView(action);
-
-    try {
-        port.postMessage({ type: 'record' }); // reuse if you can
-    }
-    catch (e) {
-        console.log(e);
-        if (![
-            'port.postMessage is not a function',
-            'Attempting to use a disconnected port object'
-        ].includes(e.message)) {
-            throw e;
-        }
-        await replaceOnConnectListener(tab.url);
-    }
-
+    await replaceOnConnectListener(tab.url);
     // I only care about navigation if I am recording
     chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
 });
@@ -280,14 +293,21 @@ $('#clearButton').on('click', async () => {
     $('#cards').empty();
 });
 
-$('#saveButton').on('click', async () => {
+function postMessage(msg) {
+    console.log('TX', msg);
+    port.postMessage(msg);
+}
+
+async function stop() {
     let userEvent = {
         type: 'stop', // stop recording
     };
-    port.postMessage(userEvent);
+    postMessage(userEvent);
     let action = await userEventToAction(userEvent);
     await updateStepInView(action);
+}
 
+$('#saveButton').on('click', async () => {   
     console.log('create zip');
     zip = new JSZip();
     zip.file('test.json', JSON.stringify({ steps: cards }, null, 2)); // add the test.json file to archive
@@ -299,6 +319,16 @@ $('#saveButton').on('click', async () => {
             let response = await fetch(card.expectedScreenshot.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.expectedScreenshot.fileName, blob, { base64: true });
+        }
+        if (card.actualScreenshot) {
+            let response = await fetch(card.actualScreenshot.dataUrl);
+            let blob = await response.blob();
+            screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
+        }
+        if(card.acceptablePixelDifferences) {
+            let response = await fetch(card.acceptablePixelDifferences.dataUrl);
+            let blob = await response.blob();
+            screenshots.file(card.acceptablePixelDifferences.fileName, blob, { base64: true });
         }
     }
 
@@ -344,21 +374,21 @@ $('#loadButton').on('click', async () => {
 
 });
 
- function injectScript(url) {
+ async function injectScript(url) {
     console.log(`injecting script into ${url}`);
     
-    chrome.storage.sync.set({ injectedArgs: { url } }, () => {
-         chrome.scripting.executeScript(
-            {
+    await (new Promise(resolve => chrome.storage.sync.set({ injectedArgs: { url } }, resolve)));
+    await (new Promise(resolve => chrome.scripting.executeScript({
                 target: { tabId },
                 files: ['content-recorder.js']
-            },
-            (injectionResults) => {
-                for (const frameResult of injectionResults)
-                    console.log('Injected script returns: ' + frameResult.result);
-            }
-        );
-    });
+            }, resolve)));
+
+            // (injectionResults) => {
+            //     for (const frameResult of injectionResults)
+            //         console.log('Injected script returns: ' + frameResult.result);
+            // }
+    //     );
+    // });
 }
 
 var port = false;
@@ -377,6 +407,9 @@ async function updateStepInView(action) {
         }
         if(!step.actualScreenshot.dataUrl) {
             step.actualScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.actualScreenshot.fileName).async('base64');
+        }
+        if(step.acceptablePixelDifferences && !step.acceptablePixelDifferences.dataUrl) {
+            step.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.acceptablePixelDifferences.fileName).async('base64');
         }
 
         step = new FailedStep(step);
@@ -440,9 +473,10 @@ async function userEventToAction(userEvent) {
             cardModel.description = `keydown ${userEvent.event.key} at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
             break;
-        case 'mousedown':
-            cardModel.description = `mousedown at location (${userEvent.x}, ${userEvent.y})`;
+        case 'click':
+            cardModel.description = `click at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
+            //cardModel.expectedScreenshot = { dataUrl: lastScreenshotTaken.dataUrl, fileName: `step${cardModel.index}_expected.png` };
             break;
         case 'stop':
             cardModel.description = 'stop recording';
@@ -463,6 +497,7 @@ async function takeScreenshot() {
     let dataUrl = await chrome.tabs.captureVisibleTab(contentWindowId, {
         format: 'png'
     });
+    console.log('\t\tscreenshot taken');
     //let response = await fetch(dataUrl);
     return {
         //blob: await response.blob(),
@@ -482,14 +517,23 @@ async function replaceOnConnectListener(url) {
             console.log(`RX: ${userEvent.type}`, userEvent);
             let action;
             switch (userEvent.type) {
-                case 'mousedown':
+                // case 'mousedown':
+                // case 'mouseup':
+                //         lastScreenshotTaken = await takeScreenshot();
+                //     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                //     break;
+                    // action = await userEventToAction(userEvent);
+                    // await updateStepInView(action);
+                    // postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                    // break;
+                case 'click': //fire and forget no need to postback
                 case 'keydown':
                     action = await userEventToAction(userEvent);
                     await updateStepInView(action);
-                    port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                    postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'change':
-                    port.postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                    postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'hello':
                     console.log('got a new hello msg from injected content script');
@@ -500,8 +544,9 @@ async function replaceOnConnectListener(url) {
             }
         });
     });
-    injectScript(url); // inject a content script that will connect
+    await injectScript(url); // inject a content script that will connect
 }
+
 
 // chrome.webNavigation.onBeforeNavigate.addListener(function (obj) {
 //     console.log('before nav disconnect', obj);
