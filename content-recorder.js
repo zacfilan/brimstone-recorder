@@ -23,38 +23,17 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
      * and send them back over the postMessage connection to the UI.
      */
     class Recorder {
-        /** The current eventing state of this recorder. */
-        _currentState;
-        /** The state transition table */
-        _table;
-        /** Used to pause event listeners this Recorder creates
-         * to allow events trigerred by user actions, to not be queued.
-         */
-        _pause = false;
+        // are we actively queuing user events (blocking them from getting into the app)
+        _queueActive = false;
+
+        // a queue of events we have blocked from getting into the app, we will release them 
+        // later.
+        _eventQueue = [];
 
         /** Two way communication with the UI. */
         port;
 
         constructor() {
-            this._currentState = 'start';
-            this._table = {
-                start: {
-                    mousedown: this.down,
-                    keydown: this.down
-                },
-                waiting_for_complete: {
-                    complete: this.releaseQueuedEvent,
-                    mouseup: this.drop,
-                    click: this.drop
-                },
-                '*': {
-                    record: (args) => {
-                        this.addEventListeners();
-                        return 'start';
-                    }
-                }
-            };
-
             console.log('connecting port');
             this.port = chrome.runtime.connect({ name: "knockknock" });
             this.port.postMessage({ type: 'hello' });
@@ -68,82 +47,32 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
             // start listening for messages back from the popup
             this.port.onMessage.addListener((msg) => {
                 console.log('RX: ', msg);
-                that.transition({ input: msg.type, args: msg.args });
-            });
-        }
-
-        /** Transition to the next state of this state machine. The input is presented to the current state,
-         * if there is a match, the function in the state transition table is run with the args supplied.
-         * If the function has a return value, it the current state is set to it, else the current state
-         * remains unchanged.
-         */
-        transition({ input, args }) {
-            let startingState = this._currentState;
-
-            if (this._pause) {
-                console.log(`SM: bubble:paused. (${startingState}) ---<${input}>---> (${this._currentState})`, args);
-                return;
-            }
-            let action = this._table[this._currentState]?.[input] ?? this._table['*']?.[input];
-            if (action) {
-                let returnedState = action.call(this, args); // pretend it's a method
-                if (returnedState) { // if the transition doesn't return a state, stay in the current state
-                    this._currentState = returnedState;
+                if(msg.type === 'complete') {
+                    this.releaseQueuedEvents();
                 }
-                console.log(`SM: intercept. (${startingState}) ---<${input}>---> (${this._currentState})`, args);
-            }
-            else {
-                console.log(`SM: bubble:unmatched. (${startingState}) ---<${input}>---> (${this._currentState})`, args);
-            }
-        }
-
-        /** Pause the event listeners created by this recorder. Events triggered by user actions
-         * will bubble as normal.
-         */
-        disableQueuing() {
-            this._pause = true;
-        }
-
-        /** Enable the event listeners created by this recorder. Events triggered by user actions
-         * will be intercepted and queued.
-         */
-        enableQueuing() {
-            this._pause = false;
+                else {
+                    console.warn('IGNORED RX');
+                }
+            });
         }
 
         /** If theree is a queued event it is released. Meaning it is now seen by the browser. 
          * This is an attempt to simulate events they way the browser would performed them.
         */
-        releaseQueuedEvent(msg) {
-            if (msg !== this.pendingEvent.type) {
-                console.error(`got a complete message for <${msg}>, was expecting <${this.pendingEvent.type}>`);
+        releaseQueuedEvents() {
+            this._queueActive = false;
+            this._simulatingEvents = true;
+            while (this._eventQueue.length) {
+                let e = this._eventQueue.shift();
+                Recorder.simulateEvent(e);
             }
-            this.disableQueuing();
-            Recorder.simulateEvent(this.pendingEvent);
-            this.pendingEvent = null;
-            this.enableQueuing();
-            return 'start';
+            this._simulatingEvents = false;
         }
 
         /** Stop the state machine */
         exit() {
             this.removeEventListeners();
-            if (this.pendingEvent) {
-                this.releaseQueuedEvent(this.pendingEvent.type);
-            }
-        }
-
-        down(e) {
-            e.stopPropagation();
-            e.preventDefault();
-            let msg = this.buildMsg(e);
-            this.port.postMessage(msg);
-            return 'waiting_for_complete';
-        }
-
-        drop(e) {
-            e.stopPropagation();
-            e.preventDefault(); // ignore it and keep waiting
+            this.releaseQueuedEvents();
         }
 
         buildMsg(e) {
@@ -157,7 +86,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
                 // properties of the message
                 type: e.type,
                 boundingClientRect: e.target.getBoundingClientRect(),
-                
+
                 // properties of the event
                 event: {
                     type: e.type
@@ -165,14 +94,16 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
             };
 
             switch (e.type) {
+                case 'mouseup':
                 case 'mousedown':
+                case 'click':
                     msg.x = e.clientX;
                     msg.y = e.clientY;
-                    ['clientX', 'clientY'].forEach(p => 
+                    ['clientX', 'clientY'].forEach(p =>
                         msg.event[p] = e[p]);
                     break;
                 case 'keydown':
-                    ['altKey', 'charCode', 'code', 'ctrlKey', 'key', 'keyCode', 'metaKey', 'shiftKey'].forEach(p => 
+                    ['altKey', 'charCode', 'code', 'ctrlKey', 'key', 'keyCode', 'metaKey', 'shiftKey'].forEach(p =>
                         msg.event[p] = e[p]);
                     msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
                     msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
@@ -199,10 +130,51 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
         }
 
         handleEvent(e) {
-            this.transition({ input: e.type, args: e });
-        }
+            if(e.type === 'click') {
+                debugger;
+            }
+            if (this._queueEvents) {
+                e.stopPropagation(); // block and queue
+                e.preventDefault(); 
+                this._queueEvents.push(e);
+                console.log(`queue subsequent event: ${e.type}`, e.target);
+            }
+            // else if(e.type === 'click') {
+            //     // click only happens after a mousedown (unless the app is triggering it manually!)
+            //     let msg = this.buildMsg(e);
+            //     this.port.postMessage(msg);
+            //     console.log(`fire and forget event: ${e.type}`, e.target);
+            // }
+            else if(this._simulatingEvents) {
+                console.log(`simulated event: ${e.type}`, e.target); // let it thru
+            }
+            else {
+                // catch the interesting ones 
+                switch (e.type) {
+                    case 'click':
+                    case 'keydown':
+                        // when this happens I must block this event
+                        e.stopPropagation();
+                        e.preventDefault(); // maybe let this thru for mousedown on buttons?
 
+                        // I will send a msg to take a screenshot, the screen must not change from the current state until the screenshot is taken.
+                        // so I must also block any events that could change the screen while I wait for that screenshot to be taken.
+                        this._queueActive = true;
+                        this._eventQueue.push(e);
+                        console.log(`queue first event: ${e.type}`, e.target);
+
+                        // send the message
+                        let msg = this.buildMsg(e);
+                        this.port.postMessage(msg);
+                        break;
+                    default:
+                        console.log(`observed event: ${e.type}`, e.target);
+                        break;
+                }
+            }
+        }
     }
+
     /** 
      * Simulate what the browser does when it changes focus to the next element
      * when a tab is pressed.
@@ -241,7 +213,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
             }
         }
     };
-    Recorder.events = ['mousedown', /*'beforeinput',*/ 'keydown', 'change', 'mouseup', 'click'];
+    Recorder.events = ['mousedown', /*'beforeinput',*/ 'keydown', 'change', 'mouseup', 'click', 'mouseleave', 'mouseenter', 'focus', 'focusin', 'blur'];
     Recorder.simulateEvent = function simulateEvent(e) {
         switch (e.type) {
             case 'keydown':
@@ -258,44 +230,16 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
                 }
                 break;
             case 'mousedown':
-                e.target.dispatchEvent(new Event('mousedown', { bubbles: true }));
-                e.target.focus();
+            case 'mouseup':
+            case 'click':
+                e.target.dispatchEvent(new Event(e.type, { bubbles: true }));
                 break;
             default:
                 console.error('unable to simulate event', e);
+                throw 'unable to simulate';
                 break;
         }
     };
-
-    /** Unused. But might be soon enough. */
-    class Player {
-        // https://www.w3schools.com/jquery/tryit.asp?filename=tryjquery_event_mouseenter_mouseover
-        // https://api.jquery.com/mouseenter/
-        mouseenter(x, y) {
-            let e = $(document.elementFromPoint(x, y));
-            e.mouseenter();
-        }
-
-        //https://api.jquery.com/mouseleave/
-        mouseleave(x, y) {
-            let e = $(document.elementFromPoint(x, y));
-            e.mouseleave();
-        }
-
-        // https://api.jquery.com/click/
-        click(x, y) {
-            let e = $(document.elementFromPoint(x, y));
-            e.click();
-        }
-
-        // https://api.jquery.com/keypress/
-        keypress(x, y) {
-            let e = $(document.elementFromPoint(x, y));
-            x.keypress();
-        }
-
-
-    }
 
     // create the instace
     window.brimstomeRecorder = new Recorder();
