@@ -6,6 +6,8 @@ const Buffer = buffer.Buffer;
 const urlParams = new URLSearchParams(window.location.search);
 const contentWindowId = parseInt(urlParams.get('parent'), 10);
 const tabId = parseInt(urlParams.get('tab'), 10);
+const player = new Player(contentWindowId, tabId);
+
 var uiCardsElement = document.getElementById('cards');
 var currentUrl;
 var lastScreenshotTaken;
@@ -60,6 +62,13 @@ class ScreenshotStep extends Step {
         return clone;
     }
 
+    toThumb() {
+        return `
+        <div class='card ${this.status}' data-index=${this.index}>
+            <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
+        </div>`;
+    }
+    
     toHtml() {
         let o = this.overlay;
         let html = `
@@ -135,6 +144,13 @@ class FailedStep extends Step {
         }
     }
 
+    toThumb() {
+        return `
+        <div class='card ${this.status}' data-index=${this.index}>
+            <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
+        </div>`;
+    }
+
     toHtml() {
         let o = this.overlay;
         let html = `
@@ -207,6 +223,15 @@ class TextStep extends Step {
         super(args);
     }
 
+    toThumb() {
+        return `
+            <div class='card ${this.status}'>
+            ...
+            ...
+            ...
+            </div>`;
+    }
+
     toHtml() {
         let oHtml = `
         <div class='step' data-index=${this.index}>
@@ -240,12 +265,13 @@ async function injectOnNavigation(obj) {
 
 $('#playButton').on('click', async () => {
     try {
-        let player = new Player(contentWindowId, tabId);
         cards.forEach( card => {
             card.status = 'notrun';
             updateStepInView(card);
         });
-        await player.play(cards); // players gotta play...
+        player.onBeforePlay = updateStepInView;
+        player.onAfterPlay = updateStepInView;
+        await player.play(cards, ); // players gotta play...
     }
     catch (e) {
         if (e?.message !== 'screenshots do not match') {
@@ -277,6 +303,7 @@ $('#recordButton').on('click', async () => {
     await replaceOnConnectListener(tab.url);
     // I only care about navigation if I am recording
     chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
+    await player.attachDebugger();
 });
 
 function stopRecording() {
@@ -433,12 +460,19 @@ async function updateStepInView(action) {
     }
     
     let $step = $(step.toHtml());
+    $('#content .step').replaceWith($step); // the big card
+    let $thumb = $(step.toThumb()); // smaller view
+
     if (cards[step.index]) {
         // replace
-        $(`.step[data-index=${step.index}]`).replaceWith($step);
+        $(`#cards .card[data-index=${step.index}]`).replaceWith($thumb);
+        let c = $(`#cards .card[data-index=${step.index}]`);
+        if(c.length) {
+            $('#cards').scrollLeft(c.position().left);
+        }
     }
     else {
-        uiCardsElement.appendChild($step[0], $step[0]);
+        uiCardsElement.appendChild($thumb[0]);
     }
     cards[step.index] = step;
 }
@@ -473,14 +507,19 @@ async function userEventToAction(userEvent) {
     }
 
     switch(userEvent.type) {
-        case 'keydown':
-            cardModel.description = `keydown ${userEvent.event.key} at location (${userEvent.x}, ${userEvent.y})`;
+        case 'keypress':
+            cardModel.description = `type ${userEvent.event.key} at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
             break;
         case 'click':
             cardModel.description = `click at location (${userEvent.x}, ${userEvent.y})`;
-            await addScreenshot(cardModel);
-            //cardModel.expectedScreenshot = { dataUrl: lastScreenshotTaken.dataUrl, fileName: `step${cardModel.index}_expected.png` };
+            if(lastScreenshotTaken) {
+                cardModel.expectedScreenshot = { dataUrl: lastScreenshotTaken.dataUrl, fileName: `step${cardModel.index}_expected.png` };
+                lastScreenshotTaken = false;
+            }
+            else {
+                await addScreenshot(cardModel);
+            }
             break;
         case 'stop':
             cardModel.description = 'stop recording';
@@ -521,22 +560,19 @@ async function replaceOnConnectListener(url) {
             console.log(`RX: ${userEvent.type}`, userEvent);
             let action;
             switch (userEvent.type) {
-                // case 'mousedown':
-                // case 'mouseup':
-                //         lastScreenshotTaken = await takeScreenshot();
-                //     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
-                //     break;
-                    // action = await userEventToAction(userEvent);
-                    // await updateStepInView(action);
-                    // postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
-                    // break;
-                case 'click': //fire and forget no need to postback
-                case 'keydown':
-                    action = await userEventToAction(userEvent);
-                    await updateStepInView(action);
+                case 'take-screenshot':
+                    lastScreenshotTaken = await takeScreenshot();
                     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
-                case 'change':
+                case 'click': 
+                case 'keypress':
+                    // update the UI with a screenshot
+                    action = await userEventToAction(userEvent);
+                    await updateStepInView(action);
+
+                    // Now simulate that event back in the recording, via the CDP
+                    await player[userEvent.type](userEvent);
+                    
                     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'hello':

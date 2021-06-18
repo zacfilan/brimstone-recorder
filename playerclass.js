@@ -2,11 +2,6 @@ import { pixelmatch } from "./pixelmatch.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 
-async function debuggerAttach(debuggee, requiredVersion) {
-    console.log(`attaching debugger to ${debuggee.tabId}`);
-    return new Promise(resolve => chrome.debugger.attach(debuggee, requiredVersion, resolve));
-}
-
 export class Player {
     /** The currently executing step. */
     actionStep;
@@ -22,6 +17,38 @@ export class Player {
     constructor(windowId, tabId) {
         this.windowId = windowId;
         this.tabId = tabId;
+        let that = this;
+        chrome.debugger.onDetach.addListener(async (source, reason) => {
+            if(reason === 'canceled_by_user') {
+                window.alert('Yo man, you cut your connection to Brimstone.')
+            }
+            else {
+            // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
+                async function reattached(resolve, reject) {
+                    console.warn('re-attaching the debugger!');
+                    await that.attachDebugger();
+                    resolve();
+                }
+                that._readyForDebuggerCommands = new Promise(reattached);
+                await that._readyForDebuggerCommands;
+            }
+        });
+    }
+
+    async attachDebugger() {
+        this.tab = await chrome.tabs.get(this.tabId);
+        this.tabId = this.tab.id;
+
+        // If you are actually debugging the page yourself as a dev, you will trick this!
+        let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
+        if (targets.find(target => target.tabId === this.tab.id && target.attached)) {
+            console.log(`A debugger is already attached to tab ${this.tab.id}`);
+        }
+        else {
+            await (new Promise(resolve => chrome.debugger.attach({ tabId: this.tabId }, "1.3", resolve)));
+            console.log(`debugger attached to ${this.tabId}`);
+            await Player.sleep(5000);
+        }
     }
 
     /** 
@@ -30,25 +57,7 @@ export class Player {
     async play(steps) {
         this._playbackComplete = false;
 
-        try {
-            this.tab = await chrome.tabs.get(this.tabId);
-        }
-        catch (e) {
-            this.tab = await chrome.tabs.create({ windowId: this.windowId });
-        }
-        this.tabId = this.tab.id;
-
-
-        // // https://developer.chrome.com/docs/extensions/reference/windows/#method-create
-        // this.window = await chrome.windows.create({
-        //     focused: true,
-        //     url: steps[0].url,
-        //     height: steps[0].tabHeight,
-        //     width: steps[0].tabWidth
-        // });
-
-        // this.tab = this.window.tabs[0];
-        // this.tabId = this.tab.id;
+        await this.attachDebugger();
 
         // start timer
         let start;
@@ -56,6 +65,9 @@ export class Player {
         for (let i = 0; i < steps.length - 1; ++i) {
             this.actionStep = steps[i];
             this.actionStep.status = 'playing';
+            if(this.onBeforePlay) {
+                await this.onBeforePlay(this.actionStep);
+            }
             delete this.actionStep.actualScreenshot; // we are replaying this step, drop any previous results
             console.log(`[${this.actionStep.index}] : ${this.actionStep.description}`);
 
@@ -65,17 +77,23 @@ export class Player {
 
             try {
                 start = performance.now();
-                await this[this.actionStep.type](); // execute this guy
+                await this[this.actionStep.type](this.actionStep); // execute this guy
                 await this.verifyScreenshot(this.nextStep);
                 stop = performance.now();
                 console.log(`\t\tscreenshot verified in ${stop - start}ms`);
                 this.actionStep.status = 'passed';
                 this.nextStep.status = 'passed';
+                if(this.onAfterPlay) {
+                    await this.onAfterPlay(this.actionStep);
+                }
             }
             catch (e) {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
+                if(this.onAfterPlay) {
+                    await this.onAfterPlay(this.actionStep);
+                }
                 throw e;
             }
             // end timer
@@ -83,58 +101,30 @@ export class Player {
         this._playbackComplete = true;
     }
 
-    async start() {
+    async start(action) {
         // If we just recorded it and want to play it back, we can reuse the window we recorded it from
         // We can reuse the tab we launched the UI from.
         await chrome.tabs.update(this.tab.id, {
             highlighted: true,
             active: true,
-            url: this.actionStep.url
+            url: action.url
         });
 
-        // If you are actually debugging the page you are recording you will trick this!
-
-        let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
-        if (targets.find(target => target.tabId === this.tab.id && target.attached)) {
-            console.log(`A debugger is already attached to tab ${this.tab.id}`);
-        }
-        else {
-            await debuggerAttach({ tabId: this.tab.id }, "1.3");
-        }
-
-        await Player.sleep(5000);
         let that = this;
-        chrome.debugger.onDetach.addListener(async (source, reason) => {
-            // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
-            if (!that._playbackComplete) {
-                async function dildo(resolve, reject) {
-                    console.warn('re-attaching the debugger!');
-                    await debuggerAttach({ tabId: that.tab.id }, "1.3");
-                    await Player.sleep(5000);
-                    await that.setViewport(that.actionStep.tabWidth, that.actionStep.tabHeight);
-                    console.warn('DONE');
-                    resolve();
-                }
-                that._readyForDebuggerCommands = new Promise(dildo);
-                await that._readyForDebuggerCommands;
-            }
-            else {
-                console.log('debugger detached after playback completes')
-            }
-        });
+        await this.attachDebugger();
 
-        this._readyForDebuggerCommands = this.setViewport(this.actionStep.tabWidth, this.actionStep.tabHeight); // that debug banner needs to be figured into the size too I think.
+        this._readyForDebuggerCommands = this.setViewport(action.tabWidth, action.tabHeight); // that debug banner needs to be figured into the size too I think.
         await this._readyForDebuggerCommands;
     }
 
-    async keydown() {
+    async keypress(action) {
         // simulate a keypress https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchKeyEvent
-        let keycode = this.actionStep.event.keyCode;
+        let keycode = action.event.keyCode;
 
-        chrome.debugger.sendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
+        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
             type: 'keyDown',
-            code: this.actionStep.event.code,
-            key: this.actionStep.event.key,
+            code: action.event.code,
+            key: action.event.key,
             windowsVirtualKeyCode: keycode,
             nativeVirtualKeyCode: keycode
         });
@@ -148,29 +138,29 @@ export class Player {
         if (printable) {
             await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
                 type: 'char',
-                code: this.actionStep.event.code,
-                key: this.actionStep.event.key,
-                text: this.actionStep.event.key,
-                unmodifiedtext: this.actionStep.event.key,
+                code: action.event.code,
+                key: action.event.key,
+                text: action.event.key,
+                unmodifiedtext: action.event.key,
                 windowsVirtualKeyCode: keycode,
                 nativeVirtualKeyCode: keycode
             });
         }
         await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
             type: 'keyUp',
-            code: this.actionStep.event.code,
-            key: this.actionStep.event.key,
-            windowsVirtualKeyCode: this.actionStep.event.keyCode,
-            nativeVirtualKeyCode: this.actionStep.event.keyCode
+            code: action.event.code,
+            key: action.event.key,
+            windowsVirtualKeyCode: action.event.keyCode,
+            nativeVirtualKeyCode: action.event.keyCode
         });
     }
 
-    async click() {
+    async click(action) {
         // simulate a click https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchMouseEvent
         await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
             type: 'mousePressed',
-            x: this.actionStep.x,
-            y: this.actionStep.y,
+            x: action.x,
+            y: action.y,
             button: 'left',
             buttons: 1,
             clickCount: 1,
@@ -178,8 +168,8 @@ export class Player {
         });
         await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
             type: 'mouseReleased',
-            x: this.actionStep.x,
-            y: this.actionStep.y,
+            x: action.x,
+            y: action.y,
             button: 'left',
             buttons: 1,
             clickCount: 1,
@@ -335,8 +325,6 @@ export class Player {
         await this._readyForDebuggerCommands;
         return new Promise(resolve => chrome.debugger.sendCommand(debuggee, method, commandParams, resolve));
     }
-
-
 }
 
 Player.sleep = async function sleep(ms) {

@@ -1,16 +1,44 @@
+body {
+    display:flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+#header {
+    display: flex;
+    flex-direction: row;
+}
+
+#content {
+    /* flex-grow: 12; */
+    /* display: flex; */
+    /* flex-direction: row; */
+    /* align-items: center; */
+    /* justify-content: space-between; */
+}
+
+#cards {
+    display:flex;
+    flex: row;
+    overflow: auto;
+}
+
 .card {
     padding: 1em;
     width: 50%;
     height: 50%;
     display: flex;
     flex-direction: column;
-    /* border-left: 1em solid #7474bf; */
-    /* border-right: 1em solid#348ac7; */
     margin-right: 2em;
     margin-bottom: 1em;
     border-radius: .6em;
     box-shadow: 10px 5px 5px grey;
     background: linear-gradient(to right, #7474bf, #348ac7);
+}
+
+#cards .card {
+    width:100px;
+    padding: 5px;
 }
 
 .card .screenshot {
@@ -24,7 +52,6 @@
 }
 
 .card .title {
-    /* background-image: linear-gradient(to right, #7474bf, #348ac7); */
     color: white;
     padding: 1em 1em 1em 0;
 }
@@ -41,8 +68,7 @@
 }
 
 .card .user-events {
-    /* border: 1px solid black; */
-    /* background: linear-gradient(to right, #7474bf, #348ac7); */
+
     color: white;
     border-top: 1px solid black;
     padding: 1em 1em 1em 0;
@@ -66,6 +92,8 @@
 .card.corrected {
     background: orange;
 }
+
+
 
 .step {
     display: flex;
