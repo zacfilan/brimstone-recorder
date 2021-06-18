@@ -87,6 +87,7 @@ class ScreenshotStep extends Step {
 class FailedStep extends Step {
     constructor(args = {}) {
         super(args);
+        this.status = 'failed';
     }
     //        this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(this.expectedScreenshot.fileName).async('base64');
 
@@ -123,21 +124,24 @@ class FailedStep extends Step {
         if(this.acceptablePixelDifferences?.dataUrl) {
             acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png;
         }
-        let {numDiffPixels, diffPng} = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+        let {numDiffPixels, numMaskedPixels, diffPng} = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
         
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
         this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
+        if(numMaskedPixels) {
+            this.status = 'corrected';
+        }
     }
 
     toHtml() {
         let o = this.overlay;
         let html = `
-          <div class='step failed' data-index=${this.index}>
+          <div class='step ${this.status}' data-index=${this.index}>
               <div class='card expected ${this.status}' data-index=${this.index}>
                   <div class='title'>[${this.index}]: Expected current screen (click image to toggle)</div>
-                  <div class='screenshot'>
+                  <div class='screenshot clickable'>
                       <img src='${this.expectedScreenshot.dataUrl}'>`;
             if(o) {
              html += `<div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
@@ -183,7 +187,7 @@ $('#cards').on('click', 'button.ignore', async function (e) {
     await updateStepInView(model);
 });
 
-$('#cards').on('click', '.card.failed .screenshot', function (e) {
+$('#cards').on('click', '.screenshot.clickable', function (e) {
     // flip the image
     const { view, model } = getCard(e.currentTarget);
     if (view.hasClass('expected')) {

@@ -38,13 +38,14 @@ export function pixelmatch(img1, img2, output, width, height, options) {
         if (output && !options.diffMask) {
             for (let i = 0; i < len; i++) drawGrayPixel(img1, 4 * i, options.alpha, output);
         }
-        return 0;
+        return {numDiffPixels: 0, numMaskedPixels:0};
     }
 
     // maximum acceptable square distance between two colors;
     // 35215 is the maximum possible value for the YIQ difference metric
     const maxDelta = 35215 * options.threshold * options.threshold;
     let diff = 0;
+    let masked = 0;
 
     // compare each pixel of one image against the other one
     for (let y = 0; y < height; y++) {
@@ -70,11 +71,10 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                         // before I draw a red one, see if that one is 'ok' due to the mask, and then draw it green
                         if(options.ignoreMask) {
                             let red = options.ignoreMask[pos + 0];
-                            let green = options.ignoreMask[pos + 1];
-                            // let blue = options.ignoreMask[pos + 2];
-                            // let alpha = options.ignoreMask[pos + 3];
-                            if(red === 255 || green === 255) {
-                                drawPixel(output, pos, 0, 255, 0, 1); // green pixel
+                            // const orange = [255, 165, 0];
+                            if(red === 255) { // match orange or red
+                                drawPixel(output, pos, 255, 165, 0, 1); // orange pixel
+                                masked++;
                             }
                         }
                         else {
@@ -95,7 +95,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
     }
 
     // return the number of different pixels
-    return diff;
+    return { numDiffPixels: diff, numMaskedPixels: masked};
 }
 
 function isPixelData(arr) {

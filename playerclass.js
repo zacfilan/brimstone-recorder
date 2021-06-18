@@ -95,7 +95,7 @@ export class Player {
         // If you are actually debugging the page you are recording you will trick this!
 
         let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
-        if(targets.find(target => target.tabId === this.tab.id && target.attached)) {
+        if (targets.find(target => target.tabId === this.tab.id && target.attached)) {
             console.log(`A debugger is already attached to tab ${this.tab.id}`);
         }
         else {
@@ -230,10 +230,17 @@ export class Player {
                 await this.setViewport(nextStep.tabWidth, nextStep.tabHeight);
                 actualScreenshot = await this.takeScreenshot();
                 let actualPng = actualScreenshot.png;
-                let { numDiffPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+                let { numDiffPixels, numMaskedPixels } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
                 let stop = performance.now();
                 console.log(`new screenshot taken and compared in ${stop - start}ms`);
                 if (numDiffPixels === 0) {
+                    if (numMaskedPixels) {
+                        nextStep.actualScreenshot = {
+                            dataUrl: actualScreenshot.dataUrl,
+                            fileName: `step${nextStep.index}_actual.png`
+                        };
+                        nextStep.status = 'corrected';
+                    }
                     return;
                 }
             }
@@ -287,7 +294,7 @@ export class Player {
             height: distance.outerHeight - viewportHeight
         };
 
-        console.log(`set window to ${width + border.width}x${height+border.height}`);
+        console.log(`set window to ${width + border.width}x${height + border.height}`);
         await chrome.windows.update(this.tab.windowId, {
             width: width + border.width,
             height: height + border.height
@@ -328,7 +335,7 @@ export class Player {
         await this._readyForDebuggerCommands;
         return new Promise(resolve => chrome.debugger.sendCommand(debuggee, method, commandParams, resolve));
     }
-    
+
 
 }
 
@@ -356,9 +363,10 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
     }
 
     const diffPng = new PNG({ width, height });
-    var numDiffPixels = pixelmatch(expectedPng.data, actualPng.data, diffPng.data, width, height, { threshold: .1, ignoreMask: maskPng?.data });
+    var { numDiffPixels, numMaskedPixels } = pixelmatch(expectedPng.data, actualPng.data, diffPng.data, width, height, { threshold: .1, ignoreMask: maskPng?.data });
     return {
         numDiffPixels,
+        numMaskedPixels,
         diffPng
     };
 };

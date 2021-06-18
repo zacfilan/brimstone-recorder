@@ -93,7 +93,7 @@ async function expectedScreenshot({ type, expectedScreenshot: ss, step, clientX,
             }
 
             const diff = new PNG({ width, height });
-            var numDiffPixels = pixelmatch(expectedScreenshot.data, actualScreenshot.data, diff.data, width, height, { threshold: 0.5 });
+            var {diff: numDiffPixels, masked} = pixelmatch(expectedScreenshot.data, actualScreenshot.data, diff.data, width, height, { threshold: 0.5 });
             if (numDiffPixels === 0) {
                 return;
             }
