@@ -29,10 +29,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
             /** Build a keypress event from a keyup and a keydown */
             this._lastKeyPress;
 
-            /** The last type of down event: mousedown or keydown */
-            this._lastDown;
-
-               /** Two way communication with the UI. */
+            /** Two way communication with the UI. */
             this.port;
 
             /** are we currently expecting events to only come i from the debugger */
@@ -119,55 +116,37 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Central callback for all bound event handlers */
         handleEvent(e) {
-            if(e.type === 'mousedown') {
-                this._lastDown = 'mousedown';
-            }
-            else if(e.type === 'keydown') {
-                this._lastDown = 'keydown'
-            }
+            console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target);
+            // e.preventDefault(); 
+            // e.stopPropagation();
+            // return false;
+
             if (this._simulatingEvents) {
                 // FIXME: how do I know this event came from the debugger versus from from the user?!
                 // FIXME: There is a race condition here!!
-                console.log(`simulated event: ${e.type}`, e.target);
+                console.log(`${e.timeStamp} simulated event: ${e.type}`, e.target);
             }
             else {
+                // block everything
+                console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target);
+                e.preventDefault(); 
+                e.stopPropagation();
+
                 switch (e.type) {
                     case 'keydown':
                         console.log(`compile event: ${e.type}`, e.target);
-                        e.stopPropagation();
-                        e.preventDefault(); 
                         let msg = this.buildMsg(e);
                         console.log('TX: keypress');
                         this.port.postMessage(msg); // will screenshot and then simulate the keydown, char, and keyup of the user
                         this._simulatingEvents = true;
                         break;
-                    case 'blur':
-                        // blur is also fired when the user tabs around
-                        // we can tell if blur is from a key press or mousedown (by recording event sequences received and looking back)
-                        // if from keydown I should ignore it since I already do screen capture on every keypres
-                        
-                        // case 1 of click handled here
-                        if(this._lastDown === 'mousedown') {
-                            e.stopPropagation();
-                            e.preventDefault(); 
-                            console.log('TX: take-screenshot');
-                            this.port.postMessage({type: 'take-screenshot'}); 
-                        }
-                        break;
                     case 'click':
-                        // there are two cases when clicking
-                        // 1. The user clicks an element that doesn't currently have focus
-                        // 2. The user clicks the element that already has focus
-                        e.stopPropagation();
-                        e.preventDefault(); 
                         console.log(`TX event: ${e.type}`, e.target);
                         this.port.postMessage(this.buildMsg(e)); // will (perhaps) screenshot and then simulate the mousedown, mouseup of the user
                         this._simulatingEvents = true;
                         break;
-                    default:
-                        console.log(`observed event: ${e.type}`, e.target);
-                        break;
                 }
+                return false;
             }
         }
     } // end class Recorder

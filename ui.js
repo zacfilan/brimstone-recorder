@@ -7,10 +7,8 @@ const urlParams = new URLSearchParams(window.location.search);
 const contentWindowId = parseInt(urlParams.get('parent'), 10);
 const tabId = parseInt(urlParams.get('tab'), 10);
 const player = new Player(contentWindowId, tabId);
-
 var uiCardsElement = document.getElementById('cards');
 var currentUrl;
-var lastScreenshotTaken;
 
 /* Some globals */
 
@@ -64,7 +62,7 @@ class ScreenshotStep extends Step {
 
     toThumb() {
         return `
-        <div class='card ${this.status}' data-index=${this.index}>
+        <div class='card ${this.status} thumb' data-index=${this.index}>
             <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
         </div>`;
     }
@@ -146,7 +144,7 @@ class FailedStep extends Step {
 
     toThumb() {
         return `
-        <div class='card ${this.status}' data-index=${this.index}>
+        <div class='card ${this.status} thumb' data-index=${this.index}>
             <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
         </div>`;
     }
@@ -196,14 +194,19 @@ function getCard(element) {
     return { view, model };
 }
 
-$('#cards').on('click', 'button.ignore', async function (e) {
+$('#content').on('click', 'button.ignore', async function (e) {
     // add a mask to the 
     const { model } = getStep(e.currentTarget);
     await model.addMask();
     await updateStepInView(model);
 });
 
-$('#cards').on('click', '.screenshot.clickable', function (e) {
+$('#cards').on('click', '.thumb', async function(e) {
+    const { model } = getCard(e.currentTarget);
+    await setContentStep(model);
+});
+
+$('#content').on('click', '.screenshot.clickable', function (e) {
     // flip the image
     const { view, model } = getCard(e.currentTarget);
     if (view.hasClass('expected')) {
@@ -225,10 +228,7 @@ class TextStep extends Step {
 
     toThumb() {
         return `
-            <div class='card ${this.status}'>
-            ...
-            ...
-            ...
+            <div class='card {this.status} thumb' data-index=${this.index}'>
             </div>`;
     }
 
@@ -251,7 +251,7 @@ class TextStep extends Step {
 /** highlist the element that was acted on in the screenshot
  * when the user hovers over the text of a user-event
  */
-$('#cards').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
+$('#content').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
     $(`.overlay[data-index='${e.target.dataset.index}']`).toggle();
 });
 
@@ -423,7 +423,10 @@ $('#loadButton').on('click', async () => {
 }
 
 var port = false;
-
+function setContentStep(step) {
+    let $step = $(step.toHtml());
+    $('#content .step').replaceWith($step); // the big card
+};
 /** The raw user action triggers an event which comes from the recording proess as a 'userEvent'. The userEvent is annotated 
  * into an action. The 'action' is passed into a particular 'step' generator, which is then
  * rendered in the UI. */
@@ -459,8 +462,8 @@ async function updateStepInView(action) {
         }
     }
     
-    let $step = $(step.toHtml());
-    $('#content .step').replaceWith($step); // the big card
+
+    setContentStep(step);
     let $thumb = $(step.toThumb()); // smaller view
 
     if (cards[step.index]) {
@@ -513,13 +516,7 @@ async function userEventToAction(userEvent) {
             break;
         case 'click':
             cardModel.description = `click at location (${userEvent.x}, ${userEvent.y})`;
-            if(lastScreenshotTaken) {
-                cardModel.expectedScreenshot = { dataUrl: lastScreenshotTaken.dataUrl, fileName: `step${cardModel.index}_expected.png` };
-                lastScreenshotTaken = false;
-            }
-            else {
-                await addScreenshot(cardModel);
-            }
+            await addScreenshot(cardModel);
             break;
         case 'stop':
             cardModel.description = 'stop recording';
@@ -560,10 +557,6 @@ async function replaceOnConnectListener(url) {
             console.log(`RX: ${userEvent.type}`, userEvent);
             let action;
             switch (userEvent.type) {
-                case 'take-screenshot':
-                    lastScreenshotTaken = await takeScreenshot();
-                    postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
-                    break;
                 case 'click': 
                 case 'keypress':
                     // update the UI with a screenshot
