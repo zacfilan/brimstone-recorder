@@ -1,6 +1,6 @@
 {
-  "name": "Brimstone Recorder",
-  "description": "Record user actions to create a Brimstone script",
+  "name": "Brimstone",
+  "description": "Record and play Brimstone pixel-perfect webpage automation tests",
   "version": "1.0",
   "manifest_version": 3,
   "background": {
@@ -19,6 +19,17 @@
     "<all_urls>"
   ],
   "action" : {
+    "default_icon": {             
+      "16": "images/fire16.png",   
+      "24": "images/fire24.png",   
+      "32": "images/fire32.png"    
+    },
     "default_title": "Click to open window"
+  },
+  "icons": {
+    "16": "images/fire16.png",
+    "32": "images/fire32.png",
+    "48": "images/fire48.png",
+    "128": "images/fire128.png"
   }
 }

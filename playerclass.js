@@ -210,8 +210,7 @@ export class Player {
             try {
                 if (nextStep.type === 'click') {
                     // for a click, we first mouseover the location, so as to change the screen correctly with hover effect
-                    //console.log(`move mouse to (500,500), and then to (${this.actionStep.clientX}, ${this.actionStep.clientY})`)
-                    await this.move(500, 500);
+                    await this.move(0, 0);
                     await this.move(nextStep.x, nextStep.y);
                     await Player.sleep(sleepMs);
                 }

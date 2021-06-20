@@ -23,8 +23,6 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
      * and send them back over the postMessage connection to the UI.
      */
     class Recorder {
-
-
         constructor() {
             /** Build a keypress event from a keyup and a keydown */
             this._lastKeyPress;
@@ -52,7 +50,10 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
                     case 'complete':
                         this._simulatingEvents = false;
                         break;
-                };
+                    case 'stop':
+                        this.exit();
+                        break;
+                }
             });
         }
 

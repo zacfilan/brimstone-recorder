@@ -42,10 +42,10 @@ class UserAction extends UserEvent {
 class Step {
     constructor(args = {}) {
         Object.assign(this, args);
-        if(!this.status) {
+        if (!this.status) {
             this.status = 'recorded';// // see ui.css
         }
-    }  
+    }
 }
 Step.instancesCreated = 0;
 
@@ -66,7 +66,7 @@ class ScreenshotStep extends Step {
             <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
         </div>`;
     }
-    
+
     toHtml() {
         let o = this.overlay;
         let html = `
@@ -102,8 +102,8 @@ class FailedStep extends Step {
         let clone = Object.assign({}, this);
         clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
         clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
-        if(clone.acceptablePixelDifferences) {
-            clone.acceptablePixelDifferences = {fileName: this.acceptablePixelDifferences.fileName};
+        if (clone.acceptablePixelDifferences) {
+            clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
         }
         delete clone.diffDataUrl;
         return clone;
@@ -114,7 +114,7 @@ class FailedStep extends Step {
      * 
      */
     async addMask() {
-        if(!this.acceptablePixelDifferences) {
+        if (!this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = {};
         }
         this.acceptablePixelDifferences.dataUrl = this.diffDataUrl;
@@ -125,19 +125,19 @@ class FailedStep extends Step {
     * and the actual screenshot, then apply mask
     */
     async pixelDiff() {
-        let {png: expectedPng} = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
-        let {png: actualPng} = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
+        let { png: expectedPng } = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
+        let { png: actualPng } = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
         let acceptableErrorsPng;
-        if(this.acceptablePixelDifferences?.dataUrl) {
+        if (this.acceptablePixelDifferences?.dataUrl) {
             acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png;
         }
-        let {numDiffPixels, numMaskedPixels, diffPng} = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
-        
+        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
         this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
-        if(numMaskedPixels) {
+        if (numMaskedPixels) {
             this.status = 'corrected';
         }
     }
@@ -157,10 +157,10 @@ class FailedStep extends Step {
                   <div class='title'>[${this.index}]: Expected current screen (click image to toggle)</div>
                   <div class='screenshot clickable'>
                       <img src='${this.expectedScreenshot.dataUrl}'>`;
-            if(o) {
-             html += `<div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
-            }
-            html += `
+        if (o) {
+            html += `<div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
+        }
+        html += `
                   </div>
                   <div class='user-events'>
                       <div class='user-event' data-index='${this.index}'>next action: ${this.description}</div>
@@ -201,7 +201,7 @@ $('#content').on('click', 'button.ignore', async function (e) {
     await updateStepInView(model);
 });
 
-$('#cards').on('click', '.thumb', async function(e) {
+$('#cards').on('click', '.thumb', async function (e) {
     const { model } = getCard(e.currentTarget);
     await setContentStep(model);
 });
@@ -264,14 +264,15 @@ async function injectOnNavigation(obj) {
 }
 
 $('#playButton').on('click', async () => {
+    stopRecording();
     try {
-        cards.forEach( card => {
+        cards.forEach(card => {
             card.status = 'notrun';
             updateStepInView(card);
         });
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
-        await player.play(cards, ); // players gotta play...
+        await player.play(cards,); // players gotta play...
     }
     catch (e) {
         if (e?.message !== 'screenshots do not match') {
@@ -280,6 +281,51 @@ $('#playButton').on('click', async () => {
         await updateStepInView(e.failingStep); // update the UI with the pixel diff information
     }
 });
+
+$('#endRecordingButton').on('click', async () => {
+    stopRecording();
+    let action = await userEventToAction(userEvent);
+    await updateStepInView(action);
+});
+
+function setIconState(state) {
+    switch(state) {
+        case 'recording':
+            // chrome.action.setIcon({imageData: imageData}, () => { ... });
+            chrome.action.setBadgeBackgroundColor(
+                 {color: [255, 0, 0, 255]}
+            );
+            chrome.action.setBadgeText({
+                text: 'R'
+            });
+            chrome.action.setTitle({
+                title: 'Brimstone is recording user actions on this tab.'
+            });
+            break;
+        case 'playing':
+            chrome.action.setBadgeBackgroundColor(
+                {color: [0, 255, 0, 255]}
+           );
+           chrome.action.setBadgeText({
+               text: 'P'
+           });
+           chrome.action.setTitle({
+               title: 'Brimstone is playing previously recorded user actions on this tab.'
+           });
+           break;
+        case 'editing':
+            chrome.action.setBadgeBackgroundColor(
+                {color: [0, 0, 0, 0]}
+           );
+           chrome.action.setBadgeText({
+               text: 'E'
+           });
+           chrome.action.setTitle({
+               title: 'Brimstone is ready to record or play back pre-recorded user actions.'
+           });
+           break;
+    }
+}
 
 $('#recordButton').on('click', async () => {
     await chrome.windows.update(contentWindowId, { focused: true });
@@ -304,11 +350,15 @@ $('#recordButton').on('click', async () => {
     // I only care about navigation if I am recording
     chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
     await player.attachDebugger();
+
+    // set the icon state to recording
+    //setIconState('recording');
 });
 
 function stopRecording() {
     // tell the endpoint to stop recording
     try {
+        postMessage({ type: 'stop' });
         port.disconnect();
     }
     catch { }
@@ -329,16 +379,7 @@ function postMessage(msg) {
     port.postMessage(msg);
 }
 
-async function stop() {
-    let userEvent = {
-        type: 'stop', // stop recording
-    };
-    postMessage(userEvent);
-    let action = await userEventToAction(userEvent);
-    await updateStepInView(action);
-}
-
-$('#saveButton').on('click', async () => {   
+$('#saveButton').on('click', async () => {
     console.log('create zip');
     zip = new JSZip();
     zip.file('test.json', JSON.stringify({ steps: cards }, null, 2)); // add the test.json file to archive
@@ -356,7 +397,7 @@ $('#saveButton').on('click', async () => {
             let blob = await response.blob();
             screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
         }
-        if(card.acceptablePixelDifferences) {
+        if (card.acceptablePixelDifferences) {
             let response = await fetch(card.acceptablePixelDifferences.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.acceptablePixelDifferences.fileName, blob, { base64: true });
@@ -405,19 +446,19 @@ $('#loadButton').on('click', async () => {
 
 });
 
- async function injectScript(url) {
+async function injectScript(url) {
     console.log(`injecting script into ${url}`);
-    
+
     await (new Promise(resolve => chrome.storage.sync.set({ injectedArgs: { url } }, resolve)));
     await (new Promise(resolve => chrome.scripting.executeScript({
-                target: { tabId },
-                files: ['content-recorder.js']
-            }, resolve)));
+        target: { tabId },
+        files: ['content-recorder.js']
+    }, resolve)));
 
-            // (injectionResults) => {
-            //     for (const frameResult of injectionResults)
-            //         console.log('Injected script returns: ' + frameResult.result);
-            // }
+    // (injectionResults) => {
+    //     for (const frameResult of injectionResults)
+    //         console.log('Injected script returns: ' + frameResult.result);
+    // }
     //     );
     // });
 }
@@ -436,13 +477,13 @@ async function updateStepInView(action) {
     if (step.actualScreenshot) {
         let screenshots = zip.folder('screenshots');
         // this step failed - we need to generate the diff
-        if(!step.expectedScreenshot.dataUrl) {
+        if (!step.expectedScreenshot.dataUrl) {
             step.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.expectedScreenshot.fileName).async('base64');
         }
-        if(!step.actualScreenshot.dataUrl) {
+        if (!step.actualScreenshot.dataUrl) {
             step.actualScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.actualScreenshot.fileName).async('base64');
         }
-        if(step.acceptablePixelDifferences && !step.acceptablePixelDifferences.dataUrl) {
+        if (step.acceptablePixelDifferences && !step.acceptablePixelDifferences.dataUrl) {
             step.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.acceptablePixelDifferences.fileName).async('base64');
         }
 
@@ -452,7 +493,7 @@ async function updateStepInView(action) {
     else {
         let screenshots = zip.folder('screenshots');
         if (step.expectedScreenshot) {
-            if(!step.expectedScreenshot.dataUrl) {
+            if (!step.expectedScreenshot.dataUrl) {
                 step.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.expectedScreenshot.fileName).async('base64');
             }
             step = new ScreenshotStep(step);
@@ -461,7 +502,7 @@ async function updateStepInView(action) {
             step = new TextStep(step);
         }
     }
-    
+
 
     setContentStep(step);
     let $thumb = $(step.toThumb()); // smaller view
@@ -470,7 +511,7 @@ async function updateStepInView(action) {
         // replace
         $(`#cards .card[data-index=${step.index}]`).replaceWith($thumb);
         let c = $(`#cards .card[data-index=${step.index}]`);
-        if(c.length) {
+        if (c.length) {
             $('#cards').scrollLeft(c.position().left);
         }
     }
@@ -481,7 +522,7 @@ async function updateStepInView(action) {
 }
 
 async function addScreenshot(step) {
-    let {dataUrl } = await takeScreenshot();
+    let { dataUrl } = await takeScreenshot();
     step.expectedScreenshot = { dataUrl, fileName: `step${step.index}_expected.png` };
 }
 
@@ -499,7 +540,7 @@ async function userEventToAction(userEvent) {
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = tab.height;
     cardModel.tabWidth = tab.width;
-    
+
     if (element) {
         cardModel.overlay = {
             height: `${element.height * 100 / tab.height}%`,
@@ -509,7 +550,7 @@ async function userEventToAction(userEvent) {
         };
     }
 
-    switch(userEvent.type) {
+    switch (userEvent.type) {
         case 'keypress':
             cardModel.description = `type ${userEvent.event.key} at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
@@ -557,7 +598,7 @@ async function replaceOnConnectListener(url) {
             console.log(`RX: ${userEvent.type}`, userEvent);
             let action;
             switch (userEvent.type) {
-                case 'click': 
+                case 'click':
                 case 'keypress':
                     // update the UI with a screenshot
                     action = await userEventToAction(userEvent);
@@ -565,7 +606,7 @@ async function replaceOnConnectListener(url) {
 
                     // Now simulate that event back in the recording, via the CDP
                     await player[userEvent.type](userEvent);
-                    
+
                     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'hello':
