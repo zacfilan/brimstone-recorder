@@ -117,32 +117,31 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Central callback for all bound event handlers */
         handleEvent(e) {
-            console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target);
-            // e.preventDefault(); 
-            // e.stopPropagation();
-            // return false;
+            // console.log(`${e.timeStamp} handle event: ${e.type}`, e.target);
+            // if(e.type === 'submit') {
+            //     debugger;
+            // }
 
             if (this._simulatingEvents) {
                 // FIXME: how do I know this event came from the debugger versus from from the user?!
                 // FIXME: There is a race condition here!!
-                console.log(`${e.timeStamp} simulated event: ${e.type}`, e.target);
+                //console.log(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
             }
             else {
                 // block everything
-                console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target);
+                //console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
                 e.preventDefault(); 
                 e.stopPropagation();
 
                 switch (e.type) {
                     case 'keydown':
-                        console.log(`compile event: ${e.type}`, e.target);
                         let msg = this.buildMsg(e);
-                        console.log('TX: keypress');
+                        //console.log('TX: keypress (from a keydown)');
                         this.port.postMessage(msg); // will screenshot and then simulate the keydown, char, and keyup of the user
                         this._simulatingEvents = true;
                         break;
                     case 'click':
-                        console.log(`TX event: ${e.type}`, e.target);
+                        //console.log(`TX event: ${e.type}`, e.target);
                         this.port.postMessage(this.buildMsg(e)); // will (perhaps) screenshot and then simulate the mousedown, mouseup of the user
                         this._simulatingEvents = true;
                         break;
@@ -152,7 +151,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
         }
     } // end class Recorder
 
-    Recorder.events = ['mousedown', /*'beforeinput',*/ 'keydown', 'change', 'mouseup', 'click', 'mouseleave', 'mouseenter', 'focus', 'focusin', 'blur'];
+    Recorder.events = ['mousedown', /*'beforeinput',*/ 'keydown', 'keypress', 'keyup', 'change', 'mouseup', 'click', 'mouseleave', 'mouseenter', 'focus', 'focusin', 'blur', 'submit', 'invalid'];
     // create the instace
     window.brimstomeRecorder = new Recorder();
 

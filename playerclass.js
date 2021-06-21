@@ -128,6 +128,8 @@ export class Player {
             windowsVirtualKeyCode: keycode,
             nativeVirtualKeyCode: keycode
         });
+        // FIXME: Verify that [ENTER] prints correctly when in a textarea
+        // https://stackoverflow.com/questions/1367700/whats-the-difference-between-keydown-and-keypress-in-net
         var printable =
             (keycode > 47 && keycode < 58) || // number keys
             keycode == 32 || keycode == 13 || // spacebar & return key(s) (if you want to allow carriage returns)
@@ -136,15 +138,16 @@ export class Player {
             (keycode > 185 && keycode < 193) || // ;=,-./` (in order)
             (keycode > 218 && keycode < 223);   // [\]' (in order)
         if (printable) {
-            await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
+            let msg = {
                 type: 'char',
                 code: action.event.code,
                 key: action.event.key,
-                text: action.event.key,
+                text: keycode == 13 ? '\r' : action.event.key,
                 unmodifiedtext: action.event.key,
                 windowsVirtualKeyCode: keycode,
                 nativeVirtualKeyCode: keycode
-            });
+            };
+            await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', msg);
         }
         await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
             type: 'keyUp',

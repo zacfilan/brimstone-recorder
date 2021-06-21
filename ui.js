@@ -284,7 +284,7 @@ $('#playButton').on('click', async () => {
 
 $('#endRecordingButton').on('click', async () => {
     stopRecording();
-    let action = await userEventToAction(userEvent);
+    let action = await userEventToAction({ type: 'stop'});
     await updateStepInView(action);
 });
 
