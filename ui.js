@@ -2,6 +2,9 @@ import { Player } from "./playerclass.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer;
 import {Tab} from "./tab.js"
+import * as iconState from "./iconState.js";
+
+iconState.Ready();
 
 // grab the parent window id from the query parameter
 const urlParams = new URLSearchParams(window.location.search);
@@ -304,44 +307,8 @@ $('#endRecordingButton').on('click', async () => {
     stopRecording();
 });
 
-function setIconState(state) {
-    switch(state) {
-        case 'recording':
-            // chrome.action.setIcon({imageData: imageData}, () => { ... });
-            chrome.action.setBadgeBackgroundColor(
-                 {color: [255, 0, 0, 255]}
-            );
-            chrome.action.setBadgeText({
-                text: 'R'
-            });
-            chrome.action.setTitle({
-                title: 'Brimstone is recording user actions on this tab.'
-            });
-            break;
-        case 'playing':
-            chrome.action.setBadgeBackgroundColor(
-                {color: [0, 255, 0, 255]}
-           );
-           chrome.action.setBadgeText({
-               text: 'P'
-           });
-           chrome.action.setTitle({
-               title: 'Brimstone is playing previously recorded user actions on this tab.'
-           });
-           break;
-        case 'editing':
-            chrome.action.setBadgeBackgroundColor(
-                {color: [0, 0, 0, 0]}
-           );
-           chrome.action.setBadgeText({
-               text: 'E'
-           });
-           chrome.action.setTitle({
-               title: 'Brimstone is ready to record or play back pre-recorded user actions.'
-           });
-           break;
-    }
-}
+
+
 
 $('#recordButton').on('click', async () => {
     await tab.fromChromeTabId(tabId);
@@ -372,6 +339,8 @@ $('#recordButton').on('click', async () => {
         active: true
         // url: tab.url // shouldn't need that
     });
+
+    iconState.Record();
 });
 
 function stopRecording() {
@@ -382,6 +351,7 @@ function stopRecording() {
     }
     catch { }
     chrome.webNavigation.onCompleted.removeListener(injectOnNavigation);
+    iconState.Ready();
     //player.detachDebugger();
 }
 
@@ -578,6 +548,14 @@ async function userEventToAction(userEvent) {
             cardModel.description = `click at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
             break;
+        case 'contextmenu':
+            cardModel.description = `right click at location (${userEvent.x}, ${userEvent.y})`;
+            await addScreenshot(cardModel);
+            break;
+        case 'dblclick':
+            cardModel.description = `double click at location (${userEvent.x}, ${userEvent.y})`;
+            await addScreenshot(cardModel);
+            break 
         case 'stop':
             cardModel.description = 'stop recording';
             await addScreenshot(cardModel);
@@ -619,12 +597,16 @@ async function replaceOnConnectListener(url) {
             switch (userEvent.type) {
                 case 'click':
                 case 'keypress':
+                case 'contextmenu':
+                case 'dblclick':
                     // update the UI with a screenshot
                     action = await userEventToAction(userEvent);
                     await updateStepInView(action);
 
+                    iconState.Play();
                     // Now simulate that event back in the recording, via the CDP
                     await player[userEvent.type](userEvent);
+                    iconState.Record();
 
                     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;

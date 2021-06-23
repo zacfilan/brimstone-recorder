@@ -1,8 +1,9 @@
 import { pixelmatch } from "./pixelmatch.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
-import {Tab} from "./tab.js"
-import {sleep} from "./utilities.js";
+import { Tab } from "./tab.js"
+import { sleep } from "./utilities.js";
+import * as iconState from "./iconState.js";
 
 async function autoReattacher() {
 
@@ -44,7 +45,7 @@ export class Player {
             // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
             console.log(`debugger attached to ${this.tab.id}`);
             await sleep(500); // the animation should practically be done aftre this, but even if it isn't we can deal with it
-            
+
             await tab.resizeViewport();
             let that = this;
             /** Automaticaly reattach the debugger if the recording navigated away from the page */
@@ -71,6 +72,7 @@ export class Player {
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. */
     async play(steps) {
+        iconState.Play();
         this._playbackComplete = false;
 
         // start timer
@@ -105,6 +107,7 @@ export class Player {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
+                iconState.Fail();
                 if (this.onAfterPlay) {
                     await this.onAfterPlay(this.actionStep);
                 }
@@ -113,6 +116,7 @@ export class Player {
             // end timer
         }
         this._playbackComplete = true;
+        iconState.Pass();
     }
 
     async start(action) {
@@ -166,8 +170,7 @@ export class Player {
         });
     }
 
-    async click(action) {
-        // simulate a click https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchMouseEvent
+    async dblclick(action) {
         await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
             type: 'mousePressed',
             x: action.x,
@@ -175,7 +178,7 @@ export class Player {
             button: 'left',
             buttons: 1,
             clickCount: 1,
-            pointerType: 'mouse'
+            pointerType: 'mouse',
         });
         await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
             type: 'mouseReleased',
@@ -184,9 +187,59 @@ export class Player {
             button: 'left',
             buttons: 1,
             clickCount: 1,
-            pointerType: 'mouse'
+            pointerType: 'mouse',
+        });
+        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+            type: 'mousePressed',
+            x: action.x,
+            y: action.y,
+            button: 'left',
+            buttons: 1,
+            clickCount: 2,
+            pointerType: 'mouse',
+        });
+        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased',
+            x: action.x,
+            y: action.y,
+            button: 'left',
+            buttons: 1,
+            clickCount: 2,
+            pointerType: 'mouse',
         });
     }
+
+    async _mouseclick(action, args) {
+        // simulate a click https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchMouseEvent
+        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+            type: 'mousePressed',
+            x: action.x,
+            y: action.y,
+            button: args.button,
+            buttons: args.buttons,
+            clickCount: 1,
+            pointerType: 'mouse',
+        });
+        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased',
+            x: action.x,
+            y: action.y,
+            button: args.button,
+            buttons: args.buttons,
+            clickCount: 1,
+            pointerType: 'mouse',
+        });
+    }
+
+    async contextmenu(action) {
+        return this._mouseclick(action, { button: 'right', buttons: 2 });
+    }
+
+    async click(action) {
+        return this._mouseclick(action, { button: 'left', buttons: 1 });
+    }
+
+
 
     async move(x, y) {
         console.log(`\t\tmove ${x},${y}`);
@@ -205,51 +258,40 @@ export class Player {
      * @returns 
      */
     async verifyScreenshot(nextStep) {
+        let start = performance.now();
+
         const { png: expectedPng } = await Player.dataUrlToPNG(nextStep.expectedScreenshot.dataUrl);
         let acceptableErrorsPng = undefined;
         if (nextStep.acceptablePixelDifferences?.dataUrl) {
             acceptableErrorsPng = (await Player.dataUrlToPNG(nextStep.acceptablePixelDifferences.dataUrl)).png;
         }
 
-        // FIXME: this is only used to fix the screensize with the debugger attached after a navigation
-
         let max_verify_timout = 15; // seconds
-        let sleepMs = 137; // 500ms can sync with the cursor!
-        let MaxCheckForEqualityCount = Math.floor((max_verify_timout * 1000) / sleepMs);
+
         let actualScreenshot;
-        for (let checkForEqualityCount = 0; checkForEqualityCount < MaxCheckForEqualityCount; ++checkForEqualityCount) {
-            try {
-                await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
+        while (((performance.now() - start) / 1000) < max_verify_timout) {
+            await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
-                if (nextStep.type === 'click') {
-                    // for a click, we first mouseover the location, so as to change the screen correctly with hover effect
-                    await this.move(0, 0);
-                    await this.move(nextStep.x, nextStep.y);
-                    await sleep(sleepMs);
-                }
+            if (nextStep.type != 'keydown') {
+                // for any mouse operation, we first mouseover the location, so as to change the screen correctly with hover effect
+                await this.move(0, 0);
+                await this.move(nextStep.x, nextStep.y);
+            }
 
-                let start = performance.now();
-                actualScreenshot = await this.takeScreenshot();
-                let actualPng = actualScreenshot.png;
-                let { numDiffPixels, numMaskedPixels } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
-                let stop = performance.now();
-                console.log(`new screenshot taken and compared in ${stop - start}ms`);
-                if (numDiffPixels === 0) {
-                    if (numMaskedPixels) {
-                        nextStep.actualScreenshot = {
-                            dataUrl: actualScreenshot.dataUrl,
-                            fileName: `step${nextStep.index}_actual.png`
-                        };
-                        nextStep.status = 'corrected';
-                    }
-                    return;
+            actualScreenshot = await this.takeScreenshot();
+            let actualPng = actualScreenshot.png;
+            let { numDiffPixels, numMaskedPixels } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+            if (numDiffPixels === 0) {
+                if (numMaskedPixels) {
+                    nextStep.actualScreenshot = {
+                        dataUrl: actualScreenshot.dataUrl,
+                        fileName: `step${nextStep.index}_actual.png`
+                    };
+                    nextStep.status = 'corrected';
                 }
-            }
-            catch (e) {
-                console.warn(e);
-            }
-            if (this.actionStep.type !== 'click') {
-                await sleep(sleepMs);
+                let doneIn = ((performance.now() - start) / 1000).toFixed(1);
+                console.log(`step done in ${doneIn} seconds`);
+                return;
             }
         }
 

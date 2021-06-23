@@ -1,6 +1,9 @@
 chrome.storage.sync.get(["injectedArgs"], (result) => {
     let expectedUrl = result.injectedArgs.url;
     let actualUrl = window.location.href;
+    
+    /** Used to wait and see if a sibgle click becomes a double click. */
+    let pendingClick;
 
     if (expectedUrl !== actualUrl) {
         console.error(`NOT injecting script, expected url to be\n${expectedUrl}\nactual\n${actualUrl}`);
@@ -81,6 +84,9 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
             switch (e.type) {
                 case 'click':
+                    msg.detail = e.detail;
+                case 'contextmenu':
+                case 'dblclick':
                     msg.x = e.clientX;
                     msg.y = e.clientY;
                     ['clientX', 'clientY'].forEach(p =>
@@ -135,15 +141,32 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
                 switch (e.type) {
                     case 'keydown':
+                    case 'contextmenu':
+                    case 'dblclick':
                         let msg = this.buildMsg(e);
                         //console.log('TX: keypress (from a keydown)');
                         this.port.postMessage(msg); // will screenshot and then simulate the keydown, char, and keyup of the user
                         this._simulatingEvents = true;
                         break;
                     case 'click':
-                        //console.log(`TX event: ${e.type}`, e.target);
-                        this.port.postMessage(this.buildMsg(e)); // will (perhaps) screenshot and then simulate the mousedown, mouseup of the user
-                        this._simulatingEvents = true;
+                        // don't know yet if it is a single click or the first of a double click
+                        if(!pendingClick) {
+                            pendingClick = e;
+                            setTimeout( () => {
+                                let msg = this.buildMsg(pendingClick);
+                                //console.log('TX: keypress (from a keydown)');
+                                this.port.postMessage(msg); // will screenshot and then simulate the keydown, char, and keyup of the user
+                                this._simulatingEvents = true;
+                                pendingClick = false;
+                            }, 500); 
+                        }
+                        else {
+                            // this is the second single click within 500ms. It should generate a double click.
+                            pendingClick = false;
+                            if(e.detail != 2) {
+                                console.error('sanity check fails. got a 2nd single click within 500ms but not marked as 2nd click.')
+                            }
+                        }
                         break;
                 }
                 return false;
@@ -151,7 +174,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
         }
     } // end class Recorder
 
-    Recorder.events = ['mousedown', /*'beforeinput',*/ 'keydown', 'keypress', 'keyup', 'change', 'mouseup', 'click', 'mouseleave', 'mouseenter', 'focus', 'focusin', 'blur', 'submit', 'invalid'];
+    Recorder.events = ['click', 'dblclick', 'contextmenu', 'mousedown', /*'beforeinput',*/ 'keydown', 'keypress', 'keyup', 'change', 'mouseup', 'mouseleave', 'mouseenter', 'focus', 'focusin', 'blur', 'submit', 'invalid'];
     // create the instace
     window.brimstomeRecorder = new Recorder();
 
