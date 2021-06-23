@@ -124,12 +124,12 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
             if (this._simulatingEvents) {
                 // FIXME: how do I know this event came from the debugger versus from from the user?!
-                // FIXME: There is a race condition here!!
-                //console.log(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
+                // FIXME: There is a race condition here!!                
+                console.log(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
             }
             else {
                 // block everything
-                //console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
+                console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
                 e.preventDefault(); 
                 e.stopPropagation();
 

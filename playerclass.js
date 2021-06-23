@@ -1,6 +1,12 @@
 import { pixelmatch } from "./pixelmatch.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
+import {Tab} from "./tab.js"
+import {sleep} from "./utilities.js";
+
+async function autoReattacher() {
+
+}
 
 export class Player {
     /** The currently executing step. */
@@ -12,32 +18,20 @@ export class Player {
     actualScreenshotBuffer;
 
     _playbackComplete = false;
-    _readyForDebuggerCommands = false; // promise resolved whent the debugger is attached
 
-    constructor(windowId, tabId) {
-        this.windowId = windowId;
-        this.tabId = tabId;
-        let that = this;
-        chrome.debugger.onDetach.addListener(async (source, reason) => {
-            if(reason === 'canceled_by_user') {
-                window.alert('Yo man, you cut your connection to Brimstone.')
-            }
-            else {
-            // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
-                async function reattached(resolve, reject) {
-                    console.warn('re-attaching the debugger!');
-                    await that.attachDebugger();
-                    resolve();
-                }
-                that._readyForDebuggerCommands = new Promise(reattached);
-                await that._readyForDebuggerCommands;
-            }
-        });
+    constructor() {
+        /**
+         * The tab we are playing on.
+         * @type {Tab}
+         */
+        this.tab = null;
     }
 
-    async attachDebugger() {
-        this.tab = await chrome.tabs.get(this.tabId);
-        this.tabId = this.tab.id;
+    /** Attach the debugger to the given tab, and set the viewport size appropriately.
+     * @param {Tab} tab The tab to attach to
+     */
+    async attachDebugger(tab) {
+        this.tab = tab;
 
         // If you are actually debugging the page yourself as a dev, you will trick this!
         let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
@@ -45,11 +39,33 @@ export class Player {
             console.log(`A debugger is already attached to tab ${this.tab.id}`);
         }
         else {
-            await (new Promise(resolve => chrome.debugger.attach({ tabId: this.tabId }, "1.3", resolve)));
-            console.log(`debugger attached to ${this.tabId}`);
-            await Player.sleep(5000);
+            await new Promise(resolve => chrome.debugger.attach({ tabId: this.tab.id }, "1.3", resolve));
+            // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
+            // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
+            console.log(`debugger attached to ${this.tab.id}`);
+            await sleep(500); // the animation should practically be done aftre this, but even if it isn't we can deal with it
+            
+            await tab.resizeViewport();
+            let that = this;
+            /** Automaticaly reattach the debugger if the recording navigated away from the page */
+            chrome.debugger.onDetach.addListener(async (source, reason) => {
+                console.log("The debugger was detached!!");
+                if (reason === 'canceled_by_user') {
+                    window.alert('Yo man, you cut your connection to Brimstone.')
+                }
+                else {
+                    // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
+                    console.warn('begin: re-attaching the debugger!');
+                    await that.attachDebugger(tab);
+                    console.warn('end:   re-attaching the debugger!');
+                }
+            });
         }
     }
+
+    // async detachDebugger() {
+    //     await new Promise(resolve => chrome.debugger.detach({ tabId: this.tab.id }, "1.3", resolve));   
+    // }
 
     /** 
      * Play the current set of actions. This allows actions to be played one
@@ -57,15 +73,13 @@ export class Player {
     async play(steps) {
         this._playbackComplete = false;
 
-        await this.attachDebugger();
-
         // start timer
         let start;
         let stop;
         for (let i = 0; i < steps.length - 1; ++i) {
             this.actionStep = steps[i];
             this.actionStep.status = 'playing';
-            if(this.onBeforePlay) {
+            if (this.onBeforePlay) {
                 await this.onBeforePlay(this.actionStep);
             }
             delete this.actionStep.actualScreenshot; // we are replaying this step, drop any previous results
@@ -83,7 +97,7 @@ export class Player {
                 console.log(`\t\tscreenshot verified in ${stop - start}ms`);
                 this.actionStep.status = 'passed';
                 this.nextStep.status = 'passed';
-                if(this.onAfterPlay) {
+                if (this.onAfterPlay) {
                     await this.onAfterPlay(this.actionStep);
                 }
             }
@@ -91,7 +105,7 @@ export class Player {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
-                if(this.onAfterPlay) {
+                if (this.onAfterPlay) {
                     await this.onAfterPlay(this.actionStep);
                 }
                 throw e;
@@ -109,12 +123,6 @@ export class Player {
             active: true,
             url: action.url
         });
-
-        let that = this;
-        await this.attachDebugger();
-
-        this._readyForDebuggerCommands = this.setViewport(action.tabWidth, action.tabHeight); // that debug banner needs to be figured into the size too I think.
-        await this._readyForDebuggerCommands;
     }
 
     async keypress(action) {
@@ -206,20 +214,21 @@ export class Player {
         // FIXME: this is only used to fix the screensize with the debugger attached after a navigation
 
         let max_verify_timout = 15; // seconds
-        let sleepMs = 500;
+        let sleepMs = 137; // 500ms can sync with the cursor!
         let MaxCheckForEqualityCount = Math.floor((max_verify_timout * 1000) / sleepMs);
         let actualScreenshot;
         for (let checkForEqualityCount = 0; checkForEqualityCount < MaxCheckForEqualityCount; ++checkForEqualityCount) {
             try {
+                await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
+
                 if (nextStep.type === 'click') {
                     // for a click, we first mouseover the location, so as to change the screen correctly with hover effect
                     await this.move(0, 0);
                     await this.move(nextStep.x, nextStep.y);
-                    await Player.sleep(sleepMs);
+                    await sleep(sleepMs);
                 }
 
                 let start = performance.now();
-                await this.setViewport(nextStep.tabWidth, nextStep.tabHeight);
                 actualScreenshot = await this.takeScreenshot();
                 let actualPng = actualScreenshot.png;
                 let { numDiffPixels, numMaskedPixels } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
@@ -240,7 +249,7 @@ export class Player {
                 console.warn(e);
             }
             if (this.actionStep.type !== 'click') {
-                await Player.sleep(sleepMs);
+                await sleep(sleepMs);
             }
         }
 
@@ -256,62 +265,6 @@ export class Player {
         };
     }
 
-    /** Turn the tab we were launched from into the initial state 
-    * of the recording we are playing back. Set url, viewport, and focus.
-    */
-    async setViewport(width, height) {
-        console.log(`set view port to ${width}x${height}`);
-        function measure() {
-            return {
-                outerHeight: window.outerHeight,
-                innerHeight: window.innerHeight,
-                outerWidth: window.outerWidth,
-                innerWidth: window.innerWidth,
-                clientWidth: document.documentElement.clientWidth,
-                clientHeight: document.documentElement.clientHeight
-            };
-        }
-
-        let frames = await chrome.scripting.executeScript({
-            target: { tabId: this.tab.id },
-            function: measure,
-        });
-        let distance = frames[0].result;
-
-
-        let viewportWidth = Math.max(distance.clientWidth || 0, distance.innerWidth || 0);
-        let viewportHeight = Math.max(distance.clientHeight || 0, distance.innerHeight || 0);
-        let border = {
-            width: distance.outerWidth - viewportWidth,
-            height: distance.outerHeight - viewportHeight
-        };
-
-        console.log(`set window to ${width + border.width}x${height + border.height}`);
-        await chrome.windows.update(this.tab.windowId, {
-            width: width + border.width,
-            height: height + border.height
-        });
-
-        // FIXME I can't get it right the first time for some reason so I will correct it
-        frames = await chrome.scripting.executeScript({
-            target: { tabId: this.tab.id },
-            function: measure,
-        });
-        distance = frames[0].result;
-        viewportWidth = Math.max(distance.clientWidth || 0, distance.innerWidth || 0);
-        viewportHeight = Math.max(distance.clientHeight || 0, distance.innerHeight || 0);
-        let dw = width - viewportWidth;
-        let dh = height - viewportHeight;
-        console.log(`viewport is apparently ${viewportWidth}x${viewportHeight}`);
-        if (dw || dh) {
-            console.warn('trying to set viewport again');
-            await chrome.windows.update(this.tab.windowId, {
-                width: distance.outerWidth + dw,
-                height: distance.outerHeight + dh
-            });
-        }
-    };
-
     /**
     * Take a screenshot convert it to a PNG objec and return it.
     * @returns {{dataUrl, actualScreenshot: PNG}}
@@ -324,15 +277,9 @@ export class Player {
     }
 
     async debuggerSendCommand(debuggee, method, commandParams) {
-        await this._readyForDebuggerCommands;
         return new Promise(resolve => chrome.debugger.sendCommand(debuggee, method, commandParams, resolve));
     }
 }
-
-Player.sleep = async function sleep(ms) {
-    console.log(`sleeping for ${ms}ms`);
-    return new Promise(resolve => setTimeout(resolve, ms));
-};
 
 Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
     let response = await fetch(dataUrl);
@@ -360,6 +307,10 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
         diffPng
     };
 };
+
+
+
+
 
 
 

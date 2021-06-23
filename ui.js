@@ -1,12 +1,18 @@
 import { Player } from "./playerclass.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer;
+import {Tab} from "./tab.js"
 
 // grab the parent window id from the query parameter
 const urlParams = new URLSearchParams(window.location.search);
-const contentWindowId = parseInt(urlParams.get('parent'), 10);
+
+/** The tab being recorded
+ * @type {Tab}
+ */
+var tab = new Tab();
 const tabId = parseInt(urlParams.get('tab'), 10);
-const player = new Player(contentWindowId, tabId);
+const player = new Player();
+
 var uiCardsElement = document.getElementById('cards');
 var currentUrl;
 
@@ -260,11 +266,12 @@ async function injectOnNavigation(obj) {
     if (obj.url !== currentUrl) {
         currentUrl = obj.url;
         await injectScript(obj.url);
+        await tab.resizeViewport();
     }
 }
 
 $('#playButton').on('click', async () => {
-    stopRecording();
+    // stopRecording(); // should not be necessary - button enable logic will prevent this
     try {
         cards.forEach(card => {
             card.status = 'notrun';
@@ -272,7 +279,14 @@ $('#playButton').on('click', async () => {
         });
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
-        await player.play(cards,); // players gotta play...
+
+        await tab.fromChromeTabId(tabId);
+        tab.height = cards[0].tabHeight;
+        tab.width = cards[0].tabWidth;
+        tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
+        await player.attachDebugger(tab);
+
+        await player.play(cards); // players gotta play...
     }
     catch (e) {
         if (e?.message !== 'screenshots do not match') {
@@ -283,9 +297,11 @@ $('#playButton').on('click', async () => {
 });
 
 $('#endRecordingButton').on('click', async () => {
-    stopRecording();
+    // before I take the last screenshot the window must have focus again.
+    await chrome.windows.update( tab.windowId, { focused: true });
     let action = await userEventToAction({ type: 'stop'});
     await updateStepInView(action);
+    stopRecording();
 });
 
 function setIconState(state) {
@@ -328,31 +344,34 @@ function setIconState(state) {
 }
 
 $('#recordButton').on('click', async () => {
-    await chrome.windows.update(contentWindowId, { focused: true });
-    chrome.tabs.update(tabId, {
-        highlighted: true,
-        active: true
-    });
+    await tab.fromChromeTabId(tabId);
+    console.log(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
-    zip = new JSZip();
-    let tab = await chrome.tabs.get(tabId);
+    // inorder to simulate any events we need to attach the debugger
+    await player.attachDebugger(tab);
 
-    // No screenshots for this first one (the first user action determines state that identifies when this is done)
+    // establish the communication channel between the tab being recorded and the brimstone workspace window
+    await replaceOnConnectListener(tab.url);
+
+    // during recording if we navigate to another page within the tab I will need to re-establish the connection
+    chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
+
+    // update the UI: insert the first text card in the ui
     let userEvent = {
         type: 'start', // start recording
-        url: tab.url,
-        tabHeight: tab.height,
-        tabWidth: tab.width
+        url: tab.url
     };
     let action = await userEventToAction(userEvent);
+    zip = new JSZip(); // FIXME: refactor so this isn't needed here!
     await updateStepInView(action);
-    await replaceOnConnectListener(tab.url);
-    // I only care about navigation if I am recording
-    chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
-    await player.attachDebugger();
-
-    // set the icon state to recording
-    //setIconState('recording');
+    
+    // last thing we do is give the focus back to the window and tab we want to record
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, {
+        highlighted: true,
+        active: true
+        // url: tab.url // shouldn't need that
+    });
 });
 
 function stopRecording() {
@@ -363,6 +382,7 @@ function stopRecording() {
     }
     catch { }
     chrome.webNavigation.onCompleted.removeListener(injectOnNavigation);
+    //player.detachDebugger();
 }
 
 $('#clearButton').on('click', async () => {
@@ -536,7 +556,6 @@ async function userEventToAction(userEvent) {
     let cardModel = userEvent; // start with the user event and convert to a cardModel (by adding some properties)
     cardModel.index = Step.instancesCreated++;
 
-    let tab = await chrome.tabs.get(tabId);
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = tab.height;
     cardModel.tabWidth = tab.width;
@@ -575,7 +594,7 @@ async function userEventToAction(userEvent) {
 }
 
 async function takeScreenshot() {
-    let dataUrl = await chrome.tabs.captureVisibleTab(contentWindowId, {
+    let dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: 'png'
     });
     console.log('\t\tscreenshot taken');
