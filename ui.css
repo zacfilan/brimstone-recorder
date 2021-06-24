@@ -42,9 +42,13 @@ body {
 }
 
 .card .screenshot {
-    position: relative; /* for the overlay to be absole positioned */
+    position: relative; /* for the action overlay to float positioned to this when absolute positioned */
     border: 1px solid white;
     padding: none;
+}
+
+.card.pixel-differences .screenshot {
+    position: unset;
 }
 
 .card .screenshot:hover {

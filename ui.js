@@ -1,8 +1,9 @@
 import { Player } from "./playerclass.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer;
-import {Tab} from "./tab.js"
+import { Tab } from "./tab.js"
 import * as iconState from "./iconState.js";
+import { Rectangle } from "./rectangle.js";
 
 iconState.Ready();
 
@@ -100,10 +101,31 @@ class ScreenshotStep extends Step {
 
 }
 
+function addRectangle({ x0, y0, width, height }) {
+    let ymax = y0 + height;
+    let xmax = x0 + width;
+    for (var y = y0; y <= ymax; y++) {
+        for (var x = x0; x <= xmax; x++) {
+            var idx = (this.width * y + x) << 2;
+            // [255, 165, 0, 255] // orange
+            this.data[idx] = 255;
+            this.data[idx + 1] = 165;
+            this.data[idx + 2] = 0;
+            this.data[idx + 3] = 255; // fully opaque
+        }
+    }
+}
+
 class FailedStep extends Step {
     constructor(args = {}) {
         super(args);
         this.status = 'failed';
+        
+        /** 
+         * This is what will be shown when the card is rendered in the UI. It is not persisted. 
+         * When loaded it is set. When played it can be set.
+        */
+        this.diffDataUrl;
     }
     //        this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(this.expectedScreenshot.fileName).async('base64');
 
@@ -122,12 +144,42 @@ class FailedStep extends Step {
      * When the user clicks the button, I want the current red pixels to all turn green, and the step to pass.
      * 
      */
-    async addMask() {
+    async addMask($card) { // FIMXE: don't pass the card in...
         if (!this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = {};
         }
-        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl;
+        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl; // what is shown currently. .
         this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
+        if (this.acceptablePixelDifferences?.dataUrl) {
+            this.acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png; // convert to png
+        }
+
+        // manipulate the PNG
+        let volatileRegions = $card.find('.rectangle');
+        if (volatileRegions.length) {
+            let $image = $card.find('img');
+            let image = $image[0].getBoundingClientRect();
+            
+            // this is scaled
+            let xscale = this.acceptableErrorsPng.width / image.width;
+            let yscale = this.acceptableErrorsPng.height / image.height;
+
+            volatileRegions.each((index, rectangle) => {
+                // viewport relative measurements with scaled lengths
+                let rec = rectangle.getBoundingClientRect();
+
+                // make them image relative measurements with lengths scaled to the PNG
+                let pngRectangle = {
+                    x0: Math.floor((rec.left - image.left) * xscale),
+                    y0: Math.floor((rec.top - image.top) * yscale),
+                    width: Math.floor(rec.width * xscale),
+                    height: Math.floor(rec.height * yscale)
+                };
+
+                addRectangle.call(this.acceptableErrorsPng, pngRectangle);
+            });
+            // once this is done I need to turn this back into the diffDataUrl, since that is what will be show...and I do in pixelDiff function
+        }
     }
 
     /** (Re)calculate the difference between the expected screenshot
@@ -136,11 +188,7 @@ class FailedStep extends Step {
     async pixelDiff() {
         let { png: expectedPng } = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
         let { png: actualPng } = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
-        let acceptableErrorsPng;
-        if (this.acceptablePixelDifferences?.dataUrl) {
-            acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png;
-        }
-        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, this.acceptableErrorsPng);
 
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
@@ -175,13 +223,16 @@ class FailedStep extends Step {
                       <div class='user-event' data-index='${this.index}'>next action: ${this.description}</div>
                   </div>
               </div>
-              <div class='card'>
+              <div class='card pixel-differences' data-index=${this.index}>
                   <div class='title'>[${this.index}]: Difference (red pixels). ${this.numDiffPixels} pixels, ${this.percentDiffPixels}% different</div>
                   <div class='screenshot'>
                       <img src='${this.diffDataUrl}'>
                   </div>
                   <div class='user-events'>
-                      <button class="ignore">Ignore</button>
+                      <span>
+                        <button class="ignore">Ignore</button>
+                        <button class="volatile">Volatile</button>
+                       </span>
                   </div>
               </div>
           </div>`;
@@ -205,9 +256,27 @@ function getCard(element) {
 
 $('#content').on('click', 'button.ignore', async function (e) {
     // add a mask to the 
-    const { model } = getStep(e.currentTarget);
-    await model.addMask();
+    const { model, view } = getCard(e.currentTarget);
+
+    await model.addMask(view);
     await updateStepInView(model);
+});
+
+// stop the image drap behavior
+$('#content').on('mousedown', '.card.pixel-differences img', () => false);
+
+$('#content').on('click', 'button.volatile', async function (e) {
+    // add a mask to the 
+    const { view } = getCard(e.currentTarget);
+    let screenshot = view.find('.screenshot');
+    Rectangle.setContainer(screenshot[0],
+        () => {
+            console.log('rectangle added');
+        },
+        () => {
+            console.log('rectangle deleted');
+        });
+    // adds these to the DOM temporarily
 });
 
 $('#cards').on('click', '.thumb', async function (e) {
@@ -301,14 +370,11 @@ $('#playButton').on('click', async () => {
 
 $('#endRecordingButton').on('click', async () => {
     // before I take the last screenshot the window must have focus again.
-    await chrome.windows.update( tab.windowId, { focused: true });
-    let action = await userEventToAction({ type: 'stop'});
+    await chrome.windows.update(tab.windowId, { focused: true });
+    let action = await userEventToAction({ type: 'stop' });
     await updateStepInView(action);
     stopRecording();
 });
-
-
-
 
 $('#recordButton').on('click', async () => {
     await tab.fromChromeTabId(tabId);
@@ -331,7 +397,7 @@ $('#recordButton').on('click', async () => {
     let action = await userEventToAction(userEvent);
     zip = new JSZip(); // FIXME: refactor so this isn't needed here!
     await updateStepInView(action);
-    
+
     // last thing we do is give the focus back to the window and tab we want to record
     await chrome.windows.update(tab.windowId, { focused: true });
     await chrome.tabs.update(tab.id, {
@@ -458,6 +524,7 @@ function setContentStep(step) {
     let $step = $(step.toHtml());
     $('#content .step').replaceWith($step); // the big card
 };
+
 /** The raw user action triggers an event which comes from the recording proess as a 'userEvent'. The userEvent is annotated 
  * into an action. The 'action' is passed into a particular 'step' generator, which is then
  * rendered in the UI. */
@@ -492,7 +559,6 @@ async function updateStepInView(action) {
             step = new TextStep(step);
         }
     }
-
 
     setContentStep(step);
     let $thumb = $(step.toThumb()); // smaller view
@@ -555,7 +621,7 @@ async function userEventToAction(userEvent) {
         case 'dblclick':
             cardModel.description = `double click at location (${userEvent.x}, ${userEvent.y})`;
             await addScreenshot(cardModel);
-            break 
+            break
         case 'stop':
             cardModel.description = 'stop recording';
             await addScreenshot(cardModel);
@@ -576,9 +642,7 @@ async function takeScreenshot() {
         format: 'png'
     });
     console.log('\t\tscreenshot taken');
-    //let response = await fetch(dataUrl);
     return {
-        //blob: await response.blob(),
         dataUrl
     };
 }
@@ -621,38 +685,3 @@ async function replaceOnConnectListener(url) {
     });
     await injectScript(url); // inject a content script that will connect
 }
-
-
-// chrome.webNavigation.onBeforeNavigate.addListener(function (obj) {
-//     console.log('before nav disconnect', obj);
-//     port.postMessage({ type: 'disconnect' });
-// });
-
-// /**
-//  * Injected into the app to store the screenshot into localstorage for the current domain
-//  * @param {string} dataUrl Base64 encoded image
-//  */
-//  function writeScreenShotToLocalStorage(dataUrl) {
-//     // content scripts can access chrome storage API, https://developer.chrome.com/docs/extensions/reference/storage/
-//     // this is used to "pass arguments" from the popup context into function injeted into the webpage context
-//     chrome.storage.local.get(['brimstoneScreenshot'],
-//         (entry) => localStorage.setItem('brimstoneScreenshot', entry.brimstoneScreenshot));
-// }
-
-// REFERENCES
-// Getting started with an extension
-//    https://developer.chrome.com/docs/extensions/mv3/getstarted/
-// headless recorder chrome extension
-//    https://chrome.google.com/webstore/detail/headless-recorder/djeegiggegleadkkbgopoonhjimgehda?hl=en
-// Chrome extension APIs 
-//     https://developer.chrome.com/extensions/tabs#method-captureVisibleTab
-// HTML5 fetch
-//     https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-//     https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
-// HTML5 file system access
-//     https://web.dev/file-system-access/ 
-//     https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker
-// Webpack
-//     https://webpack.js.org/
-// adm-zip
-//     https://www.npmjs.com/package/adm-zip

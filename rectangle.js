@@ -1,4 +1,4 @@
-import {uuidv4} from './uuidv4.js'
+import {uuidv4} from './utilities.js'
 
 export class Rectangle {
     _coords = [];
@@ -6,6 +6,7 @@ export class Rectangle {
     constructor(coords) {
         this._coords = coords;
         const rectangle = document.createElement("div");
+        rectangle.classList.add('rectangle');
         rectangle.style.position = "absolute";
         rectangle.style.backgroundColor = "rgba(204,230,255, 0.7)";
         rectangle.style.border = "1px dashed black";
@@ -20,6 +21,14 @@ export class Rectangle {
         this.rectangle = rectangle;
         Rectangle.instances.push(rectangle);
         this.redraw();
+    }
+
+    get topLeftCoords() {
+        return this._coords[0];
+    }
+
+    get bottomRightCoords() {
+        return this._coords[1];
     }
 
     redraw() {

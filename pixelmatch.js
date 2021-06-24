@@ -73,7 +73,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                             let red = options.ignoreMask[pos + 0];
                             // const orange = [255, 165, 0];
                             if(red === 255) { // match orange or red
-                                drawPixel(output, pos, 255, 165, 0, 1); // orange pixel
+                                _drawPixel(output, pos, 255, 165, 0, 255); // orange pixel
                                 masked++;
                             }
                         }
@@ -89,7 +89,24 @@ export function pixelmatch(img1, img2, output, width, height, options) {
 
             } else if (output) {
                 // pixels are similar; draw background as grayscale image blended with white
-                if (!options.diffMask) drawGrayPixel(img1, pos, options.alpha, output);
+                if (!options.diffMask) {
+
+                    if(options.ignoreMask) {
+                        let red = options.ignoreMask[pos + 0];
+                        let green = options.ignoreMask[pos + 1];
+                        let blue = options.ignoreMask[pos + 2]
+                        // const orange = [255, 165, 0];
+                        if(red === 255 && green === 165 && blue === 0) { // orange, is our volatile region
+                            _drawPixel(output, pos, 255, 165, 0, 128); // orange but lighter for volatile that didn't match
+                        }
+                        else {
+                            drawGrayPixel(img1, pos, options.alpha, output);
+                        }
+                    }
+                    else {
+                        drawGrayPixel(img1, pos, options.alpha, output);
+                    }
+                }
             }
         }
     }
@@ -234,6 +251,14 @@ function rgb2q(r, g, b) { return r * 0.21147017 - g * 0.52261711 + b * 0.3111469
 // blend semi-transparent color with white
 function blend(c, a) {
     return 255 + (c - 255) * a;
+}
+
+
+function _drawPixel(output, pos, r, g, b, a) {
+    output[pos + 0] = r;
+    output[pos + 1] = g;
+    output[pos + 2] = b;
+    output[pos + 3] = a;
 }
 
 function drawPixel(output, pos, r, g, b) {
