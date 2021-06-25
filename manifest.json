@@ -20,16 +20,11 @@
   ],
   "action" : {
     "default_icon": {             
-      "16": "images/fire16.png",   
-      "24": "images/fire24.png",   
-      "32": "images/fire32.png"    
+      "32": "images/grey_b_32.png"    
     },
-    "default_title": "Click to open window"
+    "default_title": "Brimstone is inactive.\nClick to open window."
   },
   "icons": {
-    "16": "images/fire16.png",
-    "32": "images/fire32.png",
-    "48": "images/fire48.png",
-    "128": "images/fire128.png"
+    "128": "images/orange_b_128.png"
   }
 }

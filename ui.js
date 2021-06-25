@@ -666,12 +666,8 @@ async function replaceOnConnectListener(url) {
                     // update the UI with a screenshot
                     action = await userEventToAction(userEvent);
                     await updateStepInView(action);
-
-                    iconState.Play();
                     // Now simulate that event back in the recording, via the CDP
                     await player[userEvent.type](userEvent);
-                    iconState.Record();
-
                     postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                     break;
                 case 'hello':

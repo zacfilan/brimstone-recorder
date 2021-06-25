@@ -107,7 +107,7 @@ export class Player {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
-                iconState.Fail();
+                iconState.Ready();
                 if (this.onAfterPlay) {
                     await this.onAfterPlay(this.actionStep);
                 }
@@ -116,7 +116,7 @@ export class Player {
             // end timer
         }
         this._playbackComplete = true;
-        iconState.Pass();
+        iconState.Ready();
     }
 
     async start(action) {

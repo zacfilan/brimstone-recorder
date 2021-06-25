@@ -1,15 +1,17 @@
+const record = {path: 'images/red_b_32.png',    title: 'Brimstone is recording.'};
+const play   = {path: 'images/green_b_32.png',  title: 'Brimstone is playing.'};
+const ready  = {path: 'images/orange_b_32.png', title: 'Brimstone is ready to play or record.'};
+const inactive = {path: 'images/grey_b_32.png', title: 'Brimstone is not active.'}
+// const pass = {text: '\u2705', color: [255,255,255,255], title: 'Test passed.'};
+// const fail = {text: '\u274c', color: [255,255,255,255], title: 'Test failed'}
 
-
-const record = {text: 'REC', color: [255,0,0,255], title: 'Recording'};
-const play = {text: 'PLAY', color: [0,255,0,255], title: 'Playing'};
-const ready = {text: '', color: [0,0,0,0], title: 'Ready to play or record.'};
-const pass = {text: '\u2705', color: [255,255,255,255], title: 'Test passed.'};
-const fail = {text: '\u274c', color: [255,255,255,255], title: 'Test failed'}
-
-function set({text, color, title}) {
-    chrome.action.setBadgeBackgroundColor({color});
-    chrome.action.setBadgeText({text});
-    chrome.action.setTitle({title});
+function set({path, text, color, title}) {
+    if(title) {
+        //chrome.action.setBadgeText({text});
+        chrome.action.setTitle({title});
+        //chrome.action.setBadgeBackgroundColor({color});
+    }
+    chrome.action.setIcon({path});
  }
  
  /** Change the extension icon to the ready state, */
@@ -27,12 +29,17 @@ export function Record() {
     set(record);
 }
 
-/** Change the extension icon to the passed state. */
-export function Pass() {
-    set(pass);
+/** Change the extension icon to the inactve state. */
+export function Inactive() {
+    set(inactive);
 }
 
-/** Change the extension icon to the failed state. */
-export function Fail() {
-    set(fail);
-}
+// /** Change the extension icon to the passed state. */
+// export function Pass() {
+//     set(pass);
+// }
+
+// /** Change the extension icon to the failed state. */
+// export function Fail() {
+//     set(fail);
+// }
