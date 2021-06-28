@@ -27,7 +27,7 @@ chrome.action.onClicked.addListener(async function (tab) {
     let left = result?.window?.left ?? currentWindow.left + 100;
     let top = result?.window?.top ?? currentWindow.top + 100;
     let brimstoneWindow = await chrome.windows.create({
-      url: chrome.runtime.getURL(`ui.html?parent=${currentWindow.id}&tab=${tab.id}`),
+      url: chrome.runtime.getURL(`ui/workspace.html?parent=${currentWindow.id}&tab=${tab.id}`),
       type: "popup",
       focused: false,
       width,

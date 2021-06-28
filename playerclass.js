@@ -1,13 +1,8 @@
-import { pixelmatch } from "./pixelmatch.js"
+import { pixelmatch } from "./dependencies/pixelmatch.js"
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
-import * as iconState from "./iconState.js";
-
-async function autoReattacher() {
-
-}
 
 export class Player {
     /** The currently executing step. */
@@ -28,57 +23,16 @@ export class Player {
         this.tab = null;
     }
 
-    /** Attach the debugger to the given tab, and set the viewport size appropriately.
-     * @param {Tab} tab The tab to attach to
-     */
-    async attachDebugger(tab) {
-        this.tab = tab;
-
-        // If you are actually debugging the page yourself as a dev, you will trick this!
-        let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
-        if (targets.find(target => target.tabId === this.tab.id && target.attached)) {
-            console.log(`A debugger is already attached to tab ${this.tab.id}`);
-        }
-        else {
-            await new Promise(resolve => chrome.debugger.attach({ tabId: this.tab.id }, "1.3", resolve));
-            // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
-            // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
-            console.log(`debugger attached to ${this.tab.id}`);
-            await sleep(500); // the animation should practically be done aftre this, but even if it isn't we can deal with it
-
-            await tab.resizeViewport();
-            let that = this;
-            /** Automaticaly reattach the debugger if the recording navigated away from the page */
-            chrome.debugger.onDetach.addListener(async (source, reason) => {
-                console.log("The debugger was detached!!");
-                if (reason === 'canceled_by_user') {
-                    window.alert('Yo man, you cut your connection to Brimstone.')
-                }
-                else {
-                    // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
-                    console.warn('begin: re-attaching the debugger!');
-                    await that.attachDebugger(tab);
-                    console.warn('end:   re-attaching the debugger!');
-                }
-            });
-        }
-    }
-
-    // async detachDebugger() {
-    //     await new Promise(resolve => chrome.debugger.detach({ tabId: this.tab.id }, "1.3", resolve));   
-    // }
-
     /** 
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. */
     async play(steps) {
-        iconState.Play();
         this._playbackComplete = false;
 
         // start timer
         let start;
         let stop;
-        for (let i = 0; i < steps.length - 1; ++i) {
+        for (let i = 0; !this._playbackComplete && (i < steps.length - 1); ++i) {
             this.actionStep = steps[i];
             this.actionStep.status = 'playing';
             if (this.onBeforePlay) {
@@ -107,7 +61,6 @@ export class Player {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
-                iconState.Ready();
                 if (this.onAfterPlay) {
                     await this.onAfterPlay(this.actionStep);
                 }
@@ -116,7 +69,10 @@ export class Player {
             // end timer
         }
         this._playbackComplete = true;
-        iconState.Ready();
+    }
+
+    stop() {
+        this._playbackComplete = true;
     }
 
     async start(action) {
@@ -133,7 +89,7 @@ export class Player {
         // simulate a keypress https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchKeyEvent
         let keycode = action.event.keyCode;
 
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
+        await this.debuggerSendCommand('Input.dispatchKeyEvent', {
             type: 'keyDown',
             code: action.event.code,
             key: action.event.key,
@@ -159,9 +115,9 @@ export class Player {
                 windowsVirtualKeyCode: keycode,
                 nativeVirtualKeyCode: keycode
             };
-            await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', msg);
+            await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
         }
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchKeyEvent', {
+        await this.debuggerSendCommand('Input.dispatchKeyEvent', {
             type: 'keyUp',
             code: action.event.code,
             key: action.event.key,
@@ -171,7 +127,7 @@ export class Player {
     }
 
     async dblclick(action) {
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mousePressed',
             x: action.x,
             y: action.y,
@@ -180,7 +136,7 @@ export class Player {
             clickCount: 1,
             pointerType: 'mouse',
         });
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseReleased',
             x: action.x,
             y: action.y,
@@ -189,7 +145,7 @@ export class Player {
             clickCount: 1,
             pointerType: 'mouse',
         });
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mousePressed',
             x: action.x,
             y: action.y,
@@ -198,7 +154,7 @@ export class Player {
             clickCount: 2,
             pointerType: 'mouse',
         });
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseReleased',
             x: action.x,
             y: action.y,
@@ -211,7 +167,7 @@ export class Player {
 
     async _mouseclick(action, args) {
         // simulate a click https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchMouseEvent
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mousePressed',
             x: action.x,
             y: action.y,
@@ -220,7 +176,7 @@ export class Player {
             clickCount: 1,
             pointerType: 'mouse',
         });
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseReleased',
             x: action.x,
             y: action.y,
@@ -243,7 +199,7 @@ export class Player {
 
     async move(x, y) {
         console.log(`\t\tmove ${x},${y}`);
-        await this.debuggerSendCommand({ tabId: this.tab.id }, 'Input.dispatchMouseEvent', {
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
             x: x,
             y: y,
@@ -318,9 +274,73 @@ export class Player {
         return await Player.dataUrlToPNG(dataUrl);
     }
 
-    async debuggerSendCommand(debuggee, method, commandParams) {
-        return new Promise(resolve => chrome.debugger.sendCommand(debuggee, method, commandParams, resolve));
+    async debuggerSendCommand(method, commandParams) {
+        return new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve));
     }
+
+    /** I don't think you should call this. It takes too long for chrome to remove the banner after the debugger is detached.
+     * 
+     */
+    async detachDebugger() {
+        return;
+        try {
+            this._detachExpected = true;
+            console.log("detaching debugger");
+
+            // This is a crazy slow operation. Several seconds before the banner is removed.
+            await (new Promise(resolve => {
+                chrome.debugger.detach({ tabId: this.tab.id }, () => {
+                    resolve(chrome.runtime.lastError);
+                });
+            }));
+
+            await sleep(1000); // the animation should practically be done after this, but even if it isn't we can deal with it
+            await this.tab.resizeViewport();  // reset the viewport - I wish chrome did this.
+ 
+        }
+        catch(e) {
+            console.error(e);
+        }
+    }
+
+    /** Attach the debugger to the given tab, and set the viewport size appropriately.
+    * @param {Tab} tab The tab to attach to
+    */
+    async attachDebugger({ tab, canceled_by_user, debugger_already_attached }) {
+        this._detachExpected = false;
+        let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
+        if (targets.find(target => target.tabId === tab.id && target.attached)) {
+            debugger_already_attached();
+        }
+        else {
+            await new Promise(resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", resolve));
+            // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
+            // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
+            console.log(`debugger attached to ${tab.id}`);
+            this.tab = tab;
+            let player = this;
+            await sleep(500); // the animation should practically be done aftre this, but even if it isn't we can deal with it
+
+            await tab.resizeViewport();
+            /** Automatically reattach the debugger if the recording navigated away from the page */
+            chrome.debugger.onDetach.addListener(async (source, reason) => {
+                console.log("The debugger was detached!!");
+                if (reason === 'canceled_by_user') {
+                    await sleep(500);
+                    await tab.resizeViewport();
+                    canceled_by_user();
+                }
+                else if(this._detachExpected) { 
+                }
+                else {
+                    // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
+                    console.warn('try: re-attaching the debugger!');
+                    await player.attachDebugger({tab, canceled_by_user, debugger_already_attached});
+                    console.warn('end: re-attaching the debugger!');
+                }
+            });
+        }
+    };
 }
 
 Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
@@ -349,10 +369,3 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
         diffPng
     };
 };
-
-
-
-
-
-
-

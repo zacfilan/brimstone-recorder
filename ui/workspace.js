@@ -1,9 +1,8 @@
-import { Player } from "./playerclass.js"
-const PNG = png.PNG;
-const Buffer = buffer.Buffer;
-import { Tab } from "./tab.js"
-import * as iconState from "./iconState.js";
-import { Rectangle } from "./rectangle.js";
+import { Player } from "../playerclass.js"
+import { Tab } from "../tab.js"
+import * as iconState from "../iconState.js";
+import { Rectangle } from "../rectangle.js";
+import { Step, TextStep, ScreenshotStep, FailedStep, getCard, cards } from "./card.js";
 
 iconState.Ready();
 
@@ -22,10 +21,6 @@ var currentUrl;
 
 /* Some globals */
 
-/** This contains the in memory representation of all the steps that appear in the UI.
- * These are transformed into the test.json and screenshots in the zip file, and vice versa.
- * @type Card[] */
-var cards = [];
 
 var zip;
 
@@ -47,211 +42,6 @@ class UserAction extends UserEvent {
     clientX = 0;
     /** The x-offset of the element this event occured on */
     clientY = 0;
-}
-
-class Step {
-    constructor(args = {}) {
-        Object.assign(this, args);
-        if (!this.status) {
-            this.status = 'recorded';// // see ui.css
-        }
-    }
-}
-Step.instancesCreated = 0;
-
-class ScreenshotStep extends Step {
-    constructor(args = {}) {
-        super(args);
-    }
-
-    toJSON() {
-        let clone = Object.assign({}, this);
-        clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
-        return clone;
-    }
-
-    toThumb() {
-        return `
-        <div class='card ${this.status} thumb' data-index=${this.index}>
-            <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
-        </div>`;
-    }
-
-    toHtml() {
-        let o = this.overlay;
-        let html = `
-        <div class='step' data-index=${this.index}>
-          <div class='card ${this.status}' data-index=${this.index}>
-              <div class='title'>[${this.index}]</div>
-              <div class='screenshot'>
-                  <img draggable='false' class='expected' src='${this.expectedScreenshot.dataUrl}'>`;
-        if (this.overlay) {
-            let o = this.overlay;
-            html += `<div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
-        }
-        html += `
-              </div>
-              <div class='user-events'>
-                  <div class='user-event' data-index='${this.index}'>next action: ${this.description}</div>
-              </div>
-            </div>
-        </div>`;
-        return html;
-    }
-
-}
-
-function addRectangle({ x0, y0, width, height }) {
-    let ymax = y0 + height;
-    let xmax = x0 + width;
-    for (var y = y0; y <= ymax; y++) {
-        for (var x = x0; x <= xmax; x++) {
-            var idx = (this.width * y + x) << 2;
-            // [255, 165, 0, 255] // orange
-            this.data[idx] = 255;
-            this.data[idx + 1] = 165;
-            this.data[idx + 2] = 0;
-            this.data[idx + 3] = 255; // fully opaque
-        }
-    }
-}
-
-class FailedStep extends Step {
-    constructor(args = {}) {
-        super(args);
-        this.status = 'failed';
-        
-        /** 
-         * This is what will be shown when the card is rendered in the UI. It is not persisted. 
-         * When loaded it is set. When played it can be set.
-        */
-        this.diffDataUrl;
-    }
-    //        this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await zip.file(this.expectedScreenshot.fileName).async('base64');
-
-    toJSON() {
-        let clone = Object.assign({}, this);
-        clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
-        clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
-        if (clone.acceptablePixelDifferences) {
-            clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
-        }
-        delete clone.diffDataUrl;
-        return clone;
-    }
-
-    /** 
-     * When the user clicks the button, I want the current red pixels to all turn green, and the step to pass.
-     * 
-     */
-    async addMask($card) { // FIMXE: don't pass the card in...
-        if (!this.acceptablePixelDifferences) {
-            this.acceptablePixelDifferences = {};
-        }
-        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl; // what is shown currently. .
-        this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
-        if (this.acceptablePixelDifferences?.dataUrl) {
-            this.acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png; // convert to png
-        }
-
-        // manipulate the PNG
-        let volatileRegions = $card.find('.rectangle');
-        if (volatileRegions.length) {
-            let $image = $card.find('img');
-            let image = $image[0].getBoundingClientRect();
-            
-            // this is scaled
-            let xscale = this.acceptableErrorsPng.width / image.width;
-            let yscale = this.acceptableErrorsPng.height / image.height;
-
-            volatileRegions.each((index, rectangle) => {
-                // viewport relative measurements with scaled lengths
-                let rec = rectangle.getBoundingClientRect();
-
-                // make them image relative measurements with lengths scaled to the PNG
-                let pngRectangle = {
-                    x0: Math.floor((rec.left - image.left) * xscale),
-                    y0: Math.floor((rec.top - image.top) * yscale),
-                    width: Math.floor(rec.width * xscale),
-                    height: Math.floor(rec.height * yscale)
-                };
-
-                addRectangle.call(this.acceptableErrorsPng, pngRectangle);
-            });
-            // once this is done I need to turn this back into the diffDataUrl, since that is what will be show...and I do in pixelDiff function
-        }
-    }
-
-    /** (Re)calculate the difference between the expected screenshot
-    * and the actual screenshot, then apply mask
-    */
-    async pixelDiff() {
-        let { png: expectedPng } = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
-        let { png: actualPng } = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
-        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, this.acceptableErrorsPng);
-
-        this.numDiffPixels = numDiffPixels;
-        let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
-        this.percentDiffPixels = UiPercentDelta.toFixed(2);
-        this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
-        if (numMaskedPixels) {
-            this.status = 'corrected';
-        }
-    }
-
-    toThumb() {
-        return `
-        <div class='card ${this.status} thumb' data-index=${this.index}>
-            <img draggable='false' src='${this.expectedScreenshot.dataUrl}'>
-        </div>`;
-    }
-
-    toHtml() {
-        let o = this.overlay;
-        let html = `
-          <div class='step ${this.status}' data-index=${this.index}>
-              <div class='card expected ${this.status}' data-index=${this.index}>
-                  <div class='title'>[${this.index}]: Expected current screen (click image to toggle)</div>
-                  <div class='screenshot clickable'>
-                      <img src='${this.expectedScreenshot.dataUrl}'>`;
-        if (o) {
-            html += `<div class='overlay' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
-        }
-        html += `
-                  </div>
-                  <div class='user-events'>
-                      <div class='user-event' data-index='${this.index}'>next action: ${this.description}</div>
-                  </div>
-              </div>
-              <div class='card pixel-differences' data-index=${this.index}>
-                  <div class='title'>[${this.index}]: Difference (red pixels). ${this.numDiffPixels} pixels, ${this.percentDiffPixels}% different</div>
-                  <div class='screenshot'>
-                      <img src='${this.diffDataUrl}'>
-                  </div>
-                  <div class='user-events'>
-                      <span>
-                        <button class="ignore">Ignore</button>
-                        <button class="volatile">Volatile</button>
-                       </span>
-                  </div>
-              </div>
-          </div>`;
-        return html;
-    }
-}
-
-function getStep(element) {
-    let view = $(element).closest('.step');
-    let index = view.attr('data-index');
-    let model = cards[index];
-    return { view, model };
-}
-
-function getCard(element) {
-    let view = $(element).closest('.card');
-    let index = view.attr('data-index');
-    let model = cards[index];
-    return { view, model };
 }
 
 $('#content').on('click', 'button.ignore', async function (e) {
@@ -299,32 +89,7 @@ $('#content').on('click', '.screenshot.clickable', function (e) {
     }
 });
 
-class TextStep extends Step {
-    constructor(args = {}) {
-        super(args);
-    }
 
-    toThumb() {
-        return `
-            <div class='card {this.status} thumb' data-index=${this.index}'>
-            </div>`;
-    }
-
-    toHtml() {
-        let oHtml = `
-        <div class='step' data-index=${this.index}>
-          <div class='card ${this.status}'>
-              <div class='title'>[${this.index}]</div>
-              <div class='screenshot'>
-              </div>
-              <div class='user-events'>
-                  <div class='user-event'>${this.description}</div>
-              </div>
-          </div>
-        </div>`;
-        return oHtml;
-    }
-}
 
 /** highlist the element that was acted on in the screenshot
  * when the user hovers over the text of a user-event
@@ -351,17 +116,29 @@ $('#playButton').on('click', async () => {
         });
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
-
         await tab.fromChromeTabId(tabId);
         tab.height = cards[0].tabHeight;
         tab.width = cards[0].tabWidth;
         tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
-        await player.attachDebugger(tab);
 
+        await player.attachDebugger({
+            tab,
+            canceled_by_user: () => {
+                player.stop();
+                iconState.Ready();
+            },
+            debugger_already_attached: () => { throw 'debugger_already_attached' }
+        });
+
+        iconState.Play();
         await player.play(cards); // players gotta play...
+        iconState.Ready();
     }
     catch (e) {
-        if (e?.message !== 'screenshots do not match') {
+        if (e === 'debugger_already_attached') {
+            window.alert("You must close the existing debugger first.");
+        }
+        else if (e?.message !== 'screenshots do not match') {
             throw e;
         }
         await updateStepInView(e.failingStep); // update the UI with the pixel diff information
@@ -373,56 +150,82 @@ $('#endRecordingButton').on('click', async () => {
     await chrome.windows.update(tab.windowId, { focused: true });
     let action = await userEventToAction({ type: 'stop' });
     await updateStepInView(action);
-    stopRecording();
+    let x = await stopRecording();
+    console.log(x);
 });
 
 $('#recordButton').on('click', async () => {
-    await tab.fromChromeTabId(tabId);
-    console.log(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+    try {
+        await stopRecording();
+        await tab.fromChromeTabId(tabId);
+        console.log(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
-    // inorder to simulate any events we need to attach the debugger
-    await player.attachDebugger(tab);
+        // inorder to simulate any events we need to attach the debugger
+        await player.attachDebugger({
+            tab,
+            canceled_by_user: stopRecording,
+            debugger_already_attached: () => { throw 'debugger_already_attached' }
+        });
 
-    // establish the communication channel between the tab being recorded and the brimstone workspace window
-    await replaceOnConnectListener(tab.url);
+        // establish the communication channel between the tab being recorded and the brimstone workspace window
+        await listenOnPort(tab.url);
 
-    // during recording if we navigate to another page within the tab I will need to re-establish the connection
-    chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
+        // during recording if we navigate to another page within the tab I will need to re-establish the connection
+        chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
 
-    // update the UI: insert the first text card in the ui
-    let userEvent = {
-        type: 'start', // start recording
-        url: tab.url
-    };
-    let action = await userEventToAction(userEvent);
-    zip = new JSZip(); // FIXME: refactor so this isn't needed here!
-    await updateStepInView(action);
+        // update the UI: insert the first text card in the ui
+        let userEvent = {
+            type: 'start', // start recording
+            url: tab.url
+        };
+        let action = await userEventToAction(userEvent);
+        zip = new JSZip(); // FIXME: refactor so this isn't needed here!
+        await updateStepInView(action);
 
-    // last thing we do is give the focus back to the window and tab we want to record
-    await chrome.windows.update(tab.windowId, { focused: true });
-    await chrome.tabs.update(tab.id, {
-        highlighted: true,
-        active: true
-        // url: tab.url // shouldn't need that
-    });
+        // last thing we do is give the focus back to the window and tab we want to record
+        await chrome.windows.update(tab.windowId, { focused: true });
+        await chrome.tabs.update(tab.id, {
+            highlighted: true,
+            active: true
+            // url: tab.url // shouldn't need that
+        });
 
-    iconState.Record();
+        iconState.Record();
+    }
+    catch (e) {
+        await stopRecording();
+        if (e === 'debugger_already_attached') {
+            window.alert("You must close the existing debugger first.");
+        }
+        else if (e === "cannot_set_desired_viewport") {
+            window.alert("Cannot resize the recording window. Do not start a recording maximized, space is needed for the debugger banner.");
+            await stopRecording();
+        }
+        else {
+            throw e;
+        }
+    }
 });
 
-function stopRecording() {
+async function stopRecording() {
     // tell the endpoint to stop recording
     try {
-        postMessage({ type: 'stop' });
-        port.disconnect();
+        try {
+            postMessage({ type: 'stop' });
+            port.disconnect();
+        }
+        catch { }
+        chrome.webNavigation.onCompleted.removeListener(injectOnNavigation);
+        await player.detachDebugger();
+        iconState.Ready();
     }
-    catch { }
-    chrome.webNavigation.onCompleted.removeListener(injectOnNavigation);
-    iconState.Ready();
-    //player.detachDebugger();
+    catch (e) { 
+        console.error(e);
+    }
 }
 
 $('#clearButton').on('click', async () => {
-    stopRecording();
+    await stopRecording();
     Step.instancesCreated = 0;
 
     // remove the cards
@@ -477,8 +280,7 @@ $('#saveButton').on('click', async () => {
 });
 
 $('#loadButton').on('click', async () => {
-    stopRecording();
-
+    await stopRecording();
     let [fileHandle] = await window.showOpenFilePicker({
         suggestedName: `test.zip`,
         types: [
@@ -647,37 +449,51 @@ async function takeScreenshot() {
     };
 }
 
+/** One time */
 /** Set up  */
-async function replaceOnConnectListener(url) {
-    chrome.runtime.onConnect.addListener(function (_port) { // wait for a connect
-        port = _port; // make it global
-        // contentPort.onDisconnect.addListener(function(port) {
-        //     replaceOnConnectListener(); // listen again for the next connection
-        // });
-        console.log('PORT CONNECTED', port);
-        port.onMessage.addListener(async function (userEvent) {
-            console.log(`RX: ${userEvent.type}`, userEvent);
-            let action;
-            switch (userEvent.type) {
-                case 'click':
-                case 'keypress':
-                case 'contextmenu':
-                case 'dblclick':
-                    // update the UI with a screenshot
-                    action = await userEventToAction(userEvent);
-                    await updateStepInView(action);
-                    // Now simulate that event back in the recording, via the CDP
-                    await player[userEvent.type](userEvent);
-                    postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
-                    break;
-                case 'hello':
-                    console.log('got a new hello msg from injected content script');
-                    break;
-                default:
-                    console.error(`unexpected userEvent received <${userEvent.type}>`);
-                    break;
+async function listenOnPort(url) {
+    if (port) {
+        await injectScript(url); // inject a content script that will connect, really just need to restart the event listeners unless the ther end called disconnect.
+        return Promise.resolve(port);
+    }
+
+    let p = new Promise(resolve => {
+        chrome.runtime.onConnect.addListener(function (_port) { // wait for a connect
+            if (_port.name !== 'brimstone') {
+                return;
             }
+            port = _port; // make it global
+            // contentPort.onDisconnect.addListener(function(port) {
+            //     replaceOnConnectListener(); // listen again for the next connection
+            // });
+            console.log('PORT CONNECTED', port); // this will only happen once per window launch.
+            port.onMessage.addListener(async function (userEvent) {
+                console.log(`RX: ${userEvent.type}`, userEvent);
+                let action;
+                switch (userEvent.type) {
+                    case 'click':
+                    case 'keypress':
+                    case 'contextmenu':
+                    case 'dblclick':
+                        // update the UI with a screenshot
+                        action = await userEventToAction(userEvent);
+                        await updateStepInView(action);
+                        // Now simulate that event back in the recording, via the CDP
+                        await player[userEvent.type](userEvent);
+                        postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                        break;
+                    case 'hello':
+                        console.log('got a new hello msg from injected content script');
+                        break;
+                    default:
+                        console.error(`unexpected userEvent received <${userEvent.type}>`);
+                        break;
+                }
+            });
+            resolve(port);
         });
     });
+
     await injectScript(url); // inject a content script that will connect
+    return p;
 }

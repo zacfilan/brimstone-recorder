@@ -14,13 +14,10 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
     if (window.brimstomeRecorder !== undefined) {
         console.log('exiting existing recorder')
         brimstomeRecorder.exit(); // clean it up
-        console.log('Creating new recorder');
-        window.brimstomeRecorder = new Recorder(); // start over
-        return;
     }
 
-    // else we need to create it
-    console.log('Creating first recorder');
+    // create it
+    console.log('Creating new recorder');
     /**
      * Queue events that are triggered in response to certain user actions, 
      * and send them back over the postMessage connection to the UI.
@@ -37,7 +34,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
             this._simulatingEvents = false;
 
             console.log('connecting port');
-            this.port = chrome.runtime.connect({ name: "knockknock" });
+            this.port = chrome.runtime.connect({ name: "brimstone" });
             this.port.postMessage({ type: 'hello' });
             this.addEventListeners();
 
@@ -63,6 +60,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Clean up */
         exit() {
+            console.log('exit called');
             this.removeEventListeners();
         }
 

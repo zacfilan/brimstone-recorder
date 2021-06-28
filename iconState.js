@@ -1,7 +1,7 @@
-const record = {path: 'images/red_b_32.png',    title: 'Brimstone is recording.'};
-const play   = {path: 'images/green_b_32.png',  title: 'Brimstone is playing.'};
-const ready  = {path: 'images/orange_b_32.png', title: 'Brimstone is ready to play or record.'};
-const inactive = {path: 'images/grey_b_32.png', title: 'Brimstone is not active.'}
+const record = {path: '../images/red_b_32.png',    title: 'Brimstone is recording.'};
+const play   = {path: '../images/green_b_32.png',  title: 'Brimstone is playing.'};
+const ready  = {path: '../images/orange_b_32.png', title: 'Brimstone is ready to play or record.'};
+const inactive = {path: '../images/grey_b_32.png', title: 'Brimstone is not active.'}
 // const pass = {text: '\u2705', color: [255,255,255,255], title: 'Test passed.'};
 // const fail = {text: '\u274c', color: [255,255,255,255], title: 'Test failed'}
 

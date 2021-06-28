@@ -79,7 +79,7 @@ export class Tab {
         }
 
         if (i == 10) {
-            throw "window size will not settle!"
+            throw "cannot_set_desired_viewport";
         }
     }
 
