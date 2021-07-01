@@ -23,16 +23,22 @@ export class Player {
         this.tab = null;
     }
 
+    async continue() {
+        return this.play(this._steps, this.actionStep.index);
+    }
+
     /** 
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. */
-    async play(steps) {
+    async play(steps, startIndex = 0) {
+        this._steps = steps;
         this._playbackComplete = false;
+        this.mouseLocation = {x: -1, y:-1}; // off the viewport I guess
 
         // start timer
         let start;
         let stop;
-        for (let i = 0; !this._playbackComplete && (i < steps.length - 1); ++i) {
+        for (let i = startIndex; !this._playbackComplete && (i < steps.length - 1); ++i) {
             this.actionStep = steps[i];
             this.actionStep.status = 'playing';
             if (this.onBeforePlay) {
@@ -47,7 +53,18 @@ export class Player {
 
             try {
                 start = performance.now();
-                await this[this.actionStep.type](this.actionStep); // execute this guy
+
+                await this[this.actionStep.type](this.actionStep); // really perform this in the browser
+                // remember any mousemoving operation, implicit or explicit
+                switch (this.actionStep.type) {
+                    case 'click':
+                    case 'dblclick':
+                    case 'contextmenu':
+                    case 'mousemove':
+                        this.mouseLocation = {x: this.actionStep.x, y: this.actionStep.y};
+                        break;
+                }
+
                 await this.verifyScreenshot(this.nextStep);
                 stop = performance.now();
                 console.log(`\t\tscreenshot verified in ${stop - start}ms`);
@@ -68,6 +85,12 @@ export class Player {
             }
             // end timer
         }
+
+        // we played them all, the last step still needs style updating
+        if (this.onAfterPlay) {
+            await this.onAfterPlay(this.nextStep);
+        }
+
         this._playbackComplete = true;
     }
 
@@ -195,21 +218,23 @@ export class Player {
         return this._mouseclick(action, { button: 'left', buttons: 1 });
     }
 
-
-
-    async move(x, y) {
-        console.log(`\t\tmove ${x},${y}`);
+    async mousemove(action) {
+        console.log(`\t\tmousemove ${action.x},${action.y}`);
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
-            x: x,
-            y: y,
+            x: action.x,
+            y: action.y,
             pointerType: 'mouse'
         });
     }
 
     /**
-     * Repeatedly check the expected screenshot against the actual screenshot.
-     * Return when the match, throw if they do not within given time.
+     * Called after we play the current action.
+     * 
+     * Repeatedly check the expected screenshot required to start the next action
+     * against the actual screenshot. 
+     * 
+     * Return when they match, throw if they do not match within given time.
      * 
      * @returns 
      */
@@ -228,10 +253,16 @@ export class Player {
         while (((performance.now() - start) / 1000) < max_verify_timout) {
             await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
-            if (nextStep.type != 'keydown') {
-                // for any mouse operation, we first mouseover the location, so as to change the screen correctly with hover effect
-                await this.move(0, 0);
-                await this.move(nextStep.x, nextStep.y);
+            // There is an IMPLICIT mousemove before any *click* action. I don't make it explicit because I might need to do it several times to get to the correct state.
+            switch (nextStep.type) {
+                case 'click':
+                case 'dblclick':
+                case 'contextmenu':
+                    // if the next step is any implicit mouse operation, we want to mousein into the next location, so as to change the screen correctly with hover effect.
+                    // this requires moving (back) to the current location first, then into the next location 
+                    await this.mousemove(this.mouseLocation);
+                    await this.mousemove(nextStep);
+                    break;
             }
 
             actualScreenshot = await this.takeScreenshot();
@@ -296,9 +327,9 @@ export class Player {
 
             await sleep(1000); // the animation should practically be done after this, but even if it isn't we can deal with it
             await this.tab.resizeViewport();  // reset the viewport - I wish chrome did this.
- 
+
         }
-        catch(e) {
+        catch (e) {
             console.error(e);
         }
     }
@@ -330,12 +361,12 @@ export class Player {
                     await tab.resizeViewport();
                     canceled_by_user();
                 }
-                else if(this._detachExpected) { 
+                else if (this._detachExpected) {
                 }
                 else {
                     // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
                     console.warn('try: re-attaching the debugger!');
-                    await player.attachDebugger({tab, canceled_by_user, debugger_already_attached});
+                    await player.attachDebugger({ tab, canceled_by_user, debugger_already_attached });
                     console.warn('end: re-attaching the debugger!');
                 }
             });

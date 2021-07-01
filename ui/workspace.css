@@ -72,15 +72,21 @@ body {
 }
 
 .card .user-events {
-
     color: white;
     border-top: 1px solid black;
     padding: 1em 1em 1em 0;
 }
 
-.card.running {
-    background: blue;
+@keyframes pulse {
+    from {background: green;}
+    to {background: yellow;}
 }
+
+.card.playing.thumb {
+   animation-name: pulse;
+   animation-duration: 1s;
+}
+
 .card.recorded {
     background: blue;
 }
@@ -96,8 +102,6 @@ body {
 .card.corrected {
     background: orange;
 }
-
-
 
 .step {
     display: flex;

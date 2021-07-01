@@ -4,7 +4,11 @@ const PNG = png.PNG;
 /** This contains the in memory representation of all the steps that appear in the UI.
  * These are transformed into the test.json and screenshots in the zip file, and vice versa.
  * @type Card[] */
- export var cards = [];
+export var cards = [];
+
+export function clearCards() {
+    cards = [];
+}
 
 /** 
  * A step contains 2 cards. The first is the action card, which is the card that shows what the screen looks like,

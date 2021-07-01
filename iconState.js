@@ -12,6 +12,7 @@ function set({path, text, color, title}) {
         //chrome.action.setBadgeBackgroundColor({color});
     }
     chrome.action.setIcon({path});
+    $('#favicon').attr('href', path);
  }
  
  /** Change the extension icon to the ready state, */

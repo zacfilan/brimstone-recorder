@@ -2,7 +2,7 @@ import { Player } from "../playerclass.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
-import { Step, TextStep, ScreenshotStep, FailedStep, getCard, cards } from "./card.js";
+import { Step, TextStep, ScreenshotStep, FailedStep, getCard, cards, clearCards } from "./card.js";
 
 iconState.Ready();
 
@@ -20,7 +20,7 @@ var uiCardsElement = document.getElementById('cards');
 var currentUrl;
 
 /* Some globals */
-
+var _lastScreenshot;
 
 var zip;
 
@@ -145,6 +145,23 @@ $('#playButton').on('click', async () => {
     }
 });
 
+$('#continueButton').on('click', async () => {
+    try {
+        iconState.Play();
+        await player.continue(); // players gotta play...
+        iconState.Ready();
+    }
+    catch (e) {
+        if (e === 'debugger_already_attached') {
+            window.alert("You must close the existing debugger first.");
+        }
+        else if (e?.message !== 'screenshots do not match') {
+            throw e;
+        }
+        await updateStepInView(e.failingStep); // update the UI with the pixel diff information
+    }
+});
+
 $('#endRecordingButton').on('click', async () => {
     // before I take the last screenshot the window must have focus again.
     await chrome.windows.update(tab.windowId, { focused: true });
@@ -229,8 +246,10 @@ $('#clearButton').on('click', async () => {
     Step.instancesCreated = 0;
 
     // remove the cards
-    cards = [];
+    clearCards();
+
     $('#cards').empty();
+    $('#content .step').empty();
 });
 
 function postMessage(msg) {
@@ -370,7 +389,8 @@ async function updateStepInView(action) {
         $(`#cards .card[data-index=${step.index}]`).replaceWith($thumb);
         let c = $(`#cards .card[data-index=${step.index}]`);
         if (c.length) {
-            $('#cards').scrollLeft(c.position().left);
+            $('#cards').scrollLeft(0);
+            $('#cards').scrollLeft(c.position().left - 150);
         }
     }
     else {
@@ -408,20 +428,28 @@ async function userEventToAction(userEvent) {
     }
 
     switch (userEvent.type) {
+        case 'mousemove':
+            cardModel.description = `movemouse to (${userEvent.x}, ${userEvent.y})`;
+            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
+            await addScreenshot(cardModel);
+            break;
         case 'keypress':
-            cardModel.description = `type ${userEvent.event.key} at location (${userEvent.x}, ${userEvent.y})`;
+            cardModel.description = `type ${userEvent.event.key} in active element`;
             await addScreenshot(cardModel);
             break;
         case 'click':
             cardModel.description = `click at location (${userEvent.x}, ${userEvent.y})`;
+            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break;
         case 'contextmenu':
             cardModel.description = `right click at location (${userEvent.x}, ${userEvent.y})`;
+            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break;
         case 'dblclick':
             cardModel.description = `double click at location (${userEvent.x}, ${userEvent.y})`;
+//            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break
         case 'stop':
@@ -471,6 +499,17 @@ async function listenOnPort(url) {
                 console.log(`RX: ${userEvent.type}`, userEvent);
                 let action;
                 switch (userEvent.type) {
+                    case 'screenshot':
+                        _lastScreenshot = (await takeScreenshot()).dataUrl;
+                        postMessage({ type: 'complete', args: userEvent.type }); 
+                        break;
+                    case 'mousemove':
+                        // update the UI with a screenshot
+                        action = await userEventToAction(userEvent);
+                        await updateStepInView(action);
+                        // no simulation required
+                        postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                        break;
                     case 'click':
                     case 'keypress':
                     case 'contextmenu':
