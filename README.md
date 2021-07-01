@@ -19,6 +19,7 @@ Go to some website. Poke the (B) icon to start recording on this tab.
 * Type slowly. Brimstone is doing stuff for each key you press, and if you do too many too fast, some events may be missed. 
 * Always end your recording by pressing the 'End Recording' button.
 * Save your recordings.
+* Menus that pop up on hover can be recorded by holding down the Ctrl key, moving to the location that pops up the menu, then releasing the Ctrl key.
 
 ## Limitations
 As new features are added this list should hopefully get smaller.
