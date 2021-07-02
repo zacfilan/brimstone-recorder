@@ -1,36 +1,70 @@
 
 # What?
 
-Brimstone is a web application test recorder, test player and pixel perfect test validator all in one.
+Brimstone is a web application test recorder, test player and **pixel-perfect** test validator all in one.
 
-1. Fire up the brimstone recorder workspace for the current tab.
+1. Fire up the brimstone workspace for the current tab.
 2. Record some actions.
-3. Save them.
-4. Play them back anytime, and see if the app still works and looks *exactly* like it did when the test was recorded.
+3. Play the test back anytime, validate the app still works and looks *exactly* like it did when the test was recorded.
 
 Brimstone is a strict do no harm tester: it requires every pixel to be accounted for.
 
+# Why?
+
+We required effective, easy, automated do-no-harm testing to catch the most bugs between different code versions of a complex single page web application. This testing needed to be done by non-technical employees. (And I wanted to do something fun.)
+
+# How?
+
+Brimstone records screenshots of every user action performed. When a user performs an action she is implicitly indicating that the screen is in the expected completed state of the *previous* user action performed. In this way, the user implicitly determines the screen states required between actions. Brimstone uses this information during playback to determine timing and correctness of each user action.
+
+Brimstone directly uses the chrome devtools protocol via the chrome.debugger API to control the browser. 
+
+# Who?
+
+The intended audience is quality engineers, web-software developers, automation engineers, and you. :)
+
 # Recording
 
-Go to some website. Poke the (B) icon to start recording on this tab.  
+Still here? Cool. Go to some website. Poke the (B) icon to start recording on this tab.  
 
 ## Tips
 
-* Type slowly. Brimstone is doing stuff for each key you press, and if you do too many too fast, some events may be missed. 
+* Type slower than normal. (Two finger). Brimstone is doing stuff for each key you press, and if you do too many actions too fast, some events may be missed. 
 * Always end your recording by pressing the 'End Recording' button.
-* Save your recordings.
-* Menus that pop up on hover can be recorded by holding down the Ctrl key, moving to the location that pops up the menu, then releasing the Ctrl key.
+* Save and organize your recordings.
 
-## Limitations
-As new features are added this list should hopefully get smaller.
- 
-* Only user actions in the page itself are recorded. e.g. The browser back and forward buttons are not recorded.
-* Only click, double-click, right-click, and single-keypresses are recorded. e.g. Chords like Ctrl-A are not recorded.
-* Only tab one is recorded, although that tab is free to navigate to different URLs and still be recorded. e.g. Web application spawned browser windows/tabs are not included in the current recording.
+## FAQ
+1. How do I record things which pop up on hover, like certain menus?
+
+    Menus that pop up on hover can be recorded by holding down the Ctrl key, moving to the location that pops up the menu, then releasing the Ctrl key.
+
+2. Why can't I record a maximized tab?
+
+    Brimstone uses the chrome.debugger API, which injects a banner into the browser. You need to leave some space for it.
+
+3. Why do I get "You must close the existing debugger first" alerts when I try to record or play?
+
+    You can't start a recording or playback if there is already a debugger attached. Brimstone uses the chrome.debugger API, and can't reuse an existing connection. You can attach anohter debugger **after** the recording or playback has started though.
+
 
 # Playing
 
-Coming soon
-# Correcting
-Coming soon
+You can play back right after you end a recording, or when you load a saved test.
+
+* Playing will reuse the tab the workspace was launched from.
+Make sure that your tab will 
+
+# Validating 
+
+## Correcting
+
+# Limitations
+This list is subject to change, and will probably transition to a bug/issue tracked. Nothing's perfect man. But we're trying.  
+ 
+* Each test is recorded and played back in a fixed resolution. If you want to test different resoutions you need to record different tests.
+* Only user actions in the page itself are recorded. e.g. The browser back and forward buttons are not recorded.
+* Only click, double-click, right-click, and single-keypresses are recorded. e.g. Chords like Ctrl-A are not (yet) recorded.
+* Only one tab is recorded in a test, although that tab is free to navigate to different URLs and still be recorded. e.g. Web application spawned browser windows/tabs are not included in the current recording.
+
+
 

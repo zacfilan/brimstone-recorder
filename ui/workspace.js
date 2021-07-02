@@ -4,7 +4,7 @@ import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { Step, TextStep, ScreenshotStep, FailedStep, getCard, cards, clearCards } from "./card.js";
 
-iconState.Ready();
+setToolbarState();
 
 // grab the parent window id from the query parameter
 const urlParams = new URLSearchParams(window.location.search);
@@ -107,6 +107,41 @@ async function injectOnNavigation(obj) {
     }
 }
 
+function setToolbarState() {
+
+    let ifNoCards = !cards.length;
+
+    let rb = $('#recordButton');
+    if (rb.hasClass('active')) {
+        rb.prop('title', 'Brimstone is recording.\nClick to stop.');
+
+        $('#loadButton').prop('disabled', true);
+        $('#playButton').prop('disabled', true);
+        $('#saveButton').prop('disabled', true);
+        $('#clearButton').prop('disabled', true);
+        iconState.Record();
+    }
+    else {
+        rb.prop('title', "Click to record.");
+        $('#loadButton').prop('disabled', false);
+
+        if ($('#playButton').hasClass('active')) {
+
+            $('#loadButton').prop('disabled', true);
+            $('#saveButton').prop('disabled', true);
+            $('#clearButton').prop('disabled', true);
+            $('#recordButton').prop('disabled', true);
+            iconState.Play();
+        }
+        else {
+            $('#playButton').prop('disabled', ifNoCards);
+            $('#saveButton').prop('disabled', ifNoCards);
+            $('#clearButton').prop('disabled', ifNoCards);
+            iconState.Ready();
+        }
+    }
+}
+
 $('#playButton').on('click', async () => {
     // stopRecording(); // should not be necessary - button enable logic will prevent this
     try {
@@ -125,14 +160,18 @@ $('#playButton').on('click', async () => {
             tab,
             canceled_by_user: () => {
                 player.stop();
-                iconState.Ready();
+                setToolbarState(); // you were playing but no longer
             },
             debugger_already_attached: () => { throw 'debugger_already_attached' }
         });
 
-        iconState.Play();
+        $('#playButton').addClass('active');
+        setToolbarState();
+
         await player.play(cards); // players gotta play...
-        iconState.Ready();
+
+        $('#playButton').removeClass('active');
+        setToolbarState();
     }
     catch (e) {
         if (e === 'debugger_already_attached') {
@@ -162,18 +201,20 @@ $('#continueButton').on('click', async () => {
     }
 });
 
-$('#endRecordingButton').on('click', async () => {
-    // before I take the last screenshot the window must have focus again.
-    await chrome.windows.update(tab.windowId, { focused: true });
-    let action = await userEventToAction({ type: 'stop' });
-    await updateStepInView(action);
-    let x = await stopRecording();
-    console.log(x);
-});
+$('#recordButton').on('click', async function () {
+    let button = $(this);
+    if (button.hasClass('active')) {
+        button.removeClass('active'); // stop recording
+        // before I take the last screenshot the window must have focus again.
+        await chrome.windows.update(tab.windowId, { focused: true });
+        let action = await userEventToAction({ type: 'stop' });
+        await updateStepInView(action);
+        let x = await stopRecording();
+        console.log(x);
+        return;
+    }
 
-$('#recordButton').on('click', async () => {
     try {
-        await stopRecording();
         await tab.fromChromeTabId(tabId);
         console.log(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
@@ -207,7 +248,8 @@ $('#recordButton').on('click', async () => {
             // url: tab.url // shouldn't need that
         });
 
-        iconState.Record();
+        button.addClass('active');
+        setToolbarState();
     }
     catch (e) {
         await stopRecording();
@@ -225,6 +267,10 @@ $('#recordButton').on('click', async () => {
 });
 
 async function stopRecording() {
+    $('#recordButton').removeClass('active');
+    $('#playButton').removeClass('active');
+
+    setToolbarState();
     // tell the endpoint to stop recording
     try {
         try {
@@ -234,9 +280,8 @@ async function stopRecording() {
         catch { }
         chrome.webNavigation.onCompleted.removeListener(injectOnNavigation);
         await player.detachDebugger();
-        iconState.Ready();
     }
-    catch (e) { 
+    catch (e) {
         console.error(e);
     }
 }
@@ -247,6 +292,7 @@ $('#clearButton').on('click', async () => {
 
     // remove the cards
     clearCards();
+    setToolbarState();
 
     $('#cards').empty();
     $('#content .step').empty();
@@ -299,28 +345,31 @@ $('#saveButton').on('click', async () => {
 });
 
 $('#loadButton').on('click', async () => {
-    await stopRecording();
-    let [fileHandle] = await window.showOpenFilePicker({
-        suggestedName: `test.zip`,
-        types: [
-            {
-                description: 'A ZIP archive that can be run by Brimstone',
-                accept: { 'application/zip': ['.zip'] }
-            }
-        ]
-    });
-    const blob = await fileHandle.getFile();
-    zip = await (new JSZip()).loadAsync(blob);
-    let screenshots = await zip.folder('screenshots');
-    let test = JSON.parse(await zip.file("test.json").async("string"));
+    try {
+        let [fileHandle] = await window.showOpenFilePicker({
+            suggestedName: `test.zip`,
+            types: [
+                {
+                    description: 'A ZIP archive that can be run by Brimstone',
+                    accept: { 'application/zip': ['.zip'] }
+                }
+            ]
+        });
+        const blob = await fileHandle.getFile();
+        zip = await (new JSZip()).loadAsync(blob);
+        let screenshots = await zip.folder('screenshots');
+        let test = JSON.parse(await zip.file("test.json").async("string"));
 
-    let userEvents = test.steps;
+        let userEvents = test.steps;
 
-    for (let i = 0; i < userEvents.length; ++i) {
-        let userEvent = userEvents[i];
-        await updateStepInView(userEvent);
+        for (let i = 0; i < userEvents.length; ++i) {
+            let userEvent = userEvents[i];
+            await updateStepInView(userEvent);
+        }
+        setToolbarState();
     }
-
+    catch (e) {
+    }
 });
 
 async function injectScript(url) {
@@ -449,7 +498,7 @@ async function userEventToAction(userEvent) {
             break;
         case 'dblclick':
             cardModel.description = `double click at location (${userEvent.x}, ${userEvent.y})`;
-//            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
+            //            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break
         case 'stop':
@@ -501,7 +550,7 @@ async function listenOnPort(url) {
                 switch (userEvent.type) {
                     case 'screenshot':
                         _lastScreenshot = (await takeScreenshot()).dataUrl;
-                        postMessage({ type: 'complete', args: userEvent.type }); 
+                        postMessage({ type: 'complete', args: userEvent.type });
                         break;
                     case 'mousemove':
                         // update the UI with a screenshot
