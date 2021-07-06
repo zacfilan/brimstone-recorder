@@ -2,7 +2,7 @@ import { Player } from "../playerclass.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
-import { Step, TextStep, ScreenshotStep, FailedStep, getCard, cards, clearCards } from "./card.js";
+import { TestAction, getCard, status, Step } from "./card.js";
 
 setToolbarState();
 
@@ -46,10 +46,10 @@ class UserAction extends UserEvent {
 
 $('#content').on('click', 'button.ignore', async function (e) {
     // add a mask to the 
-    const { model, view } = getCard(e.currentTarget);
+    const { action, view } = getCard(e.currentTarget);
 
-    await model.addMask(view);
-    await updateStepInView(model);
+    await action.addMask(view);
+    await updateStepInView(action);
 });
 
 // stop the image drap behavior
@@ -70,8 +70,9 @@ $('#content').on('click', 'button.volatile', async function (e) {
 });
 
 $('#cards').on('click', '.thumb', async function (e) {
-    const { model } = getCard(e.currentTarget);
-    await setContentStep(model);
+    const { action } = getCard(e.currentTarget);
+    let step = new Step({curr: action });
+    setStepContent(step);
 });
 
 $('#content').on('click', '.screenshot.clickable', function (e) {
@@ -89,12 +90,10 @@ $('#content').on('click', '.screenshot.clickable', function (e) {
     }
 });
 
-
-
 /** highlist the element that was acted on in the screenshot
  * when the user hovers over the text of a user-event
  */
-$('#content').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
+$('#step').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
     $(`.overlay[data-index='${e.target.dataset.index}']`).toggle();
 });
 
@@ -109,7 +108,7 @@ async function injectOnNavigation(obj) {
 
 function setToolbarState() {
 
-    let ifNoCards = !cards.length;
+    let ifNoCards = !TestAction.instances.length;
 
     let rb = $('#recordButton');
     if (rb.hasClass('active')) {
@@ -145,15 +144,17 @@ function setToolbarState() {
 $('#playButton').on('click', async () => {
     // stopRecording(); // should not be necessary - button enable logic will prevent this
     try {
-        cards.forEach(card => {
-            card.status = 'notrun';
-            updateStepInView(card);
-        });
+        let actions = TestAction.instances;
+        for(let i=0; i < actions.length; ++i) {
+            let action = actions[i];
+             action.status = status.NOTRUN;
+             updateThumb(action);
+        }
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
         await tab.fromChromeTabId(tabId);
-        tab.height = cards[0].tabHeight;
-        tab.width = cards[0].tabWidth;
+        tab.height = actions[0].tabHeight;
+        tab.width = actions[0].tabWidth;
         tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
         await player.attachDebugger({
@@ -168,7 +169,7 @@ $('#playButton').on('click', async () => {
         $('#playButton').addClass('active');
         setToolbarState();
 
-        await player.play(cards); // players gotta play...
+        await player.play(actions); // players gotta play...
 
         $('#playButton').removeClass('active');
         setToolbarState();
@@ -288,10 +289,9 @@ async function stopRecording() {
 
 $('#clearButton').on('click', async () => {
     await stopRecording();
-    Step.instancesCreated = 0;
 
     // remove the cards
-    clearCards();
+    TestAction.instances = [];
     setToolbarState();
 
     $('#cards').empty();
@@ -360,17 +360,47 @@ $('#loadButton').on('click', async () => {
         let screenshots = await zip.folder('screenshots');
         let test = JSON.parse(await zip.file("test.json").async("string"));
 
-        let userEvents = test.steps;
+        let actions = test.steps;
 
-        for (let i = 0; i < userEvents.length; ++i) {
-            let userEvent = userEvents[i];
-            await updateStepInView(userEvent);
+        // start: [url, viewport]
+        // input: [click, type, double click, context menu]
+        // action: [expected screen, input]
+        // stop: expected screen
+        // test: start, action[, action], stop
+
+
+        // step: action, expected screen
+        // that is expected screen, action, expected screen
+        for (let i = 0; i < actions.length; ++i) {
+            let actionDescriptor = actions[i];
+            let testAction = new TestAction(actionDescriptor);
+            await testAction.hydrate(screenshots);
         }
+
+        // fun to watch them animate on load
+        let i;
+        for (i = 0; i < actions.length-1; ++i) {
+            let action = TestAction.instances[i];
+            updateStepInView(action);
+        }
+        updateThumb(TestAction.instances[i]);
+
         setToolbarState();
     }
     catch (e) {
+        console.error(e);
     }
 });
+
+/**
+ * Updates the UI, step (two cards) and the thumbnail for the given action.
+ * @param {Action} action The modified action.
+ */
+function updateStepInView(action) {
+    let step = new Step({ curr: action });
+    setStepContent(step);
+    updateThumb(action);
+}
 
 async function injectScript(url) {
     console.log(`injecting script into ${url}`);
@@ -390,62 +420,27 @@ async function injectScript(url) {
 }
 
 var port = false;
-function setContentStep(step) {
-    let $step = $(step.toHtml());
-    $('#content .step').replaceWith($step); // the big card
+
+function setStepContent(step) {
+    $('#step').html(step.toHtml()); // two cards in a step
 };
 
-/** The raw user action triggers an event which comes from the recording proess as a 'userEvent'. The userEvent is annotated 
- * into an action. The 'action' is passed into a particular 'step' generator, which is then
- * rendered in the UI. */
-async function updateStepInView(action) {
-    let step = new Step(action); // make sure it has a step number
-
-    if (step.actualScreenshot) {
-        let screenshots = zip.folder('screenshots');
-        // this step failed - we need to generate the diff
-        if (!step.expectedScreenshot.dataUrl) {
-            step.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.expectedScreenshot.fileName).async('base64');
-        }
-        if (!step.actualScreenshot.dataUrl) {
-            step.actualScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.actualScreenshot.fileName).async('base64');
-        }
-        if (step.acceptablePixelDifferences && !step.acceptablePixelDifferences.dataUrl) {
-            step.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.acceptablePixelDifferences.fileName).async('base64');
-        }
-
-        step = new FailedStep(step);
-        await step.pixelDiff();
-    }
-    else {
-        let screenshots = zip.folder('screenshots');
-        if (step.expectedScreenshot) {
-            if (!step.expectedScreenshot.dataUrl) {
-                step.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(step.expectedScreenshot.fileName).async('base64');
-            }
-            step = new ScreenshotStep(step);
-        }
-        else {
-            step = new TextStep(step);
-        }
-    }
-
-    setContentStep(step);
-    let $thumb = $(step.toThumb()); // smaller view
-
-    if (cards[step.index]) {
+/**
+ * uUpdate the thumb from the given action
+ * @param {Action} action 
+ */
+function updateThumb(action) {
+    let $thumb = $(action.toThumb()); // smaller view
+    let card = $(`#cards .card[data-index=${action.index}]`);
+    if (card.length) {
         // replace
-        $(`#cards .card[data-index=${step.index}]`).replaceWith($thumb);
-        let c = $(`#cards .card[data-index=${step.index}]`);
-        if (c.length) {
-            $('#cards').scrollLeft(0);
-            $('#cards').scrollLeft(c.position().left - 150);
-        }
+        card.replaceWith($thumb);
+        $('#cards').scrollLeft(0);
+        $('#cards').scrollLeft(card.position().left - 150);
     }
     else {
         uiCardsElement.appendChild($thumb[0]);
     }
-    cards[step.index] = step;
 }
 
 async function addScreenshot(step) {
@@ -461,7 +456,7 @@ async function addScreenshot(step) {
  */
 async function userEventToAction(userEvent) {
     let cardModel = userEvent; // start with the user event and convert to a cardModel (by adding some properties)
-    cardModel.index = Step.instancesCreated++;
+    cardModel.index = TestAction.instancesCreated++; // FIXME!!
 
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = tab.height;

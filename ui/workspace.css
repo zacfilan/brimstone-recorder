@@ -48,8 +48,8 @@ svg {
 
 #content {
     /* flex-grow: 12; */
-    /* display: flex; */
-    /* flex-direction: row; */
+    display: flex;
+    flex-direction: row;
     /* align-items: center; */
     /* justify-content: space-between; */
 }
@@ -60,17 +60,26 @@ svg {
     overflow: auto;
 }
 
+.action {
+    text-align: center;
+}
+
 .card {
     padding: 1em;
     width: 50%;
     height: 50%;
     display: flex;
     flex-direction: column;
-    margin-right: 2em;
-    margin-bottom: 1em;
+    margin: 1em;
+    /* margin-bottom: 1em; */
     border-radius: .6em;
-    box-shadow: 10px 5px 5px grey;
+    /* box-shadow: 10px 5px 5px grey; */
     background: linear-gradient(to right, #7474bf, #348ac7);
+}
+
+.card.empty {
+    height: 200px;
+    background: grey;
 }
 
 #cards .card {
@@ -140,8 +149,13 @@ svg {
     background: orange;
 }
 
+.card.next {
+    background: purple;
+}
+
 .step {
     display: flex;
+    flex-direction: row;
 }
 
 #recordButton, #playButton {

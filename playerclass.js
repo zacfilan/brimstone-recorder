@@ -3,6 +3,7 @@ const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
+import {status, Step} from "./ui/card.js";
 
 export class Player {
     /** The currently executing step. */
@@ -24,54 +25,54 @@ export class Player {
     }
 
     async continue() {
-        return this.play(this._steps, this.actionStep.index);
+        return this.play(this.actions, this.actionStep.index);
     }
 
     /** 
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. */
-    async play(steps, startIndex = 0) {
-        this._steps = steps;
+    async play(actions, startIndex = 0) {
+        this._actions = actions;
         this._playbackComplete = false;
         this.mouseLocation = {x: -1, y:-1}; // off the viewport I guess
 
         // start timer
         let start;
         let stop;
-        for (let i = startIndex; !this._playbackComplete && (i < steps.length - 1); ++i) {
-            this.actionStep = steps[i];
-            this.actionStep.status = 'playing';
-            if (this.onBeforePlay) {
-                await this.onBeforePlay(this.actionStep);
-            }
-            delete this.actionStep.actualScreenshot; // we are replaying this step, drop any previous results
-            console.log(`[${this.actionStep.index}] : ${this.actionStep.description}`);
+        for (let i = startIndex; !this._playbackComplete && (i < actions.length - 1); ++i) {
+            let action = actions[i];
+            action.status = status.PLAYING;
 
-            // preload the state that we expect when the current action completes.
-            // don't include this in the performance measurement.
-            this.nextStep = steps[i + 1];
+            if (this.onBeforePlay) {
+                await this.onBeforePlay(action);
+            }
+
+            delete action.actualScreenshot; // we are replaying this step, drop any previous results
+            console.log(`[${action.index}] : ${action.description}`);
 
             try {
                 start = performance.now();
 
-                await this[this.actionStep.type](this.actionStep); // really perform this in the browser
+                await this[action.type](action); // really perform this in the browser
                 // remember any mousemoving operation, implicit or explicit
-                switch (this.actionStep.type) {
+                switch (action.type) {
                     case 'click':
                     case 'dblclick':
                     case 'contextmenu':
                     case 'mousemove':
-                        this.mouseLocation = {x: this.actionStep.x, y: this.actionStep.y};
+                        this.mouseLocation = {x: action.x, y: action.y};
                         break;
                 }
 
-                await this.verifyScreenshot(this.nextStep);
+                let next = actions[i+1];
+                next.status = status.NEXT;
+                await this.verifyScreenshot(next);
                 stop = performance.now();
                 console.log(`\t\tscreenshot verified in ${stop - start}ms`);
-                this.actionStep.status = 'passed';
-                this.nextStep.status = 'passed';
+                action.status = status.PASS;
+                next.status = status.PASS;
                 if (this.onAfterPlay) {
-                    await this.onAfterPlay(this.actionStep);
+                    await this.onAfterPlay(action);
                 }
             }
             catch (e) {
@@ -79,16 +80,11 @@ export class Player {
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
                 if (this.onAfterPlay) {
-                    await this.onAfterPlay(this.actionStep);
+                    await this.onAfterPlay(action);
                 }
                 throw e;
             }
             // end timer
-        }
-
-        // we played them all, the last step still needs style updating
-        if (this.onAfterPlay) {
-            await this.onAfterPlay(this.nextStep);
         }
 
         this._playbackComplete = true;
@@ -274,7 +270,7 @@ export class Player {
                         dataUrl: actualScreenshot.dataUrl,
                         fileName: `step${nextStep.index}_actual.png`
                     };
-                    nextStep.status = 'corrected';
+                    nextStep.status = status.CORRECTED;
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
                 console.log(`step done in ${doneIn} seconds`);
@@ -287,7 +283,7 @@ export class Player {
             dataUrl: actualScreenshot.dataUrl,
             fileName: `step${nextStep.index}_actual.png`
         };
-        nextStep.status = 'failed';
+        nextStep.status = status.FAIL;
         throw {
             message: 'screenshots do not match',
             failingStep: nextStep // technicaly the current step executing the action (the actionStep) failed but, the error is visible on the step.
