@@ -42,6 +42,8 @@ export class Player {
         for (let i = startIndex; !this._playbackComplete && (i < actions.length - 1); ++i) {
             let action = actions[i];
             action.status = status.PLAYING;
+            let next = actions[i+1];
+            next.status = status.NEXT;
 
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
@@ -64,8 +66,7 @@ export class Player {
                         break;
                 }
 
-                let next = actions[i+1];
-                next.status = status.NEXT;
+
                 await this.verifyScreenshot(next);
                 stop = performance.now();
                 console.log(`\t\tscreenshot verified in ${stop - start}ms`);
@@ -79,6 +80,7 @@ export class Player {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
+                action.status = status.FAIL;
                 if (this.onAfterPlay) {
                     await this.onAfterPlay(action);
                 }
@@ -286,7 +288,6 @@ export class Player {
         nextStep.status = status.FAIL;
         throw {
             message: 'screenshots do not match',
-            failingStep: nextStep // technicaly the current step executing the action (the actionStep) failed but, the error is visible on the step.
         };
     }
 

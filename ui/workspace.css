@@ -60,8 +60,9 @@ svg {
     overflow: auto;
 }
 
-.action {
+#action {
     text-align: center;
+    font-size:18px;
 }
 
 .card {
@@ -103,7 +104,7 @@ svg {
 
 .card .title {
     color: white;
-    padding: 1em 1em 1em 0;
+    padding: 1em 0em;
 }
 
 .card .screenshot img {
@@ -112,8 +113,6 @@ svg {
 
 .card .screenshot .overlay {
     position: absolute;
-    background: red;
-    opacity: .3;
     display: none; /* initially hidden */
 }
 
@@ -149,8 +148,13 @@ svg {
     background: orange;
 }
 
-.card.next {
-    background: purple;
+.card .meter {
+    display: none;
+}
+
+/** only show the meter on the next card when playing back */
+.card.next .meter {
+    display: block;
 }
 
 .step {
@@ -169,6 +173,7 @@ svg {
     background-color: green;
     display: block;  
 }
+
 /** The pulsing rec record light **/
 @keyframes opacity {
     0% { opacity: 1;}
@@ -187,4 +192,49 @@ svg {
     top: 12px;
     left: 7px;
     animation: opacity 4s infinite;
+}
+
+@keyframes opacity2 {
+    0% { opacity: 0;}
+    50% {opacity: .5;}
+    100% {opacity: 0};
+}
+.pulse-rectangle {
+    background: red;
+    position: absolute;
+    /* opacity: 0; */
+    animation: opacity2 2s infinite;
+}
+
+.meter { 
+    height: 5px;
+    position: relative;
+    background: #f3efe6;
+    overflow: hidden;
+}
+
+.meter span {
+    display: block;
+    height: 100%;
+}
+
+.progress {
+    background-color: #e4c465;
+    animation: progressBar 15s ease-in-out;
+    animation-fill-mode:both; 
+
+}
+
+@keyframes progressBar { 
+  0% {
+    width: 0;
+    background-color: green;
+  }
+  75% {
+    background-color: orange;
+  }
+  100% { 
+    width: 100%;
+    background-color: red;
+  }
 }

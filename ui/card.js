@@ -91,7 +91,7 @@ export class TestAction extends UserAction {
     }
 
     /** 
-     * Some properties are populated async, which we can't do in a constuctor so... */
+     * Some properties are populated async, which we can't do in a constructor so... */
     async hydrate(screenshots) {
         if (this?.expectedScreenshot?.fileName) {
             if (!this?.expectedScreenshot?.dataUrl) {
@@ -167,8 +167,9 @@ export class TestAction extends UserAction {
 
                 addRectangle.call(this.acceptableErrorsPng, pngRectangle);
             });
-            // once this is done I need to turn this back into the diffDataUrl, since that is what will be show...and I do in pixelDiff function
         }
+        // once this is done I need to turn this back into the diffDataUrl, since that is what will be show...and I do in pixelDiff function
+        return await this.pixelDiff();
     }
 
     /** (Re)calculate the difference between the expected screenshot
@@ -182,6 +183,11 @@ export class TestAction extends UserAction {
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
+        
+        /** 
+         * This is what will be shown when the card is rendered in the UI. It is not persisted. 
+         * When loaded it is set. When played it can be set.
+        */
         this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         if (numMaskedPixels) {
             this.status = status.CORRECTED;
@@ -219,17 +225,8 @@ export class Step {
         this.next = args.next || TestAction.instances[this.curr.index + 1];
     }
 
-    /** 
-     * This is what will be shown when the card is rendered in the UI. It is not persisted. 
-     * When loaded it is set. When played it can be set.
-    */
-    diffDataUrl;
 
     toHtml() {
-        if (this.status === status.FAIL) {
-            return this._failView();
-        }
-
         let curr = this.curr;
         let next = this.next;
         let src = curr?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
@@ -242,59 +239,39 @@ export class Step {
                     <img src='${src}'>`;
         if (curr.overlay) {
             let o = curr.overlay;
-            html += `<div class='overlay' data-index=${curr.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
+            html += `<div class='overlay pulse-rectangle' data-index=${curr.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
         }
         html += `
                 </div>
-            </div>
+            </div>`;
+
+        if (next) {
+            if (curr.status === status.FAIL) {
+                html += `
+            <div class='card expected ${next.status}' data-index=${next.index}>
+                <div class='title'>[${next.index}]: Expected next screen (click image to toggle)</div>
+                <div class='screenshot clickable'>
+                    <img src='${nextSrc}'>;
+                </div>
+            </div>`;
+            }
+            else {
+                html += `
             <div class='card ${next.status}' data-index=${next.index}>
-                <div class='title'>[${next.index}]: Next screen. (after action completes)</div>
+                <div class='title'>[${next.index}]: Waiting for next screen
+                    <div class="meter">
+                        <span style="width:100%;"><span class="progress"></span></span>
+                    </div>
+                </div>
                 <div class='screenshot'>
                     <img src='${nextSrc}'>
                 </div>
-            </div>
-        </div>`;
-
-        if (curr.overlay) {
-            html += `<div id="action" class='user-event' data-index='${curr.index}'>next action: ${curr.description}</div>`
-        }
-
-        return html;
-    }
-
-    _failView() {
-        let curr = this.curr;
-        let src = curr?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
-        let html = `
-        <div id="content">
-            <div class='card expected ${curr.status}' data-index=${curr.index}>
-            <div class='title'>[${curr.index}]: Expected current screen (click image to toggle)</div>
-            <div class='screenshot clickable'>
-                    <img src='${src}'>`;
-        if (curr.overlay) {
-            let o = curr.overlay;
-            currCardHtml += `<div class='overlay' data-index=${curr.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
+            </div>`;
+            }
         }
         html += `
-                </div>
-            </div>
-            <div class='card pixel-differences' data-index=${curr.index}>
-                <div class='title'>[${curr.index}]: Difference (red pixels). ${curr.numDiffPixels} pixels, ${curr.percentDiffPixels}% different</div>
-                <div class='screenshot'>
-                    <img src='${curr.diffDataUrl}'>
-                </div>
-                <div class='user-events'>
-                    <span>
-                        <button class="ignore">Ignore</button>
-                        <button class="volatile">Volatile</button>
-                    </span>
-                </div>
-            </div>
-        </div>`;
-
-        if (curr.overlay) {
-            html += `<div id="action" class='user-event' data-index='${curr.index}'>next action: ${curr.description}</div>`
-        }
+        </div>
+        <div id="action" class='user-event' data-index='${curr.index}'>${curr.description}</div>`;
 
         return html;
     }

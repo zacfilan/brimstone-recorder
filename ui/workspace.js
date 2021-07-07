@@ -44,21 +44,22 @@ class UserAction extends UserEvent {
     clientY = 0;
 }
 
-$('#content').on('click', 'button.ignore', async function (e) {
+$('#step').on('click', 'button#ignoreDelta', async function (e) {
     // add a mask to the 
     const { action, view } = getCard(e.currentTarget);
 
     await action.addMask(view);
-    await updateStepInView(action);
+    await updateStepInView(TestAction.instances[action.index-1]);
 });
 
 // stop the image drap behavior
-$('#content').on('mousedown', '.card.pixel-differences img', () => false);
+$('#step').on('mousedown', '.card.pixel-differences img', () => false);
 
-$('#content').on('click', 'button.volatile', async function (e) {
+$('#step').on('click', 'button#ignoreRegion', async function (e) {
     // add a mask to the 
     const { view } = getCard(e.currentTarget);
     let screenshot = view.find('.screenshot');
+    screenshot.removeClass('clickable');
     Rectangle.setContainer(screenshot[0],
         () => {
             console.log('rectangle added');
@@ -75,18 +76,59 @@ $('#cards').on('click', '.thumb', async function (e) {
     setStepContent(step);
 });
 
-$('#content').on('click', '.screenshot.clickable', function (e) {
-    // flip the image
-    const { view, model } = getCard(e.currentTarget);
+$('#step').on('click', '.screenshot.clickable', function (e) {
+    // flip the cards
+    const { view, action } = getCard(e.currentTarget);
     if (view.hasClass('expected')) {
         view.removeClass('expected').addClass('actual');
-        view.find('img').attr('src', model.actualScreenshot.dataUrl);
-        view.find('.title').text(`[${model.index}]: Actual current screen (click image to toggle)`);
+        view.find('img').attr('src', action.actualScreenshot.dataUrl);
+        view.find('.title').text(`[${action.index}]: Actual next screen (click image to toggle)`);
+    }
+    else if(view.hasClass('actual')) {
+        view.replaceWith(`
+        <div class='card pixel-differences' data-index=${action.index}>
+            <div class='title'>[${action.index}]: Difference (red pixels). ${action.numDiffPixels} pixels, ${action.percentDiffPixels}% different
+                <button title="Ignore differences" id="ignoreDelta">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fal" data-icon="thumbs-up" role="img"
+                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-thumbs-up fa-w-16 fa-9x">
+                        <path fill="currentColor"
+                        d="M496.656 285.683C506.583 272.809 512 256 512 235.468c-.001-37.674-32.073-72.571-72.727-72.571h-70.15c8.72-17.368 20.695-38.911 20.695-69.817C389.819 34.672 366.518 0 306.91 0c-29.995 0-41.126 37.918-46.829 67.228-3.407 17.511-6.626 34.052-16.525 43.951C219.986 134.75 184 192 162.382 203.625c-2.189.922-4.986 1.648-8.032 2.223C148.577 197.484 138.931 192 128 192H32c-17.673 0-32 14.327-32 32v256c0 17.673 14.327 32 32 32h96c17.673 0 32-14.327 32-32v-8.74c32.495 0 100.687 40.747 177.455 40.726 5.505.003 37.65.03 41.013 0 59.282.014 92.255-35.887 90.335-89.793 15.127-17.727 22.539-43.337 18.225-67.105 12.456-19.526 15.126-47.07 9.628-69.405zM32 480V224h96v256H32zm424.017-203.648C472 288 472 336 450.41 347.017c13.522 22.76 1.352 53.216-15.015 61.996 8.293 52.54-18.961 70.606-57.212 70.974-3.312.03-37.247 0-40.727 0-72.929 0-134.742-40.727-177.455-40.727V235.625c37.708 0 72.305-67.939 106.183-101.818 30.545-30.545 20.363-81.454 40.727-101.817 50.909 0 50.909 35.517 50.909 61.091 0 42.189-30.545 61.09-30.545 101.817h111.999c22.73 0 40.627 20.364 40.727 40.727.099 20.363-8.001 36.375-23.984 40.727zM104 432c0 13.255-10.745 24-24 24s-24-10.745-24-24 10.745-24 24-24 24 10.745 24 24z"
+                        class=""></path>
+                    </svg>
+                </button>
+
+                <button title="Choose region to ignore" id="ignoreRegion">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fal" data-icon="expand-wide" role="img"
+                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-expand-wide fa-w-16 fa-9x">
+                        <path fill="currentColor"
+                        d="M0 212V88c0-13.3 10.7-24 24-24h124c6.6 0 12 5.4 12 12v8c0 6.6-5.4 12-12 12H32v116c0 6.6-5.4 12-12 12h-8c-6.6 0-12-5.4-12-12zM364 64h124c13.3 0 24 10.7 24 24v124c0 6.6-5.4 12-12 12h-8c-6.6 0-12-5.4-12-12V96H364c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12zm148 236v124c0 13.3-10.7 24-24 24H364c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h116V300c0-6.6 5.4-12 12-12h8c6.6 0 12 5.4 12 12zM148 448H24c-13.3 0-24-10.7-24-24V300c0-6.6 5.4-12 12-12h8c6.6 0 12 5.4 12 12v116h116c6.6 0 12 5.4 12 12v8c0 6.6-5.4 12-12 12z"
+                        class=""></path>
+                    </svg>
+                </button>
+
+                <button title="Undo and startover" id="undo">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo" class="svg-inline--fa fa-undo fa-w-16"
+                        role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                        <path fill="currentColor"
+                        d="M212.333 224.333H12c-6.627 0-12-5.373-12-12V12C0 5.373 5.373 0 12 0h48c6.627 0 12 5.373 12 12v78.112C117.773 39.279 184.26 7.47 258.175 8.007c136.906.994 246.448 111.623 246.157 248.532C504.041 393.258 393.12 504 256.333 504c-64.089 0-122.496-24.313-166.51-64.215-5.099-4.622-5.334-12.554-.467-17.42l33.967-33.967c4.474-4.474 11.662-4.717 16.401-.525C170.76 415.336 211.58 432 256.333 432c97.268 0 176-78.716 176-176 0-97.267-78.716-176-176-176-58.496 0-110.28 28.476-142.274 72.333h98.274c6.627 0 12 5.373 12 12v48c0 6.627-5.373 12-12 12z">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+            <div class='screenshot clickable'>
+            <img src='${action.diffDataUrl}'>
+        </div>
+        `);
     }
     else {
-        view.removeClass('actual').addClass('expected');
-        view.find('img').attr('src', model.expectedScreenshot.dataUrl);
-        view.find('.title').text(`[${model.index}]: Expected current screen (click image to toggle)`);
+        view.replaceWith(`
+        <div class='card expected ${action.status}' data-index=${action.index}>
+                <div class='title'>[${action.index}]: Expected next screen (click image to toggle)</div>
+                <div class='screenshot clickable'>
+                    <img src='${action.expectedScreenshot.dataUrl}'>;
+                </div>
+            </div>
+        `);
     }
 });
 
@@ -181,7 +223,6 @@ $('#playButton').on('click', async () => {
         else if (e?.message !== 'screenshots do not match') {
             throw e;
         }
-        await updateStepInView(e.failingStep); // update the UI with the pixel diff information
     }
 });
 
@@ -198,6 +239,7 @@ $('#continueButton').on('click', async () => {
         else if (e?.message !== 'screenshots do not match') {
             throw e;
         }
+        go.boom.now;
         await updateStepInView(e.failingStep); // update the UI with the pixel diff information
     }
 });
@@ -379,11 +421,14 @@ $('#loadButton').on('click', async () => {
 
         // fun to watch them animate on load
         let i;
-        for (i = 0; i < actions.length-1; ++i) {
+        for (i = 0; i < actions.length; ++i) {
             let action = TestAction.instances[i];
             updateStepInView(action);
+            await (new Promise(resolve => setTimeout(resolve, 1))); // force an update of the screen
+
         }
-        updateThumb(TestAction.instances[i]);
+
+        updateStepInView(TestAction.instances[0]);
 
         setToolbarState();
     }
