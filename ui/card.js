@@ -7,13 +7,23 @@ class Input {
 }
 
 export const status = {
-    FAIL: 'failed',
-    PASS: 'passed',
-    CORRECTED: 'corrected',
-    PLAYING: 'playing',
-    RECORDED: 'recorded',
-    NOTRUN: 'notrun',
-    NEXT: 'next'
+    /** the action card */
+    INPUT: 'input',
+
+    /** we are waiting for this one (implies playing) */
+    WAITING: 'waiting',
+
+    /** it has beed edited, and has allowed errors */
+    ALLOWED: 'allowed',
+
+    /** it doesn't match. (here is what we expected) */
+    EXPECTED: 'expected',
+
+    /** it doesn't match. (here is what we got) */
+    ACTUAL: 'actual',
+
+    /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
+    EDIT: 'edit'
 };
 
 /** A container for properties of a screenshot */
@@ -41,30 +51,15 @@ class Screenshot {
     }
 }
 
-/** Something the user does. Primarily, a tuple with a pre-requiste screenshot, and a subsequent input.
- * This is populated durig recording.
- */
-class UserAction {
+export class TestAction {
+    /** The status of the test step. */
+    status;
+
     /** 
      * What the screen should look like before the input action can be performed.
      * @type {Screenshot}  
      * */
     expectedScreenshot;
-
-    /** The input.
-     * @type {Input}
-     */
-    input;
-
-    constructor(args = {}) {
-        Object.assign(this, args);
-    }
-}
-
-/** Contains additional info about the status of testing (playing) a UserAction */
-export class TestAction extends UserAction {
-    /** The status of the test step. */
-    status;
 
     /** Optional. The actual screenshot, to be compared with the expected screenshot.
      * @type {Screenshot}
@@ -76,34 +71,27 @@ export class TestAction extends UserAction {
      */
     acceptablePixelDifferences;
 
-    constructor(args = {}) {
-        super(args);
-        if (!this.status) {
-            this.status = status.RECORDED;
-        }
+    constructor(args) {
+        Object.assign(this, args);
 
+        if (!this.status) {
+            this.status = status.INPUT;
+        }
         // make sure it has a step number
         if (this.index === undefined) {
-            this.index = TestActions.instances.length;
+            this.index = TestAction.instances.length;
         }
-
         TestAction.instances[this.index] = this;
     }
 
     /** 
      * Some properties are populated async, which we can't do in a constructor so... */
     async hydrate(screenshots) {
-        if (this?.expectedScreenshot?.fileName) {
-            if (!this?.expectedScreenshot?.dataUrl) {
-                this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.expectedScreenshot.fileName).async('base64');
-            }
+        if (this.expectedScreenshot && !this.expectedScreenshot.dataUrl) {
+            this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.expectedScreenshot.fileName).async('base64');
         }
 
         if (this.actualScreenshot) {
-            // this step failed - we need to generate the diff
-            if (!this.expectedScreenshot.dataUrl) {
-                this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.expectedScreenshot.fileName).async('base64');
-            }
             if (!this.actualScreenshot.dataUrl) {
                 this.actualScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.actualScreenshot.fileName).async('base64');
             }
@@ -111,14 +99,15 @@ export class TestAction extends UserAction {
                 this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.acceptablePixelDifferences.fileName).async('base64');
             }
 
-            this.status = status.FAIL;
             await this.pixelDiff();
         }
     }
 
     toJSON() {
         let clone = Object.assign({}, this);
-        clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
+        if (this.expectedScreenshot) {
+            clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
+        }
         if (this.actualScreenshot) {
             clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
         }
@@ -183,14 +172,17 @@ export class TestAction extends UserAction {
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
-        
+
         /** 
          * This is what will be shown when the card is rendered in the UI. It is not persisted. 
          * When loaded it is set. When played it can be set.
         */
         this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         if (numMaskedPixels) {
-            this.status = status.CORRECTED;
+            this.status = status.ALLOWED;
+        }
+        else if (this.numDiffPixels) {
+            this.status = status.EXPECTED;
         }
     }
 
@@ -201,6 +193,51 @@ export class TestAction extends UserAction {
             <img draggable='false' src='${src}'>
         </div>`;
     }
+
+    /** Return the html for the edit card view. */
+    toHtml() {
+        let title = 'Current screen';
+        let src = this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
+        switch (this.status) {
+            case status.WAITING: // we are waiting for this one (implies playing)
+                title = 'Waiting for next screen';
+                break;
+            case status.ALLOWED: // it has beed edited, and has allowed errors
+                title = "Expected next screen. This screen has allowed differences.";
+                break;
+            // these are all 'fail states'
+            case status.EXPECTED: // it doesn't match. (here is what we expected)
+                title = 'Expected next screen (click image to toggle)';
+                break;
+            case status.ACTUAL: // it doesn't match. (here is what we got)
+                title = 'Actual next screen (click image to toggle)';
+                src = this?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
+                break;
+            case status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
+                title = `Difference (red pixels). ${this.numDiffPixels} pixels, ${this.percentDiffPixels}% different`;
+                src = this.diffDataUrl ?? '../images/notfound.png'
+                break;
+        }
+
+        let html = `
+    <div class='card ${this.status}' data-index=${this.index}>
+        <div class='title'>[${this.index}]: ${title}</div>
+        <div class="meter">
+            <span style="width:100%;"><span class="progress"></span></span>
+        </div>
+        <div class='screenshot clickable'>
+            <img src='${src}'>`;
+        if (this.overlay) { // or this.status === status.INPUT
+            let o = this.overlay;
+            html += `<div class='overlay pulse-rectangle' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
+        }
+        html += `
+        </div>
+    </div>`;
+
+        return html;
+    }
+
 }
 TestAction.instances = [];
 
@@ -225,56 +262,22 @@ export class Step {
         this.next = args.next || TestAction.instances[this.curr.index + 1];
     }
 
-
     toHtml() {
-        let curr = this.curr;
-        let next = this.next;
-        let src = curr?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
-        let nextSrc = next?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
         let html = `
         <div id="content">
-            <div class='card expected ${curr.status}' data-index=${curr.index}>
-                <div class='title'>[${curr.index}]: Current screen</div>
-                <div class='screenshot'>
-                    <img src='${src}'>`;
-        if (curr.overlay) {
-            let o = curr.overlay;
-            html += `<div class='overlay pulse-rectangle' data-index=${curr.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
-        }
-        html += `
-                </div>
-            </div>`;
-
-        if (next) {
-            if (curr.status === status.FAIL) {
-                html += `
-            <div class='card expected ${next.status}' data-index=${next.index}>
-                <div class='title'>[${next.index}]: Expected next screen (click image to toggle)</div>
-                <div class='screenshot clickable'>
-                    <img src='${nextSrc}'>;
-                </div>
-            </div>`;
-            }
-            else {
-                html += `
-            <div class='card ${next.status}' data-index=${next.index}>
-                <div class='title'>[${next.index}]: Waiting for next screen
-                    <div class="meter">
-                        <span style="width:100%;"><span class="progress"></span></span>
-                    </div>
-                </div>
-                <div class='screenshot'>
-                    <img src='${nextSrc}'>
-                </div>
-            </div>`;
-            }
+            ${this.curr.toHtml()}
+            `;
+        if (this.next) {
+            html += this.next.toHtml();
         }
         html += `
         </div>
-        <div id="action" class='user-event' data-index='${curr.index}'>${curr.description}</div>`;
+        <div id="action" class='user-event' data-index='${this.curr.index}'>${this.curr.description}</div>
+        `;
 
         return html;
     }
+
 }
 
 function addRectangle({ x0, y0, width, height }) {

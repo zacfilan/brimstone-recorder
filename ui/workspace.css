@@ -11,14 +11,14 @@ body {
       color: white;
   }
 
-#toolbar {
+.toolbar {
     padding: .33em;
     display: flex;
     flex-direction: row;
     height: 40px;
 }
 
-#toolbar button {
+.toolbar button {
     background: unset;
     color: unset;
     border-radius: 3px;
@@ -26,16 +26,16 @@ body {
     margin:4px;
     font-size: larger;
 }
-#toolbar button[disabled], #toolbar button[disabled] i {
+.toolbar button[disabled], .toolbar button[disabled] i {
     opacity: .3;
     /* cursor: not-allowed; */
 }
-#toolbar button[disabled]:hover {
+.toolbar button[disabled]:hover {
     background: unset;
     cursor: unset;
 }
 
-#toolbar button:hover {
+.toolbar button:hover {
     background: rgba(0,0,0,0.3);
     cursor: pointer;
 }
@@ -94,7 +94,7 @@ svg {
     padding: none;
 }
 
-.card.pixel-differences .screenshot {
+.card.edit .screenshot {
     position: unset;
 }
 
@@ -122,41 +122,30 @@ svg {
     padding: 1em 1em 1em 0;
 }
 
-@keyframes pulse {
-    from {background: green;}
-    to {background: yellow;}
+/** card defaults */
+.card .meter {
+    visibility: hidden;
 }
 
-.card.playing.thumb {
-   animation-name: pulse;
-   animation-duration: 1s;
+
+.card.waiting .meter {
+    visibility: visible;
 }
 
-.card.recorded {
-    background: blue;
-}
-.card.notrun {
-    background: gray;
-}
-.card.failed {
+
+.card.expected, .card.actual {
     background: red;
 }
-.card.passed {
-    background: green;
-}
-.card.corrected {
+
+.card.edit {
     background: orange;
 }
 
-.card .meter {
-    display: none;
+.card.allowed {
+    background: orange;
 }
 
 /** only show the meter on the next card when playing back */
-.card.next .meter {
-    display: block;
-}
-
 .step {
     display: flex;
     flex-direction: row;

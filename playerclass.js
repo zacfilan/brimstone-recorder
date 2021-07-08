@@ -41,9 +41,9 @@ export class Player {
         let stop;
         for (let i = startIndex; !this._playbackComplete && (i < actions.length - 1); ++i) {
             let action = actions[i];
-            action.status = status.PLAYING;
+            action.status = status.INPUT;
             let next = actions[i+1];
-            next.status = status.NEXT;
+            next.status = status.WAITING;
 
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
@@ -70,8 +70,8 @@ export class Player {
                 await this.verifyScreenshot(next);
                 stop = performance.now();
                 console.log(`\t\tscreenshot verified in ${stop - start}ms`);
-                action.status = status.PASS;
-                next.status = status.PASS;
+                action.status = status.INPUT;
+                next.status = status.INPUT;
                 if (this.onAfterPlay) {
                     await this.onAfterPlay(action);
                 }
@@ -80,7 +80,7 @@ export class Player {
                 stop = performance.now();
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 this._playbackComplete = true;
-                action.status = status.FAIL;
+                action.status = status.INPUT;
                 if (this.onAfterPlay) {
                     await this.onAfterPlay(action);
                 }
@@ -248,6 +248,7 @@ export class Player {
         let max_verify_timout = 15; // seconds
 
         let actualScreenshot;
+        let differencesPng;
         while (((performance.now() - start) / 1000) < max_verify_timout) {
             await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
@@ -265,14 +266,15 @@ export class Player {
 
             actualScreenshot = await this.takeScreenshot();
             let actualPng = actualScreenshot.png;
-            let { numDiffPixels, numMaskedPixels } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+            let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, acceptableErrorsPng);
+            differencesPng = diffPng;
             if (numDiffPixels === 0) {
                 if (numMaskedPixels) {
                     nextStep.actualScreenshot = {
                         dataUrl: actualScreenshot.dataUrl,
                         fileName: `step${nextStep.index}_actual.png`
                     };
-                    nextStep.status = status.CORRECTED;
+                    nextStep.status = status.ALLOWED;
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
                 console.log(`step done in ${doneIn} seconds`);
@@ -281,11 +283,14 @@ export class Player {
         }
 
         // The screenshots don't match
-        nextStep.actualScreenshot = { // the presence of this indicates a failure of the action on the previous step to result in the required screenshot for the next step
+        nextStep.status = status.EXPECTED;
+        nextStep.actualScreenshot = { 
             dataUrl: actualScreenshot.dataUrl,
             fileName: `step${nextStep.index}_actual.png`
         };
-        nextStep.status = status.FAIL;
+        // and the editable image.
+        nextStep.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
+        
         throw {
             message: 'screenshots do not match',
         };
