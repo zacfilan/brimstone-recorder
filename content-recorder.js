@@ -210,8 +210,8 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
         'submit',       // blocked. ?
         'invalid',      // blocked. ?
         'change',       // blocked. it changes styles. e.g. (x) on a combobox.
-        'mouseleave',   // blocked. it changes styles. e.g. some hover approximations.
-        'mouseenter'    // blocked. it changes styles. e.g. some hover approximations.
+        'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
+        'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
     ];
 
     Recorder.block = function block(e) {
