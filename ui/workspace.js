@@ -3,8 +3,28 @@ import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, status, Step } from "./card.js";
+import { sleep } from "../utilities.js"
 
 setToolbarState();
+
+/** The index of the first card showing in big step area */
+function currentStepIndex() {
+    let index = $('#content .card:first-of-type').attr('data-index');
+    if (index) {
+        return index - 0; // convert to number
+    }
+    return -1; // not found
+}
+
+/** Are we in the recording state? */
+function isRecording() {
+    return $('#recordButton').hasClass('active');
+}
+
+/** Are we in the playing state? */
+function isPlaying() {
+    return $('#playButton').hasClass('active');
+}
 
 // grab the parent window id from the query parameter
 const urlParams = new URLSearchParams(window.location.search);
@@ -44,54 +64,59 @@ class UserAction extends UserEvent {
     clientY = 0;
 }
 
-$('#step').on('click', 'button#ignoreDelta', async function (e) {
+$('#ignoreDelta').on('click', async function (e) {
+ 
+    // if you are editing you are going to want to save, and to save we need to detach the debugger.
+    await player.detachDebugger();
+    
     // add a mask to the 
-    const { action, view } = getCard(e.currentTarget);
-
+    const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
     await action.addMask(view);
     action.status = status.EDIT; // stay on edit
-    await updateStepInView(TestAction.instances[action.index-1]);
+
+    updateStepInView(TestAction.instances[action.index - 1]);
+    
 });
 
 // stop the image drap behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
 
-$('#step').on('click', 'button#ignoreRegion', async function (e) {
+$('#ignoreRegion').on('click', async function (e) {
     // add a mask to the 
-    const { view } = getCard(e.currentTarget);
+    const { view } = getCard($('#content .card:nth-of-type(2)')[0]);
     let screenshot = view.find('.screenshot');
     screenshot.removeClass('clickable');
     Rectangle.setContainer(screenshot[0],
         () => {
-            console.log('rectangle added');
+            console.debug('rectangle added');
         },
         () => {
-            console.log('rectangle deleted');
+            console.debug('rectangle deleted');
         });
     // adds these to the DOM temporarily
 });
 
 $('#cards').on('click', '.thumb', async function (e) {
     const { action } = getCard(e.currentTarget);
-    let step = new Step({curr: action });
+    let step = new Step({ curr: action });
     setStepContent(step);
 });
 
 $('#step').on('click', '.screenshot.clickable', function (e) {
     // flip the cards
     const { view, action } = getCard(e.currentTarget);
-    if(action.status === status.EXPECTED) {
+    if (action.status === status.EXPECTED) {
         action.status = status.ACTUAL;
     }
-    else if(action.status === status.ACTUAL) {
+    else if (action.status === status.ACTUAL) {
         action.status = status.EDIT;
     }
     else {
         action.status = status.EXPECTED;
     }
-    
+
     // we can only click the 2nd card in the step not the first.
-    updateStepInView(TestAction.instances[action.index-1]);
+    updateStepInView(TestAction.instances[action.index - 1]);
 });
 
 /** highlist the element that was acted on in the screenshot
@@ -102,57 +127,90 @@ $('#step').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
 });
 
 async function injectOnNavigation(obj) {
-    console.log('GOT NAV in Recording Window', obj);
+    console.debug('inject on navigation called', obj);
     if (obj.url !== currentUrl) {
         currentUrl = obj.url;
         await injectScript(obj.url);
-        await tab.resizeViewport();
     }
 }
 
 function setToolbarState() {
-
-    let ifNoCards = !TestAction.instances.length;
+    $('button').prop('disabled', true); // start with all disabled and selectively enable some
 
     let rb = $('#recordButton');
-    if (rb.hasClass('active')) {
+    if (rb.hasClass('active')) { // recording?
+        rb.prop('disabled', false);
         rb.prop('title', 'Brimstone is recording.\nClick to stop.');
-
-        $('#loadButton').prop('disabled', true);
-        $('#playButton').prop('disabled', true);
-        $('#saveButton').prop('disabled', true);
-        $('#clearButton').prop('disabled', true);
         iconState.Record();
     }
     else {
         rb.prop('title', "Click to record.");
-        $('#loadButton').prop('disabled', false);
-
+        $('#loadButton').prop('disabled', false); // playing?
+        let pb = $('#playButton');
         if ($('#playButton').hasClass('active')) {
-
-            $('#loadButton').prop('disabled', true);
-            $('#saveButton').prop('disabled', true);
-            $('#clearButton').prop('disabled', true);
-            $('#recordButton').prop('disabled', true);
+            pb.prop('disabled', false);
             iconState.Play();
         }
         else {
-            $('#playButton').prop('disabled', ifNoCards);
-            $('#saveButton').prop('disabled', ifNoCards);
-            $('#clearButton').prop('disabled', ifNoCards);
+            // not playing, not recoding
+            rb.prop('disabled', false);
+
+            if (TestAction.instances.length) {
+                $('#saveButton').prop('disabled', false);
+                $('#clearButton').prop('disabled', false);
+
+                let index = currentStepIndex();
+                if (index > 0) {
+                    $("#previous").prop('disabled', false);
+                    $('#first').prop('disabled', false);
+                }
+                $('#playButton').prop('disabled', false);
+                if (index < TestAction.instances.length - 1) {
+                    $("#next").prop('disabled', false);
+                    $("#last").prop('disabled', false);
+                }
+            }
+
             iconState.Ready();
+        }
+    }
+
+    // buttons for editing allowable deltas in the second card.
+    let editCard = $('#content .card:nth-of-type(2)');
+    if (editCard.length) {
+        const { action } = getCard(editCard);
+        switch (action?.status) {
+            case status.EXPECTED:
+            case status.ACTUAL:
+            case status.ALLOWED:
+                $('#edit').prop('disabled', false);
+                break;
+            case status.EDIT:
+                $('#ignoreDelta').prop('disabled', false);
+                $('#ignoreRegion').prop('disabled', false);
+                break;
         }
     }
 }
 
+$('#first').on('click', function (e) {
+    updateStepInView(TestAction.instances[0]);
+});
+
+$('#previous').on('click', function (e) {
+    let index = currentStepIndex();
+    if (index > 0) {
+        updateStepInView(TestAction.instances[index - 1]);
+    }
+});
+
 $('#playButton').on('click', async () => {
-    // stopRecording(); // should not be necessary - button enable logic will prevent this
     try {
         let actions = TestAction.instances;
-        for(let i=0; i < actions.length; ++i) {
+        for (let i = 0; i < actions.length; ++i) {
             let action = actions[i];
-             action.status = status.INPUT;
-             updateThumb(action);
+            action.status = status.INPUT;
+            updateThumb(action);
         }
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
@@ -161,50 +219,106 @@ $('#playButton').on('click', async () => {
         tab.width = actions[0].tabWidth;
         tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
-        await player.attachDebugger({
-            tab,
-            canceled_by_user: () => {
-                player.stop();
-                setToolbarState(); // you were playing but no longer
-            },
-            debugger_already_attached: () => { throw 'debugger_already_attached' }
-        });
+        await player.attachDebugger({ tab }); // in order to play we only need the debugger attached
 
         $('#playButton').addClass('active');
         setToolbarState();
 
         await player.play(actions); // players gotta play...
-
         $('#playButton').removeClass('active');
         setToolbarState();
     }
     catch (e) {
+        $('#playButton').removeClass('active');
+        setToolbarState();
         if (e === 'debugger_already_attached') {
-            window.alert("You must close the existing debugger first.");
+            window.alert("You must close the existing debugger(s) first.");
         }
-        else if (e?.message !== 'screenshots do not match') {
-            throw e;
+        else {
+            if (e?.message !== 'screenshots do not match') {
+                throw e;
+            }
         }
+    }
+
+});
+
+$('#next').on('click', function (e) {
+    let index = currentStepIndex();
+    if (index < TestAction.instances.length - 1) {
+        updateStepInView(TestAction.instances[index + 1]);
     }
 });
 
-$('#continueButton').on('click', async () => {
-    try {
-        iconState.Play();
-        await player.continue(); // players gotta play...
-        iconState.Ready();
+$('#last').on('click', function (e) {
+    updateStepInView(TestAction.instances[TestAction.instances.length - 1]);
+});
+
+/** Called during playback or recording when the user input results in a navigation to another page.
+ * e.g. for a SPA test this would only occur on login or logout of the app.
+ */
+async function beforeNavigation(obj) {
+    console.debug(`before navigation: ${obj.url}`);
+}
+
+chrome.debugger.onDetach.addListener(async (source, reason) => {
+    console.debug('The debugger was detached.', source, reason);
+    if (reason === 'canceled_by_user') {
+        await sleep(500);
+        await player.tab.resizeViewport();
+        if (isRecording()) {
+            stopRecording();
+        }
+        if (isPlaying) {
+            stopPlaying(); // FIXME: refactor for less code
+        }
     }
-    catch (e) {
-        if (e === 'debugger_already_attached') {
-            window.alert("You must close the existing debugger first.");
-        }
-        else if (e?.message !== 'screenshots do not match') {
-            throw e;
-        }
-        go.boom.now;
-        await updateStepInView(e.failingStep); // update the UI with the pixel diff information
+    else {
+        // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
+        // i am not totally clear on the 
+        await player.attachDebugger({ tab }); // it's the same tab...
     }
 });
+
+async function completeNavigation(obj) {
+    console.debug(`complete navigation: ${obj.url}`);
+    await injectOnNavigation(obj);
+}
+
+function detachNavigationListeners() {
+    chrome.webNavigation.onBeforeNavigate.removeListener(beforeNavigation);
+    chrome.webNavigation.onCompleted.removeListener(completeNavigation);
+}
+
+function attachNavigationListeners() {
+    detachNavigationListeners();
+    chrome.webNavigation.onBeforeNavigate.addListener(beforeNavigation);
+    chrome.webNavigation.onCompleted.addListener(completeNavigation);
+}
+
+/** Set up everything needed for the workspace to communicate with the content script and vice-versa. */
+async function startCommunication(tab) {
+    // inorder to simulate any events we need to attach the debugger
+    await player.attachDebugger({ tab });
+
+    // establish the communication channel between the tab being recorded and the brimstone workspace window
+    await listenOnPort(tab.url);
+
+    // during recording if we navigate to another page within the tab I will need to re-establish the connection
+    attachNavigationListeners();
+}
+
+async function stopCommunication(tab) {
+    // tell the endpoint to stop recording. i.e. disable the event handlers if possible.
+    try {
+        postMessage({ type: 'stop' });
+        // port.disconnect(); // why disconnect? I might want to play right after and reuse the port.
+    }
+    catch (e) {
+        console.error(e);
+    }
+    detachNavigationListeners(); // navigation listeners inject the content-script, which we ONLY want to do when we are recording anyway.
+}
 
 $('#recordButton').on('click', async function () {
     let button = $(this);
@@ -213,28 +327,17 @@ $('#recordButton').on('click', async function () {
         // before I take the last screenshot the window must have focus again.
         await chrome.windows.update(tab.windowId, { focused: true });
         let action = await userEventToAction({ type: 'stop' });
-        await updateStepInView(action);
+        updateStepInView(action);
         let x = await stopRecording();
-        console.log(x);
+        //console.debug(x);
         return;
     }
 
     try {
         await tab.fromChromeTabId(tabId);
-        console.log(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+        console.debug(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
-        // inorder to simulate any events we need to attach the debugger
-        await player.attachDebugger({
-            tab,
-            canceled_by_user: stopRecording,
-            debugger_already_attached: () => { throw 'debugger_already_attached' }
-        });
-
-        // establish the communication channel between the tab being recorded and the brimstone workspace window
-        await listenOnPort(tab.url);
-
-        // during recording if we navigate to another page within the tab I will need to re-establish the connection
-        chrome.webNavigation.onCompleted.addListener(injectOnNavigation);
+        await startCommunication(tab);
 
         // update the UI: insert the first text card in the ui
         let userEvent = {
@@ -243,7 +346,7 @@ $('#recordButton').on('click', async function () {
         };
         let action = await userEventToAction(userEvent);
         zip = new JSZip(); // FIXME: refactor so this isn't needed here!
-        await updateStepInView(action);
+        updateStepInView(action);
 
         // last thing we do is give the focus back to the window and tab we want to record
         await chrome.windows.update(tab.windowId, { focused: true });
@@ -257,13 +360,12 @@ $('#recordButton').on('click', async function () {
         setToolbarState();
     }
     catch (e) {
-        await stopRecording();
+        await stopCommunication();
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger first.");
         }
         else if (e === "cannot_set_desired_viewport") {
             window.alert("Cannot resize the recording window. Do not start a recording maximized, space is needed for the debugger banner.");
-            await stopRecording();
         }
         else {
             throw e;
@@ -273,42 +375,32 @@ $('#recordButton').on('click', async function () {
 
 async function stopRecording() {
     $('#recordButton').removeClass('active');
-    $('#playButton').removeClass('active');
-
     setToolbarState();
-    // tell the endpoint to stop recording
-    try {
-        try {
-            postMessage({ type: 'stop' });
-            port.disconnect();
-        }
-        catch { }
-        chrome.webNavigation.onCompleted.removeListener(injectOnNavigation);
-        await player.detachDebugger();
-    }
-    catch (e) {
-        console.error(e);
-    }
+    stopCommunication(tab);
+}
+
+async function stopPlaying() {
+    $('#playButton').removeClass('active');
+    setToolbarState();
+    stopCommunication(tab);
 }
 
 $('#clearButton').on('click', async () => {
-    await stopRecording();
-
     // remove the cards
     TestAction.instances = [];
     setToolbarState();
 
     $('#cards').empty();
-    $('#content .step').empty();
+    $('#step').empty();
 });
 
 function postMessage(msg) {
-    console.log('TX', msg);
+    console.debug('TX', msg);
     port.postMessage(msg);
 }
 
 $('#saveButton').on('click', async () => {
-    console.log('create zip');
+    console.debug('create zip');
     zip = new JSZip();
     zip.file('test.json', JSON.stringify({ steps: TestAction.instances }, null, 2)); // add the test.json file to archive
     var screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
@@ -332,8 +424,8 @@ $('#saveButton').on('click', async () => {
         }
     }
 
-    console.log('save zip to disk');
-    let blob = await zip.generateAsync({ type: "blob" });
+    console.debug('save zip to disk');
+    let blobpromise = zip.generateAsync({ type: "blob" });
     const handle = await window.showSaveFilePicker({
         suggestedName: `test.zip`,
         types: [
@@ -344,6 +436,7 @@ $('#saveButton').on('click', async () => {
         ]
     });
     const writable = await handle.createWritable();
+    let blob = await blobpromise;
     await writable.write(blob);  // Write the contents of the file to the stream.    
     await writable.close(); // Close the file and write the contents to disk.
 });
@@ -410,7 +503,7 @@ function updateStepInView(action) {
 }
 
 async function injectScript(url) {
-    console.log(`injecting script into ${url}`);
+    console.debug(`injecting script into ${url}`);
 
     await (new Promise(resolve => chrome.storage.sync.set({ injectedArgs: { url } }, resolve)));
     await (new Promise(resolve => chrome.scripting.executeScript({
@@ -430,6 +523,7 @@ var port = false;
 
 function setStepContent(step) {
     $('#step').html(step.toHtml()); // two cards in a step
+    setToolbarState();
 };
 
 /**
@@ -507,7 +601,7 @@ async function userEventToAction(userEvent) {
             await addScreenshot(cardModel);
             break;
         case 'start': {
-            cardModel.description = `start recording from ${cardModel.url}`;
+            cardModel.description = `goto ${cardModel.url}`;
             break;
         }
         default:
@@ -521,17 +615,21 @@ async function takeScreenshot() {
     let dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: 'png'
     });
-    console.log('\t\tscreenshot taken');
+    console.debug('\t\tscreenshot taken');
     return {
         dataUrl
     };
 }
 
-/** One time */
-/** Set up  */
+/** 
+ * Inject the content script into the tab we intend to interact with.
+ * Wait for the content script to connect to us on the port named 'brimstone'.
+ * 
+ * If our port is already connected, restart the event listeners.
+*/
 async function listenOnPort(url) {
     if (port) {
-        await injectScript(url); // inject a content script that will connect, really just need to restart the event listeners unless the ther end called disconnect.
+        postMessage({ type: 'start' });
         return Promise.resolve(port);
     }
 
@@ -541,12 +639,13 @@ async function listenOnPort(url) {
                 return;
             }
             port = _port; // make it global
-            // contentPort.onDisconnect.addListener(function(port) {
-            //     replaceOnConnectListener(); // listen again for the next connection
-            // });
-            console.log('PORT CONNECTED', port); // this will only happen once per window launch.
+            port.onDisconnect.addListener(function (_port) {
+                console.debug('port was disconnected!', port);
+                port = false;
+            });
+            console.debug('port connected', port); // this will only happen once per window launch.
             port.onMessage.addListener(async function (userEvent) {
-                console.log(`RX: ${userEvent.type}`, userEvent);
+                console.debug(`RX: ${userEvent.type}`, userEvent);
                 let action;
                 switch (userEvent.type) {
                     case 'screenshot':
@@ -556,7 +655,7 @@ async function listenOnPort(url) {
                     case 'mousemove':
                         // update the UI with a screenshot
                         action = await userEventToAction(userEvent);
-                        await updateStepInView(action);
+                        updateStepInView(action);
                         // no simulation required
                         postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                         break;
@@ -566,13 +665,13 @@ async function listenOnPort(url) {
                     case 'dblclick':
                         // update the UI with a screenshot
                         action = await userEventToAction(userEvent);
-                        await updateStepInView(action);
+                        updateStepInView(action);
                         // Now simulate that event back in the recording, via the CDP
                         await player[userEvent.type](userEvent);
                         postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
                         break;
                     case 'hello':
-                        console.log('got a new hello msg from injected content script');
+                        console.debug('got a new hello msg from injected content script');
                         break;
                     default:
                         console.error(`unexpected userEvent received <${userEvent.type}>`);

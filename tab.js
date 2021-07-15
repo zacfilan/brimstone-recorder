@@ -59,14 +59,17 @@ export class Tab {
     /** Resize the viewport of this tab to match its width, height and zoom properties.
      * */
     async resizeViewport() {
-        console.log(`resize viewport to ${this.width}x${this.height}`);
+        // empirically, it needs to be visible to work
+        await chrome.windows.update(this.windowId, { focused: true });
+
+        //console.debug(`resize viewport to ${this.width}x${this.height}`);
  
         let i = 0;
         for (i = 0; i < 10; i++) {
             let distance = await this.getViewport();
             if(distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
                 // it's wrong
-                console.log(`**window resized to contain desired viewport`);
+                console.debug(`window resize was performed to contain desired viewport`);
                 await chrome.windows.update(this.windowId, {
                     width: distance.borderWidth + this.zoomWidth,
                     height: distance.borderHeight + this.zoomHeight

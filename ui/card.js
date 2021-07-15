@@ -114,7 +114,13 @@ export class TestAction {
         if (clone.acceptablePixelDifferences) {
             clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
         }
+
         delete clone.diffDataUrl;
+        delete clone.numDiffPixels;
+        delete clone.percentDiffPixels;
+        delete clone.acceptableErrorsPng;
+        // FIXME: rather than add and delete can I prevent this by construction or make it easier to delete via encapsulation
+
         return clone;
     }
 

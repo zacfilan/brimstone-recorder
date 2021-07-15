@@ -11,31 +11,33 @@ body {
       color: white;
   }
 
-.toolbar {
+#toolbar {
     padding: .33em;
     display: flex;
     flex-direction: row;
     height: 40px;
+    justify-content: space-between;
 }
 
-.toolbar button {
+#toolbar button {
     background: unset;
     color: unset;
     border-radius: 3px;
     border:0;
     margin:4px;
     font-size: larger;
+    height: 31px;
 }
-.toolbar button[disabled], .toolbar button[disabled] i {
+#toolbar button[disabled], #toolbar button[disabled] i {
     opacity: .3;
     /* cursor: not-allowed; */
 }
-.toolbar button[disabled]:hover {
+#toolbar button[disabled]:hover {
     background: unset;
     cursor: unset;
 }
 
-.toolbar button:hover {
+#toolbar button:hover {
     background: rgba(0,0,0,0.3);
     cursor: pointer;
 }
@@ -154,33 +156,11 @@ svg {
 #recordButton, #playButton {
     position: relative; /** let the recording overlay in this **/
 }
-#recordButton.active .circle {
-    background-color: red;
-    display: block;
+#recordButton.active {
+    background: red;
 }
-#playButton.active .circle {
-    background-color: green;
-    display: block;  
-}
-
-/** The pulsing rec record light **/
-@keyframes opacity {
-    0% { opacity: 1;}
-    50% {opacity: .5;}
-    100% {opacity: 1};
-}
-
-.circle {
-    display:none;
-    border-radius: 50%;
-    width: 7px;
-    height: 7px;
-    position: absolute;
-    opacity: 0;
-    /** set it in top left **/
-    top: 12px;
-    left: 7px;
-    animation: opacity 4s infinite;
+#playButton.active {
+    background: green;
 }
 
 @keyframes opacity2 {
@@ -191,7 +171,6 @@ svg {
 .pulse-rectangle {
     background: red;
     position: absolute;
-    /* opacity: 0; */
     animation: opacity2 2s infinite;
 }
 
@@ -211,7 +190,6 @@ svg {
     background-color: #e4c465;
     animation: progressBar 15s ease-in-out;
     animation-fill-mode:both; 
-
 }
 
 @keyframes progressBar { 

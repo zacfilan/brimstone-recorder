@@ -3,7 +3,7 @@ const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
-import {status, Step} from "./ui/card.js";
+import { status } from "./ui/card.js";
 
 export class Player {
     /** The currently executing step. */
@@ -16,6 +16,12 @@ export class Player {
 
     _playbackComplete = false;
 
+    /** resolved when the last scheduled debugger detach is done. */
+    _debuggerDetachPromise;
+
+    /** resolved when the last scheduled debugger attached is done. */
+    _debuggerAttachPromise;
+
     constructor() {
         /**
          * The tab we are playing on.
@@ -24,17 +30,13 @@ export class Player {
         this.tab = null;
     }
 
-    async continue() {
-        return this.play(this.actions, this.actionStep.index);
-    }
-
     /** 
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. */
     async play(actions, startIndex = 0) {
         this._actions = actions;
         this._playbackComplete = false;
-        this.mouseLocation = {x: -1, y:-1}; // off the viewport I guess
+        this.mouseLocation = { x: -1, y: -1 }; // off the viewport I guess
 
         // start timer
         let start;
@@ -42,7 +44,7 @@ export class Player {
         for (let i = startIndex; !this._playbackComplete && (i < actions.length - 1); ++i) {
             let action = actions[i];
             action.status = status.INPUT;
-            let next = actions[i+1];
+            let next = actions[i + 1];
             next.status = status.WAITING;
 
             if (this.onBeforePlay) {
@@ -53,6 +55,14 @@ export class Player {
             console.log(`[${action.index}] : ${action.description}`);
 
             try {
+                switch (action.type) {
+                    case 'click':
+                    case 'dblclick':
+                    case 'contextmenu':
+                    case 'mousemove':
+                        await sleep(500); // it takes a person a while to move to an click something on the next turn. No one is as fast as the computer can be.
+                        break;
+                }
                 start = performance.now();
 
                 await this[action.type](action); // really perform this in the browser
@@ -62,14 +72,13 @@ export class Player {
                     case 'dblclick':
                     case 'contextmenu':
                     case 'mousemove':
-                        this.mouseLocation = {x: action.x, y: action.y};
+                        this.mouseLocation = { x: action.x, y: action.y };
                         break;
                 }
 
-
                 await this.verifyScreenshot(next);
                 stop = performance.now();
-                console.log(`\t\tscreenshot verified in ${stop - start}ms`);
+                console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
                 action.status = status.INPUT;
                 next.status = status.INPUT;
                 if (this.onAfterPlay) {
@@ -217,7 +226,7 @@ export class Player {
     }
 
     async mousemove(action) {
-        console.log(`\t\tmousemove ${action.x},${action.y}`);
+        //console.debug(`\t\tmousemove ${action.x},${action.y}`);
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
             x: action.x,
@@ -249,7 +258,9 @@ export class Player {
 
         let actualScreenshot;
         let differencesPng;
+        let i=0;
         while (((performance.now() - start) / 1000) < max_verify_timout) {
+            ++i;
             await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
             // There is an IMPLICIT mousemove before any *click* action. I don't make it explicit because I might need to do it several times to get to the correct state.
@@ -277,20 +288,21 @@ export class Player {
                     nextStep.status = status.ALLOWED;
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
-                console.log(`step done in ${doneIn} seconds`);
+                let avgIteration = (doneIn/i).toFixed(1);
+                console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
                 return;
             }
         }
 
         // The screenshots don't match
         nextStep.status = status.EXPECTED;
-        nextStep.actualScreenshot = { 
+        nextStep.actualScreenshot = {
             dataUrl: actualScreenshot.dataUrl,
             fileName: `step${nextStep.index}_actual.png`
         };
         // and the editable image.
         nextStep.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
-        
+
         throw {
             message: 'screenshots do not match',
         };
@@ -308,72 +320,55 @@ export class Player {
     }
 
     async debuggerSendCommand(method, commandParams) {
-        return new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve));
+        await this._debuggerDetachPromise;
+        await this._debuggerAttachPromise;
+        await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
     }
 
-    /** I don't think you should call this. It takes too long for chrome to remove the banner after the debugger is detached.
-     * 
-     */
+    /** Schedule detaching the debugger from the current tab.*/
     async detachDebugger() {
-        return;
-        try {
-            this._detachExpected = true;
-            console.log("detaching debugger");
+        console.debug("schedule detaching debugger");
+        //await this._attachDebuggerPromise; // if there is one in flight wait for it.
 
-            // This is a crazy slow operation. Several seconds before the banner is removed.
-            await (new Promise(resolve => {
-                chrome.debugger.detach({ tabId: this.tab.id }, () => {
-                    resolve(chrome.runtime.lastError);
-                });
-            }));
-
-            await sleep(1000); // the animation should practically be done after this, but even if it isn't we can deal with it
-            await this.tab.resizeViewport();  // reset the viewport - I wish chrome did this.
-
-        }
-        catch (e) {
-            console.error(e);
-        }
+        this._debuggerDetachPromise = new Promise(resolve => {
+            chrome.debugger.detach({ tabId: this.tab.id }, () => {
+                resolve(chrome.runtime.lastError);
+            });
+        });
+        await this._debuggerDetachPromise;
+        console.debug("debugger detached");
     }
 
-    /** Attach the debugger to the given tab, and set the viewport size appropriately.
+    /** Schedule attaching the debugger to the given tab.
     * @param {Tab} tab The tab to attach to
     */
-    async attachDebugger({ tab, canceled_by_user, debugger_already_attached }) {
-        this._detachExpected = false;
-        let targets = await (new Promise(resolve => chrome.debugger.getTargets(resolve)));
-        if (targets.find(target => target.tabId === tab.id && target.attached)) {
-            debugger_already_attached();
-        }
-        else {
-            await new Promise(resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", resolve));
-            // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
-            // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
-            console.log(`debugger attached to ${tab.id}`);
-            this.tab = tab;
-            let player = this;
-            await sleep(500); // the animation should practically be done aftre this, but even if it isn't we can deal with it
+    async attachDebugger({ tab }) {
+        console.debug(`schedule attach debugger`);
+        await this._debuggerDetachPromise; // if there is one in flight wait for it.
+        this.tab = tab;
 
-            await tab.resizeViewport();
-            /** Automatically reattach the debugger if the recording navigated away from the page */
-            chrome.debugger.onDetach.addListener(async (source, reason) => {
-                console.log("The debugger was detached!!");
-                if (reason === 'canceled_by_user') {
-                    await sleep(500);
-                    await tab.resizeViewport();
-                    canceled_by_user();
-                }
-                else if (this._detachExpected) {
-                }
-                else {
-                    // https://developer.chrome.com/docs/extensions/reference/debugger/#type-DetachReason
-                    console.warn('try: re-attaching the debugger!');
-                    await player.attachDebugger({ tab, canceled_by_user, debugger_already_attached });
-                    console.warn('end: re-attaching the debugger!');
-                }
-            });
-        }
+        await (new Promise( async (resolve, reject) => {
+            let p = new Promise( resolve => chrome.debugger.getTargets(resolve));
+            let targets = await p;
+            if (!targets.find(target => target.tabId === tab.id && target.attached)) {
+                chrome.debugger.attach({ tabId: tab.id }, "1.3", resolve);
+            }
+            else {
+                console.debug('the debugger is already attached');
+                resolve('the debugger is already attached');
+            }
+        }));
+
+        // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
+        // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
+        await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
+        this._debuggerAttachPromise = this.tab.resizeViewport();  // reset the viewport - I wish chrome did this.
+
+        await this._debuggerAttachPromise;
+        console.debug(`debugger attached`);
+        return this._debuggerAttachPromise;
     };
+
 }
 
 Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {

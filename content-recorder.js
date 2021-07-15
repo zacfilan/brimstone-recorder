@@ -10,15 +10,15 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
         console.error(`NOT injecting script, expected url to be\n${expectedUrl}\nactual\n${actualUrl}`);
         return;
     }
-    console.log(`Injecting content-recorder.js into ${window.location.href}`);
+    console.debug(`Injecting content-recorder.js into ${window.location.href}`);
 
     if (window.brimstomeRecorder !== undefined) {
-        console.log('exiting existing recorder')
+        console.debug('exiting existing recorder')
         brimstomeRecorder.exit(); // clean it up
     }
 
     // create it
-    console.log('Creating new recorder');
+    console.debug('Creating new recorder');
     /**
      * Queue events that are triggered in response to certain user actions, 
      * and send them back over the postMessage connection to the UI.
@@ -34,7 +34,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
             /** are we currently expecting events to only come i from the debugger */
             this._simulatingEvents = false;
 
-            console.log('connecting port');
+            console.debug('connecting port');
             this.port = chrome.runtime.connect({ name: "brimstone" });
             this.port.postMessage({ type: 'hello' });
             this.addEventListeners();
@@ -46,13 +46,17 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
             // start listening for messages back from the popup
             this.port.onMessage.addListener((msg) => {
-                console.log('RX: ', msg);
+                console.debug('RX: ', msg);
                 switch (msg.type) {
                     case 'complete':
                         this._simulatingEvents = false;
                         break;
                     case 'stop':
                         this.exit();
+                        break;
+                    case 'start':
+                        this.port.postMessage({ type: 'hello' });
+                        this.addEventListeners();
                         break;
                 }
             });
@@ -61,12 +65,12 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Clean up */
         exit() {
-            console.log('exit called');
+            console.debug('exit called');
             this.removeEventListeners();
         }
 
         buildMsg(e) {
-            console.log('building msg from', e);
+            console.debug('building msg from', e);
 
             // JSON.stringify bails as soon as it hits a circular reference, so we must project out a subset of the properties
             // rather than just augment the e object.
@@ -106,7 +110,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Add event listeners to the window, some events will be passed*/
         addEventListeners() {
-            console.log('removing + adding event listeners');
+            console.debug('removing + adding event listeners');
             Recorder.events.forEach(event => {
                 window.removeEventListener(event, this, { capture: true });
                 window.addEventListener(event, this, { capture: true });
@@ -115,7 +119,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Remove previous bound event listeners */
         removeEventListeners() {
-            console.log('removing event listeners');
+            console.debug('removing event listeners');
             Recorder.events.forEach(event => {
                 window.removeEventListener(event, this, { capture: true });
             });
@@ -123,15 +127,10 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
         /** Central callback for all bound event handlers */
         handleEvent(e) {
-            // if(e.type !== 'mousemove') { // these saturate the logs
-            //     console.log(`${e.timeStamp} observed event: ${e.type}`, e.target, e);
-            // }
-            // return;
-
             if (this._simulatingEvents) {
                 // FIXME: how do I know this event came from the debugger versus from from the user?!
                 // FIXME: There is a race condition here!!                
-                console.log(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
+                console.debug(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
             }
             else {
 
@@ -216,7 +215,7 @@ chrome.storage.sync.get(["injectedArgs"], (result) => {
 
     Recorder.block = function block(e) {
         if(e.type !== 'mousemove') { // these saturate the logs
-            console.log(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
+            console.debug(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
         }
         e.preventDefault();
         e.stopPropagation();

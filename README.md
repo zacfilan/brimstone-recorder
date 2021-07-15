@@ -17,7 +17,7 @@ We required effective, easy, automated do-no-harm testing to catch the most bugs
 
 Brimstone records screenshots of every user action performed. When a user performs an action she is implicitly indicating that the screen is in the expected completed state of the *previous* user action performed. In this way, the user implicitly determines the screen states required between actions. Brimstone uses this information during playback to determine timing and correctness of each user action.
 
-Brimstone directly uses the chrome devtools protocol via the chrome.debugger API to control the browser. 
+Brimstone uses the [chrome devtools protocol](https://chromedevtools.github.io/devtools-protocol/1-3) (CDP) via the [chrome.debugger](https://developer.chrome.com/docs/extensions/reference/debugger/) chrome extension API to control the browser. The CDP is the underlying API that automation tools like [puppeteer](https://developers.google.com/web/tools/puppeteer) and [selenium](https://www.selenium.dev/) (via [chromedriver](https://chromedriver.chromium.org/)) ultimately use to control the chrome browser.
 
 # Who?
 
@@ -29,7 +29,8 @@ Still here? Cool. Go to some website. Poke the (B) icon to start recording on th
 
 ## Tips
 
-* Type slower than normal. (Two finger). Brimstone is doing stuff for each key you press, and if you do too many actions too fast, some events may be missed. 
+* Type slower than normal. (Two finger). Brimstone is doing stuff for each key you press, and if you do too many actions too fast, some events may be missed.
+* Don't linger with the mouse. Specifically, don't generate tooltips during recording. Brimstone doesn't yet time how long you hover over an element before clicking it, so it doesn't simulate that delay when playing back. Hence if you generate a tooltip while recording, you probably won't see it when playing back, and will get a screen mismatch. (I will fix this.)
 * Always end your recording by pressing the 'End Recording' button.
 * Save and organize your recordings.
 
@@ -40,11 +41,11 @@ Still here? Cool. Go to some website. Poke the (B) icon to start recording on th
 
 2. Why can't I record a maximized tab?
 
-    Brimstone uses the chrome.debugger API, which injects a banner into the browser. You need to leave some space for it.
+    Brimstone uses the [chrome.debugger](https://developer.chrome.com/docs/extensions/reference/debugger/) API, which injects a banner into the browser. You need to leave some space for it.
 
 3. Why do I get "You must close the existing debugger first" alerts when I try to record or play?
 
-    You can't start a recording or playback if there is already a debugger attached. Brimstone uses the chrome.debugger API, and can't reuse an existing connection. You can attach anohter debugger **after** the recording or playback has started though.
+    You can't start a recording or playback if there is already a debugger attached. Brimstone uses the [chrome.debugger](https://developer.chrome.com/docs/extensions/reference/debugger/) API, and can't reuse an existing connection. You can attach anohter debugger **after** the recording or playback has started though.
 
 
 # Playing
