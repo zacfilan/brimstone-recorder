@@ -320,12 +320,21 @@ async function stopCommunication(tab) {
     detachNavigationListeners(); // navigation listeners inject the content-script, which we ONLY want to do when we are recording anyway.
 }
 
+async function focusTab() {
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, {
+        highlighted: true,
+        active: true
+        // url: tab.url // shouldn't need that
+    });
+}
+
 $('#recordButton').on('click', async function () {
     let button = $(this);
     if (button.hasClass('active')) {
         button.removeClass('active'); // stop recording
         // before I take the last screenshot the window must have focus again.
-        await chrome.windows.update(tab.windowId, { focused: true });
+        await focusTab();
         let action = await userEventToAction({ type: 'stop' });
         updateStepInView(action);
         let x = await stopRecording();
@@ -348,13 +357,8 @@ $('#recordButton').on('click', async function () {
         zip = new JSZip(); // FIXME: refactor so this isn't needed here!
         updateStepInView(action);
 
-        // last thing we do is give the focus back to the window and tab we want to record
-        await chrome.windows.update(tab.windowId, { focused: true });
-        await chrome.tabs.update(tab.id, {
-            highlighted: true,
-            active: true
-            // url: tab.url // shouldn't need that
-        });
+        // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
+        await focusTab();
 
         button.addClass('active');
         setToolbarState();

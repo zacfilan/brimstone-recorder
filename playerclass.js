@@ -354,7 +354,10 @@ export class Player {
                 chrome.debugger.attach({ tabId: tab.id }, "1.3", resolve);
             }
             else {
-                console.debug('the debugger is already attached');
+                // As long as the user didn't manually attach a debugger to this tab, then we are ok to reuse it, which is a better experience for the user
+                // However if, the user (or me as a dev) attach the devtools manually to page being recorded that will confuse this logic, 
+                // and we might not be able control the browser. FIXME: I can't yet tell the difference programatically.
+                console.debug(`a debugger is already attached to tab ${tab.id}`);
                 resolve('the debugger is already attached');
             }
         }));

@@ -17,7 +17,7 @@ We required effective, easy, automated do-no-harm testing to catch the most bugs
 
 Brimstone records screenshots of every user action performed. When a user performs an action she is implicitly indicating that the screen is in the expected completed state of the *previous* user action performed. In this way, the user implicitly determines the screen states required between actions. Brimstone uses this information during playback to determine timing and correctness of each user action.
 
-Brimstone uses the [chrome devtools protocol](https://chromedevtools.github.io/devtools-protocol/1-3) (CDP) via the [chrome.debugger](https://developer.chrome.com/docs/extensions/reference/debugger/) chrome extension API to control the browser. The CDP is the underlying API that automation tools like [puppeteer](https://developers.google.com/web/tools/puppeteer) and [selenium](https://www.selenium.dev/) (via [chromedriver](https://chromedriver.chromium.org/)) ultimately use to control the chrome browser.
+Brimstone uses the [chrome devtools protocol](https://chromedevtools.github.io/devtools-protocol/1-3) (CDP) via the [chrome.debugger](https://developer.chrome.com/docs/extensions/reference/debugger/) chrome extension API to control the browser. 
 
 # Who?
 
@@ -27,12 +27,27 @@ The intended audience is quality engineers, web-software developers, automation 
 
 Still here? Cool. Go to some website. Poke the (B) icon to start recording on this tab.  
 
-## Tips
+## Recording Tips, Dos and Don'ts.
 
-* Type slower than normal. (Two finger). Brimstone is doing stuff for each key you press, and if you do too many actions too fast, some events may be missed.
-* Don't linger with the mouse. Specifically, don't generate tooltips during recording. Brimstone doesn't yet time how long you hover over an element before clicking it, so it doesn't simulate that delay when playing back. Hence if you generate a tooltip while recording, you probably won't see it when playing back, and will get a screen mismatch. (I will fix this.)
-* Always end your recording by pressing the 'End Recording' button.
-* Save and organize your recordings.
+* Do type slower than normal.
+
+    Try using one finger, especially if each keystroke can update a chunk of the screen - some searches and filters do this. Brimstone is doing stuff, including taking a screenshot, for each key you press. If you perform too many user input actions too fast, some events may be missed.
+    
+* Do avoid tooltips. 
+
+    Don't linger with the mouse. Brimstone doesn't yet time how long you hover over an element before clicking it, so it doesn't simulate that delay when playing back. Hence if you generate a tooltip while recording, you probably won't see it when playing back, and will get a screen mismatch. (I will fix this.)
+
+* Do always end your recording by pressing the 'End Recording' button.
+
+* Do save and organize your recordings.
+
+* Don't move the mouse when you don't need to.
+
+    Although I am in the habit of wiggling the mouse around while I wait for the next screen to render, don't do this when recording in Brimstone. Brimstone uses user input as clues for when the screen is ready, and it's possible to confuse it if you move the mouse around when you don't need to.
+
+
+
+
 
 ## FAQ
 1. How do I record things which pop up on hover, like certain menus?
