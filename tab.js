@@ -62,11 +62,13 @@ export class Tab {
         // empirically, it needs to be visible to work
         await chrome.windows.update(this.windowId, { focused: true });
 
-        //console.debug(`resize viewport to ${this.width}x${this.height}`);
+        console.debug(`resize viewport to ${this.width}x${this.height} requested`);
  
-        let i = 0;
+        let i = 0; let distance;
+        let matched = 0;
         for (i = 0; i < 10; i++) {
-            let distance = await this.getViewport();
+            await sleep(137); // stupid animation
+            distance = await this.getViewport();
             if(distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
                 // it's wrong
                 console.debug(`window resize was performed to contain desired viewport`);
@@ -74,18 +76,22 @@ export class Tab {
                     width: distance.borderWidth + this.zoomWidth,
                     height: distance.borderHeight + this.zoomHeight
                 });
-                await sleep(137); // stupid animation
             }
             else {
-                break;
+                // measure twice cut once? It seems that I may be getting a stale measurement the first time.
+                if(++matched>1) {
+                    break;
+                }
             }
         }
 
+        console.debug(`viewport is measured to be ${distance.innerWidth}x${distance.innerHeight}`);
         if (i == 10) {
             throw "cannot_set_desired_viewport";
         }
     }
 
+    /** Inject a script into the current tab to measure the browser and viewport dimensions. */
     async getViewport() {
         function measureScript() {
             return {
