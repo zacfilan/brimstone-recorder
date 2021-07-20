@@ -26,5 +26,6 @@
   },
   "icons": {
     "128": "images/orange_b_128.png"
-  }
+  },
+  "options_page": "options_ui.html"
 }

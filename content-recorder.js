@@ -4,7 +4,7 @@
         return;
     }
 
-    chrome.storage.sync.get(["injectedArgs"], (result) => {
+    chrome.storage.local.get(["injectedArgs"], (result) => {
         let expectedUrl = result.injectedArgs.url;
         let actualUrl = window.location.href;
 
@@ -90,6 +90,16 @@
                         msg.detail = e.detail;
                     case 'contextmenu':
                     case 'dblclick':
+                        msg.hoverTime = performance.now() - this._mouseEnterTime;
+                        if(msg.hoverTime > 5000) {
+                            msg.hoverTime = 5000;
+                            console.warn("hover time is limited to 5 seconds");
+                        }
+                        msg.x = e.clientX;
+                        msg.y = e.clientY;
+                        ['clientX', 'clientY'].forEach(p =>
+                            msg.event[p] = e[p]);
+                        break;
                     case 'mousemove':
                         msg.x = e.clientX;
                         msg.y = e.clientY;
@@ -127,21 +137,26 @@
 
             /** Central callback for all bound event handlers */
             handleEvent(e) {
+                console.debug(`handle user input event: ${e.type}`);
+                //return;
+
                 // if we are done driving the browser (simulating a user input) 
-                // wait for the next user input befre we start blocking events.
+                // wait for the next user input before we start blocking events.
                 if (this._state === Recorder.state.READY) {
                     switch (e.type) {
-                        case 'mouseleave':
-                        case 'mouseenter':
+                        case 'mousemove':
                         case 'mousedown':
                         case 'contextmenu':
                         case 'keydown':
                             this._state = Recorder.state.RECORD;
-                            console.debug(`${e.timeStamp} user input event: ${e.type} switches us to RECORD state`);
+                            console.debug(`user input event: ${e.type} switches us to RECORD state`);
                             break;
+                        case 'mouseover': 
+                            this._mouseEnterTime = performance.now(); // keep on accounting
+                            return;
                         default:
                             // mouse move clutters things up
-                            //console.debug(`${e.timeStamp} passthru event: ${e.type} while waiting for user input event to switch us to record`);
+                            console.debug(`passthru event: ${e.type} while waiting for user input event to switch us to record`);
                             return;
                     }
                 }
@@ -152,19 +167,8 @@
                     console.debug(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
                 }
                 else {
-
-                    Recorder.block(e);
-
                     switch (e.type) {
                         case 'keydown':
-                            if (e.key === 'Control') {
-                                if (!e.repeat) {
-                                    // just take a snapshot now and that is all
-                                    this.port.postMessage({ type: 'screenshot' }); // nothing will be simulated
-                                }
-                                break;
-                            }
-                        // else fall through
                         case 'contextmenu':
                         case 'dblclick':
                             let msg = this.buildMsg(e);
@@ -190,17 +194,16 @@
                                 }
                             }
                             break;
-                        case 'mousemove':
-                            this._mousemove = e; // remember the last element entered, but bubble
-                            break;
-                        case 'keyup':
-                            if (e.key === 'Control') {
-                                let msg = this.buildMsg(this._mousemove); // send a *mousemove* event
-                                this.port.postMessage(msg);
-                            }
-                            break;
+                        
+                        // these will bubble (via the early return)
+                        case 'mouseover': // alow these to bubble so I can see the complex hover stuff like tooltips and menus
+                            /** The time that the users mouse entered the current element, used to record hover effects. */
+                            this._mouseEnterTime = performance.now();
+                        case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
+                            return; // let it bubble
                     }
-                    return false; // should be redundant and not needed.
+                    Recorder.block(e);
+                    return false; // should be redundant and not needed, I am blocking all these I hope
                 }
             }
         } // end class Recorder
@@ -220,7 +223,7 @@
             // comments describe what is done when recording, not handling 'simulated' events.
             // simulated events all bubble directly to the app.
 
-            'mousemove',    // blocked. maintains last known mouse position
+            //'mousemove',    // blocked. maintains last known mouse position
             'mousedown',    // blocked. just observed, required for click to occur?.
             'mouseup',      // blocked. just observed, required for click to occur?.
 
@@ -239,13 +242,21 @@
             'submit',       // blocked. ?
             'invalid',      // blocked. ?
             'change',       // blocked. it changes styles. e.g. (x) on a combobox.
-            'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
-            'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
+
+            'mouseout',
+            'mouseover'
+            
+            // FIXME: I do not ever see these...WHY? 
+            //'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
+            //'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
         ];
 
         Recorder.block = function block(e) {
             if (e.type !== 'mousemove') { // these saturate the logs
                 console.debug(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
+            }
+            else {
+                console.debug(`blocking event: ${e.type}`);
             }
             e.preventDefault();
             e.stopPropagation();

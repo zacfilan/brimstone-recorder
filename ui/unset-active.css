@@ -1,0 +1,10 @@
+button.brimstone1.brimstone2.brimstone3:active,
+div.brimstone1.brimstone2.brimstone3:active,
+span.brimstone1.brimstone2.brimstone3:active,
+input.brimstone1.brimstone2.brimstone3:active,
+textarea.brimstone1.brimstone2.brimstone3:active
+{
+    background-image: unset!important;
+    color: unset!important;
+    border-color: unset!important;
+}

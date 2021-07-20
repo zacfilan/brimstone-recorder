@@ -275,7 +275,6 @@ chrome.debugger.onDetach.addListener(async (source, reason) => {
     }
     else {
         // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
-        // i am not totally clear on the 
         await player.attachDebugger({ tab }); // it's the same tab...
     }
 });
@@ -509,11 +508,18 @@ function updateStepInView(action) {
 async function injectScript(url) {
     console.debug(`injecting script into ${url}`);
 
-    await (new Promise(resolve => chrome.storage.sync.set({ injectedArgs: { url } }, resolve)));
+    await (new Promise(resolve => chrome.storage.local.set({ injectedArgs: { url } }, resolve)));
     await (new Promise(resolve => chrome.scripting.executeScript({
         target: { tabId },
         files: ['content-recorder.js']
     }, resolve)));
+    
+    // Leaving in case I want to add css at some point.
+    // await (new Promise(resolve => chrome.scripting.insertCSS({
+    //     target: { tabId },
+    //     files: ['unset-active.css']
+    // }, resolve)));
+    
 
     // (injectionResults) => {
     //     for (const frameResult of injectionResults)
@@ -676,6 +682,7 @@ async function listenOnPort(url) {
                         break;
                     case 'hello':
                         console.debug('got a new hello msg from injected content script');
+                        await tab.resizeViewport(); // if the debugger doesn't need to be attached, we still need to resize the viewport
                         break;
                     default:
                         console.error(`unexpected userEvent received <${userEvent.type}>`);

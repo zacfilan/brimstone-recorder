@@ -4,6 +4,8 @@ const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
 import { status } from "./ui/card.js";
+import { loadOptions } from "./options.js";
+var options;
 
 export class Player {
     /** The currently executing step. */
@@ -22,18 +24,57 @@ export class Player {
     /** resolved when the last scheduled debugger attached is done. */
     _debuggerAttachPromise;
 
+    /** Know if there are navigations in flight. */
+    _navigationsInFlight = 0;
+
     constructor() {
         /**
          * The tab we are playing on.
          * @type {Tab}
          */
         this.tab = null;
+
+        // this.beforeNavigation = Player.beforeNavigation.bind(this);
+        // this.completeNavigation = Player.beforeNavigation.bind(this);
+
+        // /** Call this to resolve the current navigation promise 
+        //  * @type {function => void]
+        // */
+        // this.resolveNavigation;
+
+        // /** Call this to reject the current navigation promise 
+        //  * @type {function => void]
+        // */
+        // this.rejectNavigation;
+
+    }
+
+    detachNavigationListeners() {
+        chrome.webNavigation.onBeforeNavigate.removeListener(this.beforeNavigation);
+        chrome.webNavigation.onCompleted.removeListener(this.completeNavigation);
+    }
+    
+    attachNavigationListeners() {
+        this.detachNavigationListeners();
+        chrome.webNavigation.onBeforeNavigate.addListener(this.beforeNavigation);
+        chrome.webNavigation.onCompleted.addListener(this.completeNavigation);
+    }
+
+    /** Resolves when there are no navigations pending anymore */
+    async createNavigationsCompletePromise() {
+        that = this;
+        // create a deferred
+        return new Promise( (resolve, reject) => {
+            that.resolveNavigation = resolve;
+            that.rejectNavigation = reject;
+        });
     }
 
     /** 
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. */
     async play(actions, startIndex = 0) {
+        options = await loadOptions();
         this._actions = actions;
         this._playbackComplete = false;
         this.mouseLocation = { x: -1, y: -1 }; // off the viewport I guess
@@ -55,27 +96,29 @@ export class Player {
             console.log(`[${action.index}] : ${action.description}`);
 
             try {
-                switch (action.type) {
-                    case 'click':
-                    case 'dblclick':
-                    case 'contextmenu':
-                    case 'mousemove':
-                        await sleep(500); // it takes a person a while to move to an click something on the next turn. No one is as fast as the computer can be.
-                        break;
-                }
                 start = performance.now();
 
-                await this[action.type](action); // really perform this in the browser
+                await this[action.type](action); // really perform this in the browser (this action may start some navigations)
+
                 // remember any mousemoving operation, implicit or explicit
                 switch (action.type) {
                     case 'click':
                     case 'dblclick':
                     case 'contextmenu':
                     case 'mousemove':
+                        /** Remember any mousemoving operation plyed, implicit or explicit */
                         this.mouseLocation = { x: action.x, y: action.y };
                         break;
                 }
 
+                // Leaving just in case I want this later.
+                // if(this._navigationsInFlight) {
+                //     console.debug('wait for navigation to complete');
+                //     let navigationsComplete = this.createNavigationsCompletePromise();
+                //      await navigationsComplete; // I want all navigations complete before I start taking screenshots.
+                //      console.debug('navigation complete');
+                //      await this.tab.resizeViewport();
+                // }
                 await this.verifyScreenshot(next);
                 stop = performance.now();
                 console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
@@ -254,12 +297,12 @@ export class Player {
             acceptableErrorsPng = (await Player.dataUrlToPNG(nextStep.acceptablePixelDifferences.dataUrl)).png;
         }
 
-        let max_verify_timout = 15; // seconds
-
         let actualScreenshot;
         let differencesPng;
         let i=0;
-        while (((performance.now() - start) / 1000) < max_verify_timout) {
+
+        // this loop will run even if the app is in the process of navigating to the next page.
+        while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
             ++i;
             await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
@@ -272,6 +315,9 @@ export class Player {
                     // this requires moving (back) to the current location first, then into the next location 
                     await this.mousemove(this.mouseLocation);
                     await this.mousemove(nextStep);
+                    if(nextStep.hoverTime) {
+                        await sleep(nextStep.hoverTime);
+                    }
                     break;
             }
 
@@ -373,6 +419,23 @@ export class Player {
     };
 
 }
+
+Player.beforeNavigation = function() {
+    this._navigationsInFlight++;
+
+};
+
+Player.completeNavigation = function() {
+    this._navigationsInFlight--;
+    if(this._navigationsInFlight < 0) {
+        console.error('navigation accounting is broken');
+        this._navigationsInFlight = 0;
+    }
+
+    if(!this._navigationsInFlight) {
+        this.resolveNavigation();
+    }
+};
 
 Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
     let response = await fetch(dataUrl);
