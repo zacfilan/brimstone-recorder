@@ -285,7 +285,7 @@
             'focus',        // blocked. it changes styles. e.g. border.
             'focusin',      // blocked. it changes styles. e.g. border.
             'blur',         // blocked. it changes styles. e.g. border.
-            'submit',       // blocked. ?
+            //'submit',       // blocked. ?
             'invalid',      // blocked. ?
             'change',       // blocked. it changes styles. e.g. (x) on a combobox.
 

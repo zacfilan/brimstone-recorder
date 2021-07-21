@@ -574,40 +574,40 @@ async function userEventToAction(userEvent) {
 
     if (element) {
         cardModel.overlay = {
-            height: `${element.height * 100 / tab.height}%`,
-            width: `${element.width * 100 / tab.width}%`,
-            top: `${element.top * 100 / tab.height}%`,
-            left: `${element.left * 100 / tab.width}%`
+            height: element.height * 100 / tab.height,
+            width: element.width * 100 / tab.width,
+            top: element.top * 100 / tab.height,
+            left: element.left * 100 / tab.width
         };
     }
 
     switch (userEvent.type) {
         case 'mousemove':
-            cardModel.description = `movemouse to (${userEvent.x}, ${userEvent.y})`;
+            cardModel.description = 'move mouse here';
             //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break;
         case 'wheel':
-            cardModel.description = `scroll element (deltaX:${userEvent.deltaX}, deltaY:${userEvent.deltaY})`;
+            cardModel.description = 'move mouse here, then scroll via mouse wheel';
             cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             //await addScreenshot(cardModel);
             break;
         case 'keypress':
-            cardModel.description = `type ${userEvent.event.key} in active element`;
+            cardModel.description = `type ${userEvent.event.key}`;
             await addScreenshot(cardModel);
             break;
         case 'click':
-            cardModel.description = `click at location (${userEvent.x}, ${userEvent.y})`;
+            cardModel.description = 'click';
             //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break;
         case 'contextmenu':
-            cardModel.description = `right click at location (${userEvent.x}, ${userEvent.y})`;
+            cardModel.description = 'right click';
             //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break;
         case 'dblclick':
-            cardModel.description = `double click at location (${userEvent.x}, ${userEvent.y})`;
+            cardModel.description = 'double click';
             //            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
             break

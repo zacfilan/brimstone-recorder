@@ -62,11 +62,6 @@ svg {
     overflow: auto;
 }
 
-#action {
-    text-align: center;
-    font-size:18px;
-}
-
 .card {
     padding: 1em;
     width: 50%;
@@ -115,7 +110,14 @@ svg {
 
 .card .screenshot .overlay {
     position: absolute;
-    display: none; /* initially hidden */
+}
+
+.card:nth-of-type(2) .screenshot .overlay {
+    display:none
+}
+
+.card:nth-of-type(2) .screenshot .action {
+    display:none
 }
 
 .card .user-events {
@@ -204,4 +206,18 @@ svg {
     width: 100%;
     background-color: red;
   }
+}
+
+#infobar {
+    background:#348ac7;
+    color:white;
+    height: 35px;
+}
+
+.action {
+    position: absolute;
+    text-align: center;
+    font-size:18px;
+    background: grey;
+    margin: 3px;
 }

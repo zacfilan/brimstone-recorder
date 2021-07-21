@@ -233,9 +233,14 @@ export class TestAction {
         </div>
         <div class='screenshot clickable'>
             <img src='${src}'>`;
+        
+        // FIXME: calculate the best location for the callout, based on the location of the overlay
         if (this.overlay) { // or this.status === status.INPUT
             let o = this.overlay;
-            html += `<div class='overlay pulse-rectangle' data-index=${this.index} style='height:${o.height};width:${o.width};top:${o.top};left:${o.left}'></div>`;
+            html += `
+            <div class='overlay pulse-rectangle' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
+            <div class='action callout user-event' data-index='${this.index}' style='top:${o.top + o.height}%;left:${o.left}%;'>${this.description}</div>
+            `;
         }
         html += `
         </div>
@@ -270,7 +275,6 @@ export class Step {
 
     toHtml() {
         let html = `
-        <div id="action" class='user-event' data-index='${this.curr.index}'>${this.curr.description}</div>
         <div id="content">
             ${this.curr.toHtml()}
             `;
