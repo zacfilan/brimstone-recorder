@@ -31,7 +31,7 @@ Still here? Cool. Go to some website. Poke the (B) icon to start recording on th
 
 * Do type slower than normal.
 
-    Try using one finger, especially if each keystroke can update a chunk of the screen - some searches and filters do this. Brimstone is doing stuff, including taking a screenshot, for each key you press. If you perform too many user input actions too fast, some events may be missed.
+    Brimstone is executing code, including taking a screenshot, for each key you press. If you perform too many user input actions too fast, some events may be missed. Some searches and filters update a chunk of the screen each time you press a key. Be aware of that, and slow down and look at the screen for a moment between each keypress. 
     
 * Do always end your recording by pressing the 'End Recording' button.
 
@@ -39,10 +39,14 @@ Still here? Cool. Go to some website. Poke the (B) icon to start recording on th
 
 * Don't move the mouse unless the screen is actually ready for your next user action.
 
-    Outside of Brimstone, I am in the habit of wiggling the mouse around while I wait for the next screen to render. I am easily bored. *Don't do this when recording in Brimstone.* Brimstone uses your movement of the mouse as an indication that the screen **is** ready for your next user action. 
+    Outside of Brimstone, I am in the habit of wiggling the mouse around while I wait for the next screen in the browser to render. I am easily bored. *Don't do this when recording in Brimstone.* Brimstone uses your movement of the mouse as an indication that the screen **is** ready for your next user action. 
 
 ## FAQ
-1. Why can't I record a maximized tab?
+1. How do I record scrolling?
+
+    As of 7/21/2021 only mouse wheel scrolling is recorded. Specfically, moving scrollbars with mousedown, mousemove, mouseup will not be interpreted as a scroll user input.
+
+2. Why can't I record a maximized tab?
 
     Brimstone uses the [chrome.debugger](https://developer.chrome.com/docs/extensions/reference/debugger/) API, which injects a banner into the browser. You need to leave some space for it.
 
@@ -75,7 +79,7 @@ This list is subject to change, and will probably transition to a bug/issue trac
  
 * Each test is recorded and played back in a fixed resolution. If you want to test different resoutions you need to record different tests.
 * Only user actions in the page itself are recorded. e.g. The browser back and forward buttons are not recorded.
-* Only click, double-click, right-click, and single-keypresses are recorded. e.g. Chords like Ctrl-A are not (yet) recorded.
+* Click, double-click, right-click, single-keypresses, and mouse wheel user inputs are recorded. e.g. Chords like Ctrl-A are not (yet) recorded.
 * Only one tab is recorded in a test, although that tab is free to navigate to different URLs and still be recorded. e.g. Web application spawned additional browser windows/tabs recording is not supported.
 
 

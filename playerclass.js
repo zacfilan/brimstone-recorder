@@ -106,6 +106,7 @@ export class Player {
                     case 'dblclick':
                     case 'contextmenu':
                     case 'mousemove':
+                    case 'wheel':
                         /** Remember any mousemoving operation plyed, implicit or explicit */
                         this.mouseLocation = { x: action.x, y: action.y };
                         break;
@@ -149,6 +150,7 @@ export class Player {
     }
 
     async start(action) {
+        //console.debug("player: start");
         // If we just recorded it and want to play it back, we can reuse the window we recorded it from
         // We can reuse the tab we launched the UI from.
         await chrome.tabs.update(this.tab.id, {
@@ -269,11 +271,23 @@ export class Player {
     }
 
     async mousemove(action) {
-        //console.debug(`\t\tmousemove ${action.x},${action.y}`);
+        //console.debug(`player: dispatch mouseMoved (${action.x},${action.y})`);
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
             x: action.x,
             y: action.y,
+            pointerType: 'mouse'
+        });
+    }
+
+    async wheel(action) {
+        //console.debug(`player: dispatch mouseWheel from ${action.x}, ${action.y}`);
+        await this.debuggerSendCommand('Input.dispatchMouseEvent', {
+            type: 'mouseWheel',
+            x: action.x,
+            y: action.y,
+            deltaX: action.deltaX,
+            deltaY: action.deltaY,
             pointerType: 'mouse'
         });
     }
@@ -306,11 +320,12 @@ export class Player {
             ++i;
             await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
-            // There is an IMPLICIT mousemove before any *click* action. I don't make it explicit because I might need to do it several times to get to the correct state.
+            // There is an IMPLICIT mousemove before any *click* action. I don't make it explicit (don't record it) because I might need to do it several times to get to the correct state.
             switch (nextStep.type) {
                 case 'click':
                 case 'dblclick':
                 case 'contextmenu':
+                case 'wheel':
                     // if the next step is any implicit mouse operation, we want to mousein into the next location, so as to change the screen correctly with hover effect.
                     // this requires moving (back) to the current location first, then into the next location 
                     await this.mousemove(this.mouseLocation);

@@ -65,17 +65,17 @@ class UserAction extends UserEvent {
 }
 
 $('#ignoreDelta').on('click', async function (e) {
- 
+
     // if you are editing you are going to want to save, and to save we need to detach the debugger.
     await player.detachDebugger();
-    
+
     // add a mask to the 
     const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
     await action.addMask(view);
     action.status = status.EDIT; // stay on edit
 
     updateStepInView(TestAction.instances[action.index - 1]);
-    
+
 });
 
 // stop the image drap behavior
@@ -513,13 +513,13 @@ async function injectScript(url) {
         target: { tabId },
         files: ['content-recorder.js']
     }, resolve)));
-    
+
     // Leaving in case I want to add css at some point.
     // await (new Promise(resolve => chrome.scripting.insertCSS({
     //     target: { tabId },
     //     files: ['unset-active.css']
     // }, resolve)));
-    
+
 
     // (injectionResults) => {
     //     for (const frameResult of injectionResults)
@@ -586,6 +586,11 @@ async function userEventToAction(userEvent) {
             cardModel.description = `movemouse to (${userEvent.x}, ${userEvent.y})`;
             //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             await addScreenshot(cardModel);
+            break;
+        case 'wheel':
+            cardModel.description = `scroll element (deltaX:${userEvent.deltaX}, deltaY:${userEvent.deltaY})`;
+            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
+            //await addScreenshot(cardModel);
             break;
         case 'keypress':
             cardModel.description = `type ${userEvent.event.key} in active element`;
@@ -663,11 +668,12 @@ async function listenOnPort(url) {
                         postMessage({ type: 'complete', args: userEvent.type });
                         break;
                     case 'mousemove':
+                    case 'wheel':
                         // update the UI with a screenshot
                         action = await userEventToAction(userEvent);
                         updateStepInView(action);
                         // no simulation required
-                        postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
+                        // this does not ack, because it will always be followed by another operation.
                         break;
                     case 'click':
                     case 'keypress':

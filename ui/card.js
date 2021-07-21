@@ -270,6 +270,7 @@ export class Step {
 
     toHtml() {
         let html = `
+        <div id="action" class='user-event' data-index='${this.curr.index}'>${this.curr.description}</div>
         <div id="content">
             ${this.curr.toHtml()}
             `;
@@ -278,9 +279,8 @@ export class Step {
         }
         html += `
         </div>
-        <div id="action" class='user-event' data-index='${this.curr.index}'>${this.curr.description}</div>
         `;
-
+        
         return html;
     }
 

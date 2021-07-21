@@ -86,6 +86,13 @@
                 };
 
                 switch (e.type) {
+                    case 'wheel':
+                        msg.detail = 'wheel';
+                        msg.deltaX = e.deltaX;
+                        msg.deltaY = e.deltaY;
+                        msg.x = e.clientX;
+                        msg.y = e.clientY;
+                        break;
                     case 'click':
                         msg.detail = e.detail;
                     case 'contextmenu':
@@ -137,13 +144,18 @@
 
             /** Central callback for all bound event handlers */
             handleEvent(e) {
-                console.debug(`handle user input event: ${e.type}`);
-                //return;
+                console.debug(`handle user input event: ${e.type}`, e);
+                
+                if (this._state === Recorder.state.BLOCK) {
+                    Recorder.block(e);
+                    return false; 
+                } 
 
                 // if we are done driving the browser (simulating a user input) 
                 // wait for the next user input before we start blocking events.
                 if (this._state === Recorder.state.READY) {
                     switch (e.type) {
+                        case 'wheel':
                         case 'mousemove':
                         case 'mousedown':
                         case 'contextmenu':
@@ -168,9 +180,34 @@
                 }
                 else {
                     switch (e.type) {
+                        case 'wheel': 
+                            if(!this._wheel) {
+                                this._wheel = {
+                                    type: 'wheel',
+                                    deltaX: e.deltaX,
+                                    deltaY: e.deltaY,
+                                    target: e.target,
+                                    clientX: e.clientX,
+                                    clientY: e.clientY
+                                };
+                                this._state === Recorder.state.BLOCK;
+                                this.port.postMessage({type: 'screenshot'}); 
+                                break; // the first is (intended) to be blocked from the app, and used just to indicate start, we block other events til the screenshot is taken.
+                                        // but...apparently I can't block it and it sneaks through, so I need to include the delta in my total count.
+                            }
+                            // subsequent wheel events in the chain are agregatted and allowed to bubble, and really scroll the app
+                            this._wheel.deltaX += e.deltaX;
+                            this._wheel.deltaY += e.deltaY;
+                            return; // bubble
                         case 'keydown':
                         case 'contextmenu':
-                        case 'dblclick':
+                        case 'dblclick':                            
+                            if(this._wheel) { 
+                                // any (other) user input signals the end of a scroll input
+                                let msg = this.buildMsg(this._wheel);
+                                this.port.postMessage(msg); // record a wheel action 
+                                this._wheel = false;
+                            }
                             let msg = this.buildMsg(e);
                             this.port.postMessage(msg); // take screenshot and then simulate 
                             this._state = Recorder.state.SIMULATE;
@@ -180,6 +217,12 @@
                             if (!pendingClick) {
                                 pendingClick = e;
                                 setTimeout(() => {
+                                    if(this._wheel) { 
+                                        // any (other) user input signals the end of a scroll input
+                                        let msg = this.buildMsg(this._wheel);
+                                        this.port.postMessage(msg); // record a wheel action, fire and forget 
+                                        this._wheel = false;
+                                    }
                                     let msg = this.buildMsg(pendingClick);
                                     this.port.postMessage(msg); // take screenshot, and then simulate 
                                     this._state = Recorder.state.SIMULATE;
@@ -209,14 +252,17 @@
         } // end class Recorder
 
         Recorder.state = {
-            /** we are recording and blocking all events */
+            /** we are recording, some events are intercepted and blocked, some bubble */
             RECORD: 0,
 
-            /** we are simulating (driving the browser programmatically) and letting all events through */
+            /** we are simulating (driving the browser programmatically) and letting all events through. Everything bubbles. */
             SIMULATE: 1,
 
             /** we are ready to start recording (again), but need a user input before we block events */
-            READY: 2
+            READY: 2,
+
+            /** we are blocking everything. let nothing bubble. */
+            BLOCK: 3
         };
 
         Recorder.events = [
@@ -244,7 +290,15 @@
             'change',       // blocked. it changes styles. e.g. (x) on a combobox.
 
             'mouseout',
-            'mouseover'
+            'mouseover',
+
+            'wheel' // monitored to decide when a user performs a "complete" scroll action. 
+                    // the first wheel event must take a screenshot and block all subsequent events until that's done.
+                    // subsequent wheel events are agregated.
+                    // we decide the the user is no longer scrolling when a non-wheel user action type event occurs.
+                    // this records the completed scroll action.
+
+            //'scroll'
             
             // FIXME: I do not ever see these...WHY? 
             //'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
@@ -258,8 +312,9 @@
             else {
                 console.debug(`blocking event: ${e.type}`);
             }
-            e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
+            e.preventDefault();
         };
 
 
