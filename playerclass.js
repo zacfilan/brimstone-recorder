@@ -3,7 +3,7 @@ const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
-import { status } from "./ui/card.js";
+import { constants } from "./ui/card.js";
 import { loadOptions } from "./options.js";
 var options;
 
@@ -53,7 +53,7 @@ export class Player {
         chrome.webNavigation.onBeforeNavigate.removeListener(this.beforeNavigation);
         chrome.webNavigation.onCompleted.removeListener(this.completeNavigation);
     }
-    
+
     attachNavigationListeners() {
         this.detachNavigationListeners();
         chrome.webNavigation.onBeforeNavigate.addListener(this.beforeNavigation);
@@ -64,7 +64,7 @@ export class Player {
     async createNavigationsCompletePromise() {
         that = this;
         // create a deferred
-        return new Promise( (resolve, reject) => {
+        return new Promise((resolve, reject) => {
             that.resolveNavigation = resolve;
             that.rejectNavigation = reject;
         });
@@ -72,81 +72,65 @@ export class Player {
 
     /** 
      * Play the current set of actions. This allows actions to be played one
-     * at a time or in chunks. */
+     * at a time or in chunks. 
+     * 
+     * Returns a deferred boolean that reflects the success of playing all the steps:
+     * true if they all played successfully, false if one failed.*/
     async play(actions, startIndex = 0) {
         options = await loadOptions();
+
+        document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
+        
         this._actions = actions;
-        this._playbackComplete = false;
         this.mouseLocation = { x: -1, y: -1 }; // off the viewport I guess
 
         // start timer
         let start;
         let stop;
-        for (let i = startIndex; !this._playbackComplete && (i < actions.length - 1); ++i) {
+        let playedSuccessfully = true; // optimist
+        for (let i = startIndex; playedSuccessfully && (i < actions.length - 1); ++i) {
             let action = actions[i];
-            action.status = status.INPUT;
+            action.status = constants.status.INPUT;
             let next = actions[i + 1];
-            next.status = status.WAITING;
-
+            next.status = constants.status.WAITING;
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
             }
 
             delete action.actualScreenshot; // we are replaying this step, drop any previous results
             console.log(`[${action.index}] : ${action.description}`);
+            start = performance.now();
+            await this[action.type](action); // really perform this in the browser (this action may start some navigations)
 
-            try {
-                start = performance.now();
+            // remember any mousemoving operation, implicit or explicit
+            switch (action.type) {
+                case 'click':
+                case 'dblclick':
+                case 'contextmenu':
+                case 'mousemove':
+                case 'wheel':
+                    /** Remember any mousemoving operation plyed, implicit or explicit */
+                    this.mouseLocation = { x: action.x, y: action.y };
+                    break;
+            }
 
-                await this[action.type](action); // really perform this in the browser (this action may start some navigations)
-
-                // remember any mousemoving operation, implicit or explicit
-                switch (action.type) {
-                    case 'click':
-                    case 'dblclick':
-                    case 'contextmenu':
-                    case 'mousemove':
-                    case 'wheel':
-                        /** Remember any mousemoving operation plyed, implicit or explicit */
-                        this.mouseLocation = { x: action.x, y: action.y };
-                        break;
-                }
-
-                // Leaving just in case I want this later.
-                // if(this._navigationsInFlight) {
-                //     console.debug('wait for navigation to complete');
-                //     let navigationsComplete = this.createNavigationsCompletePromise();
-                //      await navigationsComplete; // I want all navigations complete before I start taking screenshots.
-                //      console.debug('navigation complete');
-                //      await this.tab.resizeViewport();
-                // }
-                await this.verifyScreenshot(next);
-                stop = performance.now();
+            let match = await this.verifyScreenshot(next);
+            stop = performance.now();
+            action.status = constants.status.INPUT;
+            if (match) {
                 console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
-                action.status = status.INPUT;
-                next.status = status.INPUT;
-                if (this.onAfterPlay) {
-                    await this.onAfterPlay(action);
-                }
+                next.status = constants.status.INPUT;
             }
-            catch (e) {
-                stop = performance.now();
+            else {
                 console.log(`\t\tscreenshots still unmatched after ${stop - start}ms`);
-                this._playbackComplete = true;
-                action.status = status.INPUT;
-                if (this.onAfterPlay) {
-                    await this.onAfterPlay(action);
-                }
-                throw e;
+                playedSuccessfully = false;
             }
-            // end timer
+            if (this.onAfterPlay) {
+                await this.onAfterPlay(action);
+            }
         }
 
-        this._playbackComplete = true;
-    }
-
-    stop() {
-        this._playbackComplete = true;
+        return playedSuccessfully;
     }
 
     async start(action) {
@@ -271,7 +255,7 @@ export class Player {
     }
 
     async mousemove(action) {
-        //console.debug(`player: dispatch mouseMoved (${action.x},${action.y})`);
+        console.debug(`player: dispatch mouseMoved (${action.x},${action.y})`);
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
             x: action.x,
@@ -298,9 +282,7 @@ export class Player {
      * Repeatedly check the expected screenshot required to start the next action
      * against the actual screenshot. 
      * 
-     * Return when they match, throw if they do not match within given time.
-     * 
-     * @returns 
+     * @returns {boolean} true when the screenshots match false when they don't
      */
     async verifyScreenshot(nextStep) {
         let start = performance.now();
@@ -313,7 +295,7 @@ export class Player {
 
         let actualScreenshot;
         let differencesPng;
-        let i=0;
+        let i = 0;
 
         // this loop will run even if the app is in the process of navigating to the next page.
         while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
@@ -330,7 +312,7 @@ export class Player {
                     // this requires moving (back) to the current location first, then into the next location 
                     await this.mousemove(this.mouseLocation);
                     await this.mousemove(nextStep);
-                    if(nextStep.hoverTime) {
+                    if (nextStep.hoverTime) {
                         await sleep(nextStep.hoverTime);
                     }
                     break;
@@ -346,17 +328,17 @@ export class Player {
                         dataUrl: actualScreenshot.dataUrl,
                         fileName: `step${nextStep.index}_actual.png`
                     };
-                    nextStep.status = status.ALLOWED;
+                    nextStep.status = constants.status.ALLOWED;
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
-                let avgIteration = (doneIn/i).toFixed(1);
+                let avgIteration = (doneIn / i).toFixed(1);
                 console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
-                return;
+                return true;
             }
         }
 
         // The screenshots don't match
-        nextStep.status = status.EXPECTED;
+        nextStep.status = constants.status.EXPECTED;
         nextStep.actualScreenshot = {
             dataUrl: actualScreenshot.dataUrl,
             fileName: `step${nextStep.index}_actual.png`
@@ -364,9 +346,7 @@ export class Player {
         // and the editable image.
         nextStep.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
 
-        throw {
-            message: 'screenshots do not match',
-        };
+        return false;
     }
 
     /**
@@ -374,16 +354,32 @@ export class Player {
     * @returns {{dataUrl, actualScreenshot: PNG}}
     */
     async takeScreenshot() {
-        let dataUrl = await chrome.tabs.captureVisibleTab(this.tab.windowId, {
+        // throttling sucks: https://developer.chrome.com/docs/extensions/reference/tabs/#property-MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND
+        // let dataUrl = await chrome.tabs.captureVisibleTab(this.tab.windowId, {
+        //     format: 'png'
+        // });
+
+        // unthrottled? alternative method
+        let result = await this.debuggerSendCommand('Page.captureScreenshot', {
             format: 'png'
         });
+        let dataUrl = 'data:image/png;base64,' + result.data;
+
         return await Player.dataUrlToPNG(dataUrl);
     }
 
     async debuggerSendCommand(method, commandParams) {
-        await this._debuggerDetachPromise;
-        await this._debuggerAttachPromise;
-        await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
+        try {
+            await this._debuggerDetachPromise;
+            await this._debuggerAttachPromise;
+            return await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
+        }
+        catch(e) {
+            if(e.message === 'detached while') {
+                return; // we have a handler for when the debugger detaches, if there was something in flight ignore it.
+            }
+            throw e;
+        }
     }
 
     /** Schedule detaching the debugger from the current tab.*/
@@ -408,8 +404,8 @@ export class Player {
         await this._debuggerDetachPromise; // if there is one in flight wait for it.
         this.tab = tab;
 
-        await (new Promise( async (resolve, reject) => {
-            let p = new Promise( resolve => chrome.debugger.getTargets(resolve));
+        await (new Promise(async (resolve, reject) => {
+            let p = new Promise(resolve => chrome.debugger.getTargets(resolve));
             let targets = await p;
             if (!targets.find(target => target.tabId === tab.id && target.attached)) {
                 chrome.debugger.attach({ tabId: tab.id }, "1.3", resolve);
@@ -435,19 +431,19 @@ export class Player {
 
 }
 
-Player.beforeNavigation = function() {
+Player.beforeNavigation = function () {
     this._navigationsInFlight++;
 
 };
 
-Player.completeNavigation = function() {
+Player.completeNavigation = function () {
     this._navigationsInFlight--;
-    if(this._navigationsInFlight < 0) {
+    if (this._navigationsInFlight < 0) {
         console.error('navigation accounting is broken');
         this._navigationsInFlight = 0;
     }
 
-    if(!this._navigationsInFlight) {
+    if (!this._navigationsInFlight) {
         this.resolveNavigation();
     }
 };

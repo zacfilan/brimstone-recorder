@@ -6,24 +6,26 @@ class Input {
 
 }
 
-export const status = {
-    /** the action card */
-    INPUT: 'input',
+export const constants = {
+    status: {
+        /** the action card */
+        INPUT: 'input',
 
-    /** we are waiting for this one (implies playing) */
-    WAITING: 'waiting',
+        /** we are waiting for this one (implies playing) */
+        WAITING: 'waiting',
 
-    /** it has beed edited, and has allowed errors */
-    ALLOWED: 'allowed',
+        /** it has beed edited, and has allowed errors */
+        ALLOWED: 'allowed',
 
-    /** it doesn't match. (here is what we expected) */
-    EXPECTED: 'expected',
+        /** it doesn't match. (here is what we expected) */
+        EXPECTED: 'expected',
 
-    /** it doesn't match. (here is what we got) */
-    ACTUAL: 'actual',
+        /** it doesn't match. (here is what we got) */
+        ACTUAL: 'actual',
 
-    /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
-    EDIT: 'edit'
+        /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
+        EDIT: 'edit'
+    }
 };
 
 /** A container for properties of a screenshot */
@@ -75,7 +77,7 @@ export class TestAction {
         Object.assign(this, args);
 
         if (!this.status) {
-            this.status = status.INPUT;
+            this.status = constants.status.INPUT;
         }
         // make sure it has a step number
         if (this.index === undefined) {
@@ -185,10 +187,10 @@ export class TestAction {
         */
         this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         if (numMaskedPixels) {
-            this.status = status.ALLOWED;
+            this.status = constants.status.ALLOWED;
         }
         else if (this.numDiffPixels) {
-            this.status = status.EXPECTED;
+            this.status = constants.status.EXPECTED;
         }
     }
 
@@ -205,21 +207,21 @@ export class TestAction {
         let title = 'Current screen';
         let src = this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
         switch (this.status) {
-            case status.WAITING: // we are waiting for this one (implies playing)
+            case constants.status.WAITING: // we are waiting for this one (implies playing)
                 title = 'Waiting for next screen';
                 break;
-            case status.ALLOWED: // it has beed edited, and has allowed errors
+            case constants.status.ALLOWED: // it has beed edited, and has allowed errors
                 title = "Expected next screen. This screen has allowed differences.";
                 break;
             // these are all 'fail states'
-            case status.EXPECTED: // it doesn't match. (here is what we expected)
+            case constants.status.EXPECTED: // it doesn't match. (here is what we expected)
                 title = 'Expected next screen (click image to toggle)';
                 break;
-            case status.ACTUAL: // it doesn't match. (here is what we got)
+            case constants.status.ACTUAL: // it doesn't match. (here is what we got)
                 title = 'Actual next screen (click image to toggle)';
                 src = this?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
                 break;
-            case status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
+            case constants.status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
                 title = `Difference (red pixels). ${this.numDiffPixels} pixels, ${this.percentDiffPixels}% different`;
                 src = this.diffDataUrl ?? '../images/notfound.png'
                 break;
@@ -233,9 +235,9 @@ export class TestAction {
         </div>
         <div class='screenshot clickable'>
             <img src='${src}'>`;
-        
+
         // FIXME: calculate the best location for the callout, based on the location of the overlay
-        if (this.overlay) { // or this.status === status.INPUT
+        if (this.overlay) { // or this.status === constants.status.INPUT
             let o = this.overlay;
             html += `
             <div class='overlay pulse-rectangle' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
@@ -284,7 +286,7 @@ export class Step {
         html += `
         </div>
         `;
-        
+
         return html;
     }
 

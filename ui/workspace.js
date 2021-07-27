@@ -2,7 +2,7 @@ import { Player } from "../playerclass.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
-import { TestAction, getCard, status, Step } from "./card.js";
+import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep } from "../utilities.js"
 
 setToolbarState();
@@ -43,7 +43,7 @@ var currentUrl;
 var _lastScreenshot;
 
 var zip;
-
+var infobarText = 'ready';
 /** The parsed test.json object, this will change in memory during use.
  * It represents the recorded user actions, and optionally the result
  * of playing them back. 
@@ -65,17 +65,15 @@ class UserAction extends UserEvent {
 }
 
 $('#ignoreDelta').on('click', async function (e) {
-
     // if you are editing you are going to want to save, and to save we need to detach the debugger.
     await player.detachDebugger();
 
     // add a mask to the 
     const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
     await action.addMask(view);
-    action.status = status.EDIT; // stay on edit
+    action.status = constants.status.EDIT; // stay on edit
 
     updateStepInView(TestAction.instances[action.index - 1]);
-
 });
 
 // stop the image drap behavior
@@ -105,14 +103,14 @@ $('#cards').on('click', '.thumb', async function (e) {
 $('#step').on('click', '.screenshot.clickable', function (e) {
     // flip the cards
     const { view, action } = getCard(e.currentTarget);
-    if (action.status === status.EXPECTED) {
-        action.status = status.ACTUAL;
+    if (action.status === constants.status.EXPECTED) {
+        action.status = constants.status.ACTUAL;
     }
-    else if (action.status === status.ACTUAL) {
-        action.status = status.EDIT;
+    else if (action.status === constants.status.ACTUAL) {
+        action.status = constants.status.EDIT;
     }
     else {
-        action.status = status.EXPECTED;
+        action.status = constants.status.EXPECTED;
     }
 
     // we can only click the 2nd card in the step not the first.
@@ -142,6 +140,8 @@ function setToolbarState() {
         rb.prop('disabled', false);
         rb.prop('title', 'Brimstone is recording.\nClick to stop.');
         iconState.Record();
+        infobarText = 'recording...';
+
     }
     else {
         rb.prop('title', "Click to record.");
@@ -150,6 +150,7 @@ function setToolbarState() {
         if ($('#playButton').hasClass('active')) {
             pb.prop('disabled', false);
             iconState.Play();
+            infobarText = 'playing...';
         }
         else {
             // not playing, not recoding
@@ -180,17 +181,20 @@ function setToolbarState() {
     if (editCard.length) {
         const { action } = getCard(editCard);
         switch (action?.status) {
-            case status.EXPECTED:
-            case status.ACTUAL:
-            case status.ALLOWED:
+            case constants.status.EXPECTED:
+            case constants.status.ACTUAL:
+            case constants.status.ALLOWED:
                 $('#edit').prop('disabled', false);
                 break;
-            case status.EDIT:
+            case constants.status.EDIT:
                 $('#ignoreDelta').prop('disabled', false);
                 $('#ignoreRegion').prop('disabled', false);
                 break;
         }
     }
+
+    $('#infobar').text(infobarText);
+
 }
 
 $('#first').on('click', function (e) {
@@ -209,7 +213,7 @@ $('#playButton').on('click', async () => {
         let actions = TestAction.instances;
         for (let i = 0; i < actions.length; ++i) {
             let action = actions[i];
-            action.status = status.INPUT;
+            action.status = constants.status.INPUT;
             updateThumb(action);
         }
         player.onBeforePlay = updateStepInView;
@@ -224,20 +228,21 @@ $('#playButton').on('click', async () => {
         $('#playButton').addClass('active');
         setToolbarState();
 
-        await player.play(actions); // players gotta play...
+        let playedSuccessfully = await player.play(actions); // players gotta play...
+        
+        infobarText = playedSuccessfully ? 'PASSED' : 'FAILED';  
         $('#playButton').removeClass('active');
         setToolbarState();
     }
     catch (e) {
         $('#playButton').removeClass('active');
+        infobarText = 'aborted!';  
         setToolbarState();
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
         }
         else {
-            if (e?.message !== 'screenshots do not match') {
-                throw e;
-            }
+            throw e;
         }
     }
 
@@ -627,12 +632,21 @@ async function userEventToAction(userEvent) {
 }
 
 async function takeScreenshot() {
-    let dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+    // throttling sucks: https://developer.chrome.com/docs/extensions/reference/tabs/#property-MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND
+    // let dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+    //     format: 'png'
+    // });
+    // console.debug('\t\tscreenshot taken');
+    // return {
+    //     dataUrl
+    // };
+
+    // unthrottled? alternative method
+    let result = await player.debuggerSendCommand('Page.captureScreenshot', {
         format: 'png'
     });
-    console.debug('\t\tscreenshot taken');
     return {
-        dataUrl
+        dataUrl : 'data:image/png;base64,' + result.data
     };
 }
 
