@@ -141,7 +141,7 @@ function setToolbarState() {
         rb.prop('title', 'Brimstone is recording.\nClick to stop.');
         iconState.Record();
         infobarText = 'recording...';
-
+        document.documentElement.style.setProperty('--action-color', 'red');
     }
     else {
         rb.prop('title', "Click to record.");
@@ -151,10 +151,12 @@ function setToolbarState() {
             pb.prop('disabled', false);
             iconState.Play();
             infobarText = 'playing...';
+            document.documentElement.style.setProperty('--action-color', 'green');
         }
         else {
             // not playing, not recoding
             rb.prop('disabled', false);
+            document.documentElement.style.setProperty('--action-color', 'blue');
 
             if (TestAction.instances.length) {
                 $('#saveButton').prop('disabled', false);

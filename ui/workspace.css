@@ -4,6 +4,7 @@ html {
 
 :root {
     --screenshot-timeout: 15s;
+    --action-color: red;
 }
 
 body {
@@ -181,7 +182,7 @@ svg {
     100% {opacity: 0};
 }
 .pulse-rectangle {
-    background: red;
+    background: var(--action-color);
     position: absolute;
     animation: opacity2 2s infinite;
 }
@@ -228,6 +229,10 @@ svg {
     position: absolute;
     text-align: center;
     font-size:18px;
-    background: grey;
+    background: var(--action-color);
     margin: 3px;
+    border: 1px solid black;
+    border-radius:  6px;
+    padding: 5px;
+    /* text-align: center; */
 }
