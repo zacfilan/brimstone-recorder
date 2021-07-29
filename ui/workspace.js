@@ -268,7 +268,7 @@ async function beforeNavigation(obj) {
 
 chrome.debugger.onDetach.addListener(async (source, reason) => {
     console.debug('The debugger was detached.', source, reason);
-    if (reason === 'canceled_by_user') {
+    if (reason === 'canceled_by_user' || player._debugger_detatch_requested) {
         await sleep(500);
         await player.tab.resizeViewport();
         if (isRecording()) {
@@ -599,6 +599,11 @@ async function userEventToAction(userEvent) {
             break;
         case 'keypress':
             cardModel.description = `type ${userEvent.event.key}`;
+            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
+            await addScreenshot(cardModel);
+            break;
+        case 'chord':
+            cardModel.description = 'type ' + userEvent.keysDown.map( k => k.key).join('-'); // e.g. Ctrl-a
             await addScreenshot(cardModel);
             break;
         case 'click':
@@ -681,18 +686,18 @@ async function listenOnPort(url) {
                         _lastScreenshot = (await takeScreenshot()).dataUrl;
                         postMessage({ type: 'complete', args: userEvent.type });
                         break;
-                    case 'mousemove':
-                    case 'wheel':
+                    case 'mousemove': // this does not ack, because it will always be followed by another operation.
+                    case 'wheel': // this does not ack, because it will always be followed by another operation.
                         // update the UI with a screenshot
                         action = await userEventToAction(userEvent);
                         updateStepInView(action);
                         // no simulation required
-                        // this does not ack, because it will always be followed by another operation.
                         break;
                     case 'click':
                     case 'keypress':
                     case 'contextmenu':
                     case 'dblclick':
+                    case 'chord':
                         // update the UI with a screenshot
                         action = await userEventToAction(userEvent);
                         updateStepInView(action);

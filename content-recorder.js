@@ -25,8 +25,11 @@
          */
         class Recorder {
             constructor() {
-                /** Build a keypress event from a keyup and a keydown */
-                this._lastKeyPress;
+                /** The keys that have been pressed down in the current chord. */
+                this.keysDown = [];
+
+                /** The keys that have been released up in the current chord. */
+                this.keysUp = [];
 
                 /** Two way communication with the UI. */
                 this.port;
@@ -98,7 +101,7 @@
                     case 'contextmenu':
                     case 'dblclick':
                         msg.hoverTime = performance.now() - this._mouseEnterTime;
-                        if(msg.hoverTime > 5000) {
+                        if (msg.hoverTime > 5000) {
                             msg.hoverTime = 5000;
                             console.warn("hover time is limited to 5 seconds");
                         }
@@ -119,6 +122,24 @@
                         msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
                         msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
                         msg.type = 'keypress'; // keydown events will be emitted as keypress msgs eventually
+                        break;
+                    case 'chord':
+                        msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
+                        msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
+                        msg.keysDown = [];
+                        msg.keysUp = [];
+                        for (let i = 0; i < this.keysDown.length; ++i) {
+                            let keyDownEvent = this.keysDown[i];
+                            let keyUpEvent = this.keysUp[i];
+                            let down = {};
+                            let up = {};
+                            ['altKey', 'charCode', 'code', 'ctrlKey', 'key', 'keyCode', 'metaKey', 'shiftKey'].forEach(p => {
+                                down[p] = keyDownEvent[p];
+                                up[p] = keyUpEvent[p];
+                            });
+                            msg.keysDown.push(down);
+                            msg.keysUp.push(up);
+                        }
                         break;
                 }
 
@@ -144,12 +165,12 @@
 
             /** Central callback for all bound event handlers */
             handleEvent(e) {
-                console.debug(`handle user input event: ${e.type}`, e);
-                
+              //  console.debug(`handle user input event: ${e.type}`, e);
+
                 if (this._state === Recorder.state.BLOCK) {
                     Recorder.block(e);
-                    return false; 
-                } 
+                    return false;
+                }
 
                 // if we are done driving the browser (simulating a user input) 
                 // wait for the next user input before we start blocking events.
@@ -163,7 +184,7 @@
                             this._state = Recorder.state.RECORD;
                             console.debug(`user input event: ${e.type} switches us to RECORD state`);
                             break;
-                        case 'mouseover': 
+                        case 'mouseover':
                             this._mouseEnterTime = performance.now(); // keep on accounting
                             return;
                         default:
@@ -179,9 +200,10 @@
                     console.debug(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
                 }
                 else {
+                    let msg;
                     switch (e.type) {
-                        case 'wheel': 
-                            if(!this._wheel) {
+                        case 'wheel':
+                            if (!this._wheel) {
                                 this._wheel = {
                                     type: 'wheel',
                                     deltaX: e.deltaX,
@@ -191,24 +213,72 @@
                                     clientY: e.clientY
                                 };
                                 this._state === Recorder.state.BLOCK;
-                                this.port.postMessage({type: 'screenshot'}); 
+                                this.port.postMessage({ type: 'screenshot' });
                                 break; // the first is (intended) to be blocked from the app, and used just to indicate start, we block other events til the screenshot is taken.
-                                        // but...apparently I can't block it and it sneaks through, so I need to include the delta in my total count.
+                                // but...apparently I can't block it and it sneaks through, so I need to include the delta in my total count.
                             }
                             // subsequent wheel events in the chain are agregatted and allowed to bubble, and really scroll the app
                             this._wheel.deltaX += e.deltaX;
                             this._wheel.deltaY += e.deltaY;
                             return; // bubble
                         case 'keydown':
-                        case 'contextmenu':
-                        case 'dblclick':                            
-                            if(this._wheel) { 
+                            if (e.repeat) {
+                                break;
+                            }
+                            if (this._wheel) {
                                 // any (other) user input signals the end of a scroll input
-                                let msg = this.buildMsg(this._wheel);
+                                msg = this.buildMsg(this._wheel);
                                 this.port.postMessage(msg); // record a wheel action 
                                 this._wheel = false;
                             }
-                            let msg = this.buildMsg(e);
+
+                            if (this.keysDown.length || e.ctrlKey) {
+                                this.keysDown.push(e);
+                                //console.debug('chord? chord start or continue keydown');
+                                break;
+                            }
+
+                            // this keydown is unrelated to chords
+                            //console.debug('chord? not chord keydown');
+                            msg = this.buildMsg(e);
+                            this.port.postMessage(msg); // take screenshot and then simulate 
+                            this._state = Recorder.state.SIMULATE;
+                            break;
+                        case 'keyup':
+                            if (this.keysDown.length) {
+                                // we started a chord
+                                this.keysUp.push(e); // and just released a key in the chord
+                                if (this.keysUp.length === this.keysDown.length) {
+                                    //console.debug('chord? all released keyup');// else not all keys are released
+                                    // released all keys n the chord
+                                    let userAction = {
+                                        type: 'chord',
+                                        target: e.target
+                                    };
+                                    msg = this.buildMsg(userAction);
+                                    this.keysUp = [];
+                                    this.keysDown = [];
+                                    this.port.postMessage(msg); // take screenshot and then simulate 
+                                    this._state = Recorder.state.SIMULATE;
+                                }
+                                else {
+                                    //console.debug('chord? not all released keyup');// else not all keys are released
+                                }
+                            }
+                            else {
+                                //console.debug('chord? not chord keyup');
+                            }
+
+                            break;
+                        case 'contextmenu':
+                        case 'dblclick':
+                            if (this._wheel) {
+                                // any (other) user input signals the end of a scroll input
+                                msg = this.buildMsg(this._wheel);
+                                this.port.postMessage(msg); // record a wheel action 
+                                this._wheel = false;
+                            }
+                            msg = this.buildMsg(e);
                             this.port.postMessage(msg); // take screenshot and then simulate 
                             this._state = Recorder.state.SIMULATE;
                             break;
@@ -217,7 +287,7 @@
                             if (!pendingClick) {
                                 pendingClick = e;
                                 setTimeout(() => {
-                                    if(this._wheel) { 
+                                    if (this._wheel) {
                                         // any (other) user input signals the end of a scroll input
                                         let msg = this.buildMsg(this._wheel);
                                         this.port.postMessage(msg); // record a wheel action, fire and forget 
@@ -237,7 +307,7 @@
                                 }
                             }
                             break;
-                        
+
                         // these will bubble (via the early return)
                         case 'mouseover': // alow these to bubble so I can see the complex hover stuff like tooltips and menus
                             /** The time that the users mouse entered the current element, used to record hover effects. */
@@ -293,13 +363,13 @@
             'mouseover',
 
             'wheel' // monitored to decide when a user performs a "complete" scroll action. 
-                    // the first wheel event must take a screenshot and block all subsequent events until that's done.
-                    // subsequent wheel events are agregated.
-                    // we decide the the user is no longer scrolling when a non-wheel user action type event occurs.
-                    // this records the completed scroll action.
+            // the first wheel event must take a screenshot and block all subsequent events until that's done.
+            // subsequent wheel events are agregated.
+            // we decide the the user is no longer scrolling when a non-wheel user action type event occurs.
+            // this records the completed scroll action.
 
             //'scroll'
-            
+
             // FIXME: I do not ever see these...WHY? 
             //'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
             //'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
@@ -316,7 +386,6 @@
             e.stopImmediatePropagation();
             e.preventDefault();
         };
-
 
         // create the instace
         window.brimstomeRecorder = new Recorder();

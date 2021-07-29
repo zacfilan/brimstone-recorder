@@ -11,7 +11,7 @@ Brimstone is a strict do no harm tester: it requires every pixel to be accounted
 
 # Why?
 
-We required effective, easy, automated do-no-harm testing to catch the most bugs between different code versions of a complex single page web application. This testing needed to be done by non-technical employees. (And I wanted to do something fun.)
+We required an easy, automated do-no-harm testing methodology to catch the most bugs between different code versions of a complex single page web application. This testing needed to be done by non-technical employees. (And I wanted to do something fun.)
 
 # How?
 
@@ -25,14 +25,16 @@ The intended audience is quality engineers, web-software developers, automation 
 
 # Recording
 
-Still here? Cool. Go to some website. Poke the (B) icon to start recording on this tab.  
+Still here? Cool. Go to some website. Poke the ![Brimstone Icon](/images/grey_b_32.png) icon to launch the workspace.  
 
 ## Recording Tips, Dos and Don'ts.
 
 * Do type slower than normal.
 
-    Brimstone is executing code, including taking a screenshot, for each key you press. If you perform too many user input actions too fast, some events may be missed. Some searches and filters update a chunk of the screen each time you press a key. Be aware of that, and slow down and look at the screen for a moment between each keypress. 
+    Brimstone is executing code, including taking a screenshot, for each key you press. If you perform too many user input actions too fast, some events may be missed. Some searches and filters update a chunk of the screen each time you press a key. Be aware of that, slow down and look at the screen for a moment between each keypress. 
     
+* Do watch the workspace to see what Brimstone recorded for each user action.
+
 * Do always end your recording by pressing the 'End Recording' button.
 
 * Do save and organize your recordings.
@@ -68,8 +70,10 @@ Still here? Cool. Go to some website. Poke the (B) icon to start recording on th
 
 You can play back right after you end a recording, or when you load a saved test.
 
-* Playing will reuse the tab the workspace was launched from.
+## Playing Tips, Dos and Don'ts.
 
+* Don't multi-task during playback. Mousing or typing in other applications could affect playback.
+    
 # Validating 
 
 ## Correcting
@@ -79,7 +83,7 @@ This list is subject to change, and will probably transition to a bug/issue trac
  
 * Each test is recorded and played back in a fixed resolution. If you want to test different resoutions you need to record different tests.
 * Only user actions in the page itself are recorded. e.g. The browser back and forward buttons are not recorded.
-* Click, double-click, right-click, single-keypresses, and mouse wheel user inputs are recorded. e.g. Chords like Ctrl-A are not (yet) recorded.
+* Click, double-click, right-click, single-keypresses, limited chords, and mouse wheel user inputs are recorded. e.g. Chords must start with a Ctrl. e.g. Ctrl-a will be recorded, but I haven' gotten around to Alt-a. 
 * Only one tab is recorded in a test, although that tab is free to navigate to different URLs and still be recorded. e.g. Web application spawned additional browser windows/tabs recording is not supported.
 
 

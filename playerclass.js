@@ -80,7 +80,7 @@ export class Player {
         options = await loadOptions();
 
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
-        
+
         this._actions = actions;
         this.mouseLocation = { x: -1, y: -1 }; // off the viewport I guess
 
@@ -276,6 +276,45 @@ export class Player {
         });
     }
 
+    /** Chords must start with Alt, Ctrl, Meta/Command, or Shift */
+    async chord(action) {
+        let Alt = 1;
+        let Ctrl = 2;
+        let Meta = 4;
+        let Shift = 8;
+        for (let i = 0; i < action.keysDown.length; ++i) {
+            let key = action.keysDown[i];
+            let args = {
+                type: 'keyDown',
+                modifiers: Ctrl,
+                code: key.code,
+                key: key.key,
+                windowsVirtualKeyCode: key.keyCode,
+                nativeVirtualKeyCode: key.keyCode
+            };
+            if (i > 0) {
+                args.modifiers = Ctrl; // FIXME:!
+            }
+            await this.debuggerSendCommand('Input.dispatchKeyEvent', args);
+        }
+
+        for (let i = 0; i < action.keysUp.length; ++i) {
+            let key = action.keysUp[i];
+            let args = {
+                type: 'keyUp',
+                modifiers: Ctrl,
+                code: key.code,
+                key: key.key,
+                windowsVirtualKeyCode: key.keyCode,
+                nativeVirtualKeyCode: key.keyCode
+            };
+            if (i > 0) {
+                args.modifiers = Ctrl; // FIXME:!
+            }
+            await this.debuggerSendCommand('Input.dispatchKeyEvent', args);
+        }
+    }
+
     /**
      * Called after we play the current action.
      * 
@@ -374,8 +413,8 @@ export class Player {
             await this._debuggerAttachPromise;
             return await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
         }
-        catch(e) {
-            if(e.message === 'detached while') {
+        catch (e) {
+            if (e.message === 'detached while') {
                 return; // we have a handler for when the debugger detaches, if there was something in flight ignore it.
             }
             throw e;
@@ -387,6 +426,7 @@ export class Player {
         console.debug("schedule detaching debugger");
         //await this._attachDebuggerPromise; // if there is one in flight wait for it.
 
+        this._debugger_detatch_requested = true;
         this._debuggerDetachPromise = new Promise(resolve => {
             chrome.debugger.detach({ tabId: this.tab.id }, () => {
                 resolve(chrome.runtime.lastError);
@@ -402,6 +442,7 @@ export class Player {
     async attachDebugger({ tab }) {
         console.debug(`schedule attach debugger`);
         await this._debuggerDetachPromise; // if there is one in flight wait for it.
+        this._debugger_detatch_requested = false;
         this.tab = tab;
 
         await (new Promise(async (resolve, reject) => {

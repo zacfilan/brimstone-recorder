@@ -14,7 +14,7 @@ chrome.action.onClicked.addListener(async function (tab) {
           return;
         }
       }
-      catch(e) {
+      catch (e) {
         console.error(e); // at least report it in the extension details area
       }
     }
@@ -37,15 +37,15 @@ chrome.action.onClicked.addListener(async function (tab) {
     });
 
     // keep track of the brimstone window id between invocations of this worker (multiple clicks of icon)
-    chrome.storage.local.set({ session: { brimstoneWindowId: brimstoneWindow.id, tabId: tab.id }});
+    chrome.storage.local.set({ session: { brimstoneWindowId: brimstoneWindow.id, tabId: tab.id } });
 
     // clean up when the brimstone window is closed
     chrome.windows.onRemoved.addListener(async (windowId) => {
       if (windowId === brimstoneWindow.id) {
         chrome.storage.local.remove('session');
         // FIXME: not sure how to import iconState module into here so...
-        await chrome.action.setTitle({title: 'Brimstone is not active.'});
-        await chrome.action.setIcon({path: 'images/grey_b_32.png' });
+        await chrome.action.setTitle({ title: 'Brimstone is not active.' });
+        await chrome.action.setIcon({ path: 'images/grey_b_32.png' });
       }
     });
 
