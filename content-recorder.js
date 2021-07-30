@@ -150,8 +150,8 @@
             addEventListeners() {
                 console.debug('removing + adding event listeners');
                 Recorder.events.forEach(event => {
-                    window.removeEventListener(event, this, { capture: true });
-                    window.addEventListener(event, this, { capture: true });
+                    window.removeEventListener(event, this, { capture: true, passive: false });
+                    window.addEventListener(event, this, { capture: true, passive: false });
                 });
             }
 
@@ -159,7 +159,7 @@
             removeEventListeners() {
                 console.debug('removing event listeners');
                 Recorder.events.forEach(event => {
-                    window.removeEventListener(event, this, { capture: true });
+                    window.removeEventListener(event, this, { capture: true, passive: false });
                 });
             }
 
@@ -206,8 +206,8 @@
                             if (!this._wheel) {
                                 this._wheel = {
                                     type: 'wheel',
-                                    deltaX: e.deltaX,
-                                    deltaY: e.deltaY,
+                                    deltaX: 0,
+                                    deltaY: 0,
                                     target: e.target,
                                     clientX: e.clientX,
                                     clientY: e.clientY
@@ -215,7 +215,6 @@
                                 this._state === Recorder.state.BLOCK;
                                 this.port.postMessage({ type: 'screenshot' });
                                 break; // the first is (intended) to be blocked from the app, and used just to indicate start, we block other events til the screenshot is taken.
-                                // but...apparently I can't block it and it sneaks through, so I need to include the delta in my total count.
                             }
                             // subsequent wheel events in the chain are agregatted and allowed to bubble, and really scroll the app
                             this._wheel.deltaX += e.deltaX;
@@ -362,13 +361,15 @@
             'mouseout',
             'mouseover',
 
-            'wheel' // monitored to decide when a user performs a "complete" scroll action. 
+            // https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event
+            'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action. 
             // the first wheel event must take a screenshot and block all subsequent events until that's done.
-            // subsequent wheel events are agregated.
+            // subsequent wheel events are aggregated.
             // we decide the the user is no longer scrolling when a non-wheel user action type event occurs.
             // this records the completed scroll action.
 
-            //'scroll'
+            // https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll_event
+            //'scroll' // not cancelable :( 
 
             // FIXME: I do not ever see these...WHY? 
             //'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
@@ -382,9 +383,10 @@
             else {
                 console.debug(`blocking event: ${e.type}`);
             }
-            e.stopPropagation();
-            e.stopImmediatePropagation();
+
             e.preventDefault();
+            e.stopImmediatePropagation();
+            e.stopPropagation();
         };
 
         // create the instace
