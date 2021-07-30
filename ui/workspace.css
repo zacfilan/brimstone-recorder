@@ -68,9 +68,9 @@ svg {
 }
 
 #cards img {
-    object-fit: cover;
+    object-fit: contain;
     width:100%;
-    height:76px; /* 76 + (5 pad +12 margin)*2 = 110 */
+    height: 100%;
 }
 
 .card {
