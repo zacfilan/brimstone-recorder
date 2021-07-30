@@ -146,6 +146,21 @@ async function injectOnNavigation(obj) {
     }
 }
 
+function setInfoBarText(infobarText) {
+    if(!infobarText) {
+        if($('#recordButton').hasClass('active')) {
+            infobarText = 'recording...';
+        }
+        else if($('#playButton').hasClass('active')) {
+            infobarText = 'playing...';
+        }
+        else {
+            infobarText = 'ready';
+        }
+    }
+    $('#infobar').text(infobarText);
+}
+
 function setToolbarState() {
     $('button').prop('disabled', true); // start with all disabled and selectively enable some
 
@@ -154,7 +169,6 @@ function setToolbarState() {
         rb.prop('disabled', false);
         rb.prop('title', 'Brimstone is recording.\nClick to stop.');
         iconState.Record();
-        infobarText = 'recording...';
         document.documentElement.style.setProperty('--action-color', 'red');
     }
     else {
@@ -164,7 +178,6 @@ function setToolbarState() {
         if ($('#playButton').hasClass('active')) {
             pb.prop('disabled', false);
             iconState.Play();
-            infobarText = 'playing...';
             document.documentElement.style.setProperty('--action-color', 'green');
         }
         else {
@@ -189,8 +202,9 @@ function setToolbarState() {
             }
 
             iconState.Ready();
-            infobarText = 'ready';
         }
+        
+        setInfoBarText();
     }
 
     // buttons for editing allowable deltas in the second card.
@@ -209,9 +223,6 @@ function setToolbarState() {
                 break;
         }
     }
-
-    $('#infobar').text(infobarText);
-
 }
 
 $('#first').on('click', function (e) {
@@ -247,14 +258,14 @@ $('#playButton').on('click', async () => {
 
         let playedSuccessfully = await player.play(actions); // players gotta play...
 
-        infobarText = playedSuccessfully ? 'PASSED' : 'FAILED';
         $('#playButton').removeClass('active');
         setToolbarState();
+        setInfoBarText(playedSuccessfully ? 'PASSED' : 'FAILED');
     }
     catch (e) {
         $('#playButton').removeClass('active');
-        infobarText = 'aborted!';
         setToolbarState();
+        setInfoBarText('aborted!');
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
         }

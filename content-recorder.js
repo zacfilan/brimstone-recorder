@@ -355,8 +355,8 @@
             'focus',        // blocked. it changes styles. e.g. border.
             'focusin',      // blocked. it changes styles. e.g. border.
             'blur',         // blocked. it changes styles. e.g. border.
-            //'submit',       // blocked. ?
-            'invalid',      // blocked. ?
+            'submit',       // blocked. this can submit a form and start a navigation and I can't have that until I am simulating.
+            'invalid',      // blocked. ''
             'change',       // blocked. it changes styles. e.g. (x) on a combobox.
 
             'mouseout',
