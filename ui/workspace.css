@@ -57,7 +57,6 @@ svg {
 #content {
     display: flex;
     flex-direction: row;
-    height: 100%;
 }
 
 #cards {
@@ -65,6 +64,7 @@ svg {
     flex: row;
     overflow: auto;
     height: 110px;
+    background: rgba(0,0,0,0.2);
 }
 
 #cards img {
@@ -84,12 +84,6 @@ svg {
     background: linear-gradient(to right, rgba(116, 116, 191, .3), rgba(52, 138, 199, .3));
 }
 
-.card img {
-    object-fit: contain;
-    width:100%;
-    height: 100%;
-}
-
 .card.empty {
     height: 200px;
     background: grey;
@@ -103,7 +97,6 @@ svg {
 
 .card .screenshot {
     position: relative; /* for the action overlay to float positioned to this when absolute positioned */
-    max-height: calc(100% - 40px);
     padding: none;
 }
 

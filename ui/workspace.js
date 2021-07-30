@@ -64,58 +64,72 @@ class UserAction extends UserEvent {
     clientY = 0;
 }
 
-$('#ignoreDelta').on('click', async function (e) {
-    // if you are editing you are going to want to save, and to save we need to detach the debugger.
-    await player.detachDebugger();
 
-    // add a mask to the 
-    const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
-    await action.addMask(view);
-    action.status = constants.status.EDIT; // stay on edit
+$('#ignoreDelta').on('click',
+    /** Commit any volatile rectangles or individual pixel deltas. */
+    async function ignoreDelta(e) {
+        // if you are editing you are going to want to save, and to save we need to detach the debugger.
+        await player.detachDebugger();
 
-    updateStepInView(TestAction.instances[action.index - 1]);
-});
+        // add a mask
+        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
+        await action.addMask(view);
+        action.status = constants.status.EDIT; // stay on edit
+
+        updateStepInView(TestAction.instances[action.index - 1]);
+    }
+);
 
 // stop the image drap behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
 
-$('#ignoreRegion').on('click', async function (e) {
-    // add a mask to the 
-    const { view } = getCard($('#content .card:nth-of-type(2)')[0]);
-    let screenshot = view.find('.screenshot');
-    screenshot.removeClass('clickable');
-    Rectangle.setContainer(screenshot[0],
-        () => {
-            console.debug('rectangle added');
-        },
-        () => {
-            console.debug('rectangle deleted');
-        });
-    // adds these to the DOM temporarily
-});
-
-$('#cards').on('click', '.thumb', async function (e) {
-    const { action } = getCard(e.currentTarget);
-    let step = new Step({ curr: action });
-    setStepContent(step);
-});
-
-$('#step').on('click', '.screenshot.clickable', function (e) {
-    // flip the cards
-    const { view, action } = getCard(e.currentTarget);
-    if (action.status === constants.status.EXPECTED) {
-        action.status = constants.status.ACTUAL;
+$('#ignoreRegion').on('click',
+    /** Add rectangles where we don't care about pixel differences. */
+    async function addVolatileRegions(e) {
+        const { view } = getCard($('#content .card:nth-of-type(2)')[0]);
+        let screenshot = view.find('.screenshot');
+        screenshot.removeClass('clickable');
+        Rectangle.setContainer(screenshot[0],
+            () => {
+                console.debug('rectangle added');
+            },
+            () => {
+                console.debug('rectangle deleted');
+            });
+        // adds these to the DOM temporarily
     }
-    else if (action.status === constants.status.ACTUAL) {
-        action.status = constants.status.EDIT;
-    }
-    else {
-        action.status = constants.status.EXPECTED;
-    }
+);
 
-    // we can only click the 2nd card in the step not the first.
-    updateStepInView(TestAction.instances[action.index - 1]);
-});
+$('#cards').on('click', '.thumb',
+    /** When the user clicks on the thumbnail put that step in the main area. */
+    async function gotoStepFromThumb(e) {
+        const { action } = getCard(e.currentTarget);
+        let step = new Step({ curr: action });
+        setStepContent(step);
+    }
+);
+
+$('#step').on('click', '.screenshot.clickable',
+    /** When clicking on an editable action, cycle through expected, actual, and edit states. */
+    function cycleEditStates(e) {
+        // flip the cards
+        const { view, action } = getCard(e.currentTarget);
+        if (action.status === constants.status.EXPECTED) {
+            action.status = constants.status.ACTUAL;
+            updateStepInView(TestAction.instances[action.index - 1]);
+
+        }
+        else if (action.status === constants.status.ACTUAL) {
+            action.status = constants.status.EDIT;
+            updateStepInView(TestAction.instances[action.index - 1]);
+
+        }
+        else if(action.status === constants.status.EDIT) {
+            action.status = constants.status.EXPECTED;
+            updateStepInView(TestAction.instances[action.index - 1]);
+        }
+    }
+);
 
 /** highlist the element that was acted on in the screenshot
  * when the user hovers over the text of a user-event
@@ -156,7 +170,7 @@ function setToolbarState() {
         else {
             // not playing, not recoding
             rb.prop('disabled', false);
-            document.documentElement.style.setProperty('--action-color', 'green');
+            document.documentElement.style.setProperty('--action-color', 'blue');
 
             if (TestAction.instances.length) {
                 $('#saveButton').prop('disabled', false);
@@ -175,6 +189,7 @@ function setToolbarState() {
             }
 
             iconState.Ready();
+            infobarText = 'ready';
         }
     }
 
@@ -231,14 +246,14 @@ $('#playButton').on('click', async () => {
         setToolbarState();
 
         let playedSuccessfully = await player.play(actions); // players gotta play...
-        
-        infobarText = playedSuccessfully ? 'PASSED' : 'FAILED';  
+
+        infobarText = playedSuccessfully ? 'PASSED' : 'FAILED';
         $('#playButton').removeClass('active');
         setToolbarState();
     }
     catch (e) {
         $('#playButton').removeClass('active');
-        infobarText = 'aborted!';  
+        infobarText = 'aborted!';
         setToolbarState();
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
@@ -472,7 +487,7 @@ $('#loadButton').on('click', async () => {
         for (let i = 0; i < actions.length; ++i) {
             let firstAction = await (new TestAction(actions[i])).hydrate(screenshots);
             ++i; // load them in pairs so I can watch the steps animate during load
-            if(i < actions.length) {
+            if (i < actions.length) {
                 await (new TestAction(actions[i])).hydrate(screenshots);
                 updateStepInView(firstAction);
             }
@@ -564,6 +579,10 @@ async function userEventToAction(userEvent) {
     cardModel.tabWidth = tab.width;
 
     if (element) {
+        /** During recording we know the tab height and width, this will be the size of the screenshots captured.
+         * We can convert the element positions in pixels into percentages. The overlay represents the location
+         * of the overlay in percentages of the aspect-ratio preserved image.
+         */
         cardModel.overlay = {
             height: element.height * 100 / tab.height,
             width: element.width * 100 / tab.width,
@@ -589,7 +608,7 @@ async function userEventToAction(userEvent) {
             await addScreenshot(cardModel);
             break;
         case 'chord':
-            cardModel.description = 'type ' + userEvent.keysDown.map( k => k.key).join('-'); // e.g. Ctrl-a
+            cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
             await addScreenshot(cardModel);
             break;
         case 'click':
@@ -637,7 +656,7 @@ async function takeScreenshot() {
         format: 'png'
     });
     return {
-        dataUrl : 'data:image/png;base64,' + result.data
+        dataUrl: 'data:image/png;base64,' + result.data
     };
 }
 
