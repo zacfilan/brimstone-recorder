@@ -9,12 +9,7 @@ html {
 
 body {
     height:100%;
-
-    display:flex;
-    flex-direction: column;
-    justify-content: space-between;
     margin:0;
-
 }
 
   .themed {
@@ -23,7 +18,7 @@ body {
   }
 
 #toolbar {
-    padding: .33em;
+    padding: 0px;
     display: flex;
     flex-direction: row;
     height: 40px;
@@ -60,30 +55,39 @@ svg {
 }
 
 #content {
-    /* flex-grow: 12; */
     display: flex;
     flex-direction: row;
-    /* align-items: center; */
-    /* justify-content: space-between; */
+    height: 100%;
 }
 
 #cards {
     display:flex;
     flex: row;
     overflow: auto;
+    height: 110px;
+}
+
+#cards img {
+    object-fit: cover;
+    width:100%;
+    height:76px; /* 76 + (5 pad +12 margin)*2 = 110 */
 }
 
 .card {
     padding: 1em;
     width: 50%;
-    height: 50%;
     display: flex;
     flex-direction: column;
     margin: 1em;
-    /* margin-bottom: 1em; */
     border-radius: .6em;
-    /* box-shadow: 10px 5px 5px grey; */
-    background: linear-gradient(to right, #7474bf, #348ac7);
+    border: 1px solid;
+    background: linear-gradient(to right, rgba(116, 116, 191, .3), rgba(52, 138, 199, .3));
+}
+
+.card img {
+    object-fit: contain;
+    width:100%;
+    height: 100%;
 }
 
 .card.empty {
@@ -94,11 +98,12 @@ svg {
 #cards .card {
     width:100px;
     padding: 5px;
+    min-width: 100px;
 }
 
 .card .screenshot {
     position: relative; /* for the action overlay to float positioned to this when absolute positioned */
-    border: 1px solid white;
+    max-height: calc(100% - 40px);
     padding: none;
 }
 
@@ -161,9 +166,8 @@ svg {
 }
 
 /** only show the meter on the next card when playing back */
-.step {
-    display: flex;
-    flex-direction: row;
+#step {
+    height: calc(100% - 172px);
 }
 
 #recordButton, #playButton {
@@ -220,9 +224,11 @@ svg {
 }
 
 #infobar {
-    background:#348ac7;
+    background: #1571b3;
     color:white;
-    height: 35px;
+    height: 12px;
+    padding: 5px;
+    line-height: 1em;
 }
 
 .action {
@@ -234,5 +240,10 @@ svg {
     border: 1px solid black;
     border-radius:  6px;
     padding: 5px;
-    /* text-align: center; */
+}
+
+#footer {
+    position: fixed;
+    bottom:  0%;
+    width: 100%;
 }

@@ -156,7 +156,7 @@ function setToolbarState() {
         else {
             // not playing, not recoding
             rb.prop('disabled', false);
-            document.documentElement.style.setProperty('--action-color', 'blue');
+            document.documentElement.style.setProperty('--action-color', 'green');
 
             if (TestAction.instances.length) {
                 $('#saveButton').prop('disabled', false);
@@ -469,30 +469,14 @@ $('#loadButton').on('click', async () => {
 
         let actions = test.steps;
 
-        // start: [url, viewport]
-        // input: [click, type, double click, context menu]
-        // action: [expected screen, input]
-        // stop: expected screen
-        // test: start, action[, action], stop
-
-
-        // step: action, expected screen
-        // that is expected screen, action, expected screen
         for (let i = 0; i < actions.length; ++i) {
-            let actionDescriptor = actions[i];
-            let testAction = new TestAction(actionDescriptor);
-            await testAction.hydrate(screenshots);
+            let firstAction = await (new TestAction(actions[i])).hydrate(screenshots);
+            ++i; // load them in pairs so I can watch the steps animate during load
+            if(i < actions.length) {
+                await (new TestAction(actions[i])).hydrate(screenshots);
+                updateStepInView(firstAction);
+            }
         }
-
-        // fun to watch them animate on load
-        let i;
-        for (i = 0; i < actions.length; ++i) {
-            let action = TestAction.instances[i];
-            updateStepInView(action);
-            await (new Promise(resolve => setTimeout(resolve, 1))); // force an update of the screen
-
-        }
-
         updateStepInView(TestAction.instances[0]);
 
         setToolbarState();

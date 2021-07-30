@@ -103,6 +103,7 @@ export class TestAction {
 
             await this.pixelDiff();
         }
+        return this;
     }
 
     toJSON() {
