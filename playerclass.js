@@ -109,7 +109,7 @@ export class Player {
                 case 'contextmenu':
                 case 'mousemove':
                 case 'wheel':
-                    /** Remember any mousemoving operation plyed, implicit or explicit */
+                    /** Remember any mousemoving operation played, implicit or explicit */
                     this.mouseLocation = { x: action.x, y: action.y };
                     break;
             }
@@ -343,6 +343,7 @@ export class Player {
 
             // There is an IMPLICIT mousemove before any *click* action. I don't make it explicit (don't record it) because I might need to do it several times to get to the correct state.
             switch (nextStep.type) {
+                case 'stop':
                 case 'click':
                 case 'dblclick':
                 case 'contextmenu':

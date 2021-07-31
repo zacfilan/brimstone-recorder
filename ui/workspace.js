@@ -367,7 +367,11 @@ $('#recordButton').on('click', async function () {
         button.removeClass('active'); // stop recording
         // before I take the last screenshot the window must have focus again.
         await focusTab();
-        let action = await userEventToAction({ type: 'stop' });
+        let action = await userEventToAction({ 
+            type: 'stop',
+            x: -1,
+            y: -1 
+        });
         updateStepInView(action);
         let x = await stopRecording();
         //console.debug(x);

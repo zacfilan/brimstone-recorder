@@ -174,6 +174,10 @@
 
                 // if we are done driving the browser (simulating a user input) 
                 // wait for the next user input before we start blocking events.
+                // e.g. a click changes the screen, the app may give focus to some new element text box,
+                // I do not want to lose this state when I take the prereq screenshot for the next action, so I cannot block that focus event.
+                // I wait for a user action to indicate that the screen is ready, and now it's okay to start blocking subsequent events
+                // while I decode the users next action.
                 if (this._state === Recorder.state.READY) {
                     switch (e.type) {
                         case 'wheel':
