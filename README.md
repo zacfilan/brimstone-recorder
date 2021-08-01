@@ -35,6 +35,8 @@ Still here? Cool. Go to some website. Poke the ![Brimstone Icon](/images/grey_b_
     
 * Do watch the workspace to see what Brimstone recorded for each user action.
 
+* Do use the mouse scroll wheel for scrolling. Do use it slower than normal.
+
 * Do always end your recording by pressing the 'End Recording' button.
 
 * Do save and organize your recordings.

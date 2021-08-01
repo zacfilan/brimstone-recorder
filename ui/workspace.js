@@ -482,7 +482,7 @@ $('#saveButton').on('click', async () => {
     let blob = await blobpromise;
     await writable.write(blob);  // Write the contents of the file to the stream.    
     await writable.close(); // Close the file and write the contents to disk.
-    window.document.title = `Brimstone - ${blob.name}`;
+    window.document.title = `Brimstone - ${handle.name}`;
 });
 
 $('#loadButton').on('click', async () => {
