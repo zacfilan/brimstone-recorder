@@ -262,7 +262,13 @@ $('#playButton').on('click', async () => {
 
         $('#playButton').removeClass('active');
         setToolbarState();
-        setInfoBarText(playedSuccessfully ? 'PASSED' : 'FAILED');
+
+        setInfoBarText(playedSuccessfully ? '✅ last run passed' : `❌ last run failed after user action ${player.currentAction.index + 1}` );
+        await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true } );
+
+        if(playedSuccessfully) {
+            alert('Test passed.');
+        }
     }
     catch (e) {
         $('#playButton').removeClass('active');

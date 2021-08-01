@@ -90,6 +90,7 @@ export class Player {
         let playedSuccessfully = true; // optimist
         for (let i = startIndex; playedSuccessfully && (i < actions.length - 1); ++i) {
             let action = actions[i];
+            this.currentAction = action;
             action.status = constants.status.INPUT;
             let next = actions[i + 1];
             next.status = constants.status.WAITING;
