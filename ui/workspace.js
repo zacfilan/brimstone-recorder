@@ -662,6 +662,13 @@ async function userEventToAction(userEvent) {
             break;
         case 'start': {
             cardModel.description = `goto ${cardModel.url}`;
+            cardModel.overlay = {
+                height: 0,
+                width: 0,
+                top: 0,
+                left: 0
+            },
+            cardModel.status = constants.status.RECORDED;
             break;
         }
         default:
