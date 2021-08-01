@@ -72,6 +72,7 @@
                 this.removeEventListeners();
             }
 
+            // FIXME: this 'e' should have a better defined type.
             buildMsg(e) {
                 console.debug('building msg from', e);
 
@@ -80,7 +81,9 @@
                 let msg = {
                     // properties of the message
                     type: e.type,
-                    boundingClientRect: e.target.getBoundingClientRect(),
+
+                    // e.target.getBoundingClientRect() identifies where the element is NOW. for wheel events that would be too late, so allow an overload
+                    boundingClientRect: e.boundingClientRect || e.target.getBoundingClientRect(),
 
                     // properties of the event
                     event: {
@@ -212,7 +215,11 @@
                                     type: 'wheel',
                                     deltaX: 0,
                                     deltaY: 0,
-                                    target: e.target,
+
+                                    // This is the element that first sees the event (e.g. some div)
+                                    // the actual one being scrolled (e.g. window) currentTargetbeing scrolled? Or the element the scrollwheel is over, cause we scroll the big one.
+                                    boundingClientRect: e.target.getBoundingClientRect(), // capture that now before we scroll it away
+
                                     clientX: e.clientX,
                                     clientY: e.clientY
                                 };
@@ -220,7 +227,7 @@
                                 this.port.postMessage({ type: 'screenshot' });
                                 break; // the first is (intended) to be blocked from the app, and used just to indicate start, we block other events til the screenshot is taken.
                             }
-                            // subsequent wheel events in the chain are agregatted and allowed to bubble, and really scroll the app
+                            // subsequent wheel events in the chain are aggregated and allowed to bubble, and really scroll the app
                             this._wheel.deltaX += e.deltaX;
                             this._wheel.deltaY += e.deltaY;
                             return; // bubble

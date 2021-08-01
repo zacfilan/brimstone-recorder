@@ -11,10 +11,11 @@ export const constants = {
         /** the action card */
         INPUT: 'input',
 
+        // PLAYING STATES
         /** we are waiting for this one (implies playing) */
         WAITING: 'waiting',
 
-        /** it has beed edited, and has allowed errors */
+        /** it has been edited, and has allowed errors */
         ALLOWED: 'allowed',
 
         /** it doesn't match. (here is what we expected) */
@@ -24,7 +25,10 @@ export const constants = {
         ACTUAL: 'actual',
 
         /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
-        EDIT: 'edit'
+        EDIT: 'edit',
+
+        /** We are recording, this card was recorded. */
+        RECORDED: 'recorded'
     }
 };
 
@@ -204,33 +208,12 @@ export class TestAction {
     }
 
     /** Return the html for the edit card view. */
-    toHtml() {
-        let title = 'Current screen';
-        let src = this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
-        switch (this.status) {
-            case constants.status.WAITING: // we are waiting for this one (implies playing)
-                title = 'Waiting for next screen';
-                break;
-            case constants.status.ALLOWED: // it has beed edited, and has allowed errors
-                title = "Expected next screen. This screen has allowed differences.";
-                break;
-            // these are all 'fail states'
-            case constants.status.EXPECTED: // it doesn't match. (here is what we expected)
-                title = 'Expected next screen (click image to toggle)';
-                break;
-            case constants.status.ACTUAL: // it doesn't match. (here is what we got)
-                title = 'Actual next screen (click image to toggle)';
-                src = this?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
-                break;
-            case constants.status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
-                title = `Difference (red pixels). ${this.numDiffPixels} pixels, ${this.percentDiffPixels}% different`;
-                src = this.diffDataUrl ?? '../images/notfound.png'
-                break;
-        }
+    toHtml(title, src) {
+        src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
 
         let html = `
     <div class='card ${this.status}' data-index=${this.index}>
-        <div class='title'>[${this.index}]: ${title}</div>
+        <div class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
         </div>
@@ -277,12 +260,42 @@ export class Step {
     }
 
     toHtml() {
+        let title = 'User action';
+        switch (this.curr.status) {
+            case constants.status.RECORDED:
+                title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
+                break;
+        }
         let html = `
         <div id="content">
-            ${this.curr.toHtml()}
+            ${this.curr.toHtml(title)}
             `;
-        if (this.next) {
-            html += this.next.toHtml();
+
+            if (this.next) {
+            let src;
+            title = 'Expected result';
+            switch (this.next.status) {
+                case constants.status.WAITING: // we are waiting for this one (implies playing)
+                    title = 'Waiting for actual next screen to match this.';
+                    break;
+                case constants.status.ALLOWED: // it has beed edited, and has allowed errors
+                    title = "Expected result. This screen has allowed differences.";
+                    break;
+
+                // these are all 'fail states'
+                case constants.status.EXPECTED: // it doesn't match. (here is what we expected)
+                    title = 'Expected result (last play failed here, click image to toggle)';
+                    break;
+                case constants.status.ACTUAL: // it doesn't match. (here is what we got)
+                    title = 'Actual result (last play failed here, click image to toggle)';
+                    src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
+                    break;
+                case constants.status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
+                    title = `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
+                    src = this.next.diffDataUrl ?? '../images/notfound.png'
+                    break;
+            }
+            html += this.next.toHtml(title, src);
         }
         html += `
         </div>

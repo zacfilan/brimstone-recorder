@@ -7,6 +7,8 @@ import { sleep } from "../utilities.js"
 
 setToolbarState();
 
+window.document.title = 'Brimstone - untitled';
+
 /** The index of the first card showing in big step area */
 function currentStepIndex() {
     let index = $('#content .card:first-of-type').attr('data-index');
@@ -429,6 +431,7 @@ $('#clearButton').on('click', async () => {
     // remove the cards
     TestAction.instances = [];
     setToolbarState();
+    window.document.title = `Brimstone - untitled`;
 
     $('#cards').empty();
     $('#step').empty();
@@ -479,6 +482,7 @@ $('#saveButton').on('click', async () => {
     let blob = await blobpromise;
     await writable.write(blob);  // Write the contents of the file to the stream.    
     await writable.close(); // Close the file and write the contents to disk.
+    window.document.title = `Brimstone - ${blob.name}`;
 });
 
 $('#loadButton').on('click', async () => {
@@ -493,6 +497,7 @@ $('#loadButton').on('click', async () => {
             ]
         });
         const blob = await fileHandle.getFile();
+        window.document.title = `Brimstone - ${blob.name}`;
         zip = await (new JSZip()).loadAsync(blob);
         let screenshots = await zip.folder('screenshots');
         let test = JSON.parse(await zip.file("test.json").async("string"));
@@ -613,7 +618,17 @@ async function userEventToAction(userEvent) {
             await addScreenshot(cardModel);
             break;
         case 'wheel':
-            cardModel.description = 'move mouse here, then scroll via mouse wheel';
+            let direction = '';
+            let magnitude;
+            if(cardModel.deltaX) {
+                direction = cardModel.deltaY < 0 ? 'left' : 'right';
+                magnitude = Math.abs(cardModel.deltaY);
+            }
+            else if(cardModel.deltaY) {
+                direction = cardModel.deltaY < 0 ? 'up' : 'down';
+                magnitude = Math.abs(cardModel.deltaY);
+            }
+            cardModel.description = `mouse here, scroll wheel ${magnitude}px ${direction}`;
             cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
             //await addScreenshot(cardModel);
             break;
@@ -701,6 +716,7 @@ async function listenOnPort(url) {
             port.onMessage.addListener(async function (userEvent) {
                 console.debug(`RX: ${userEvent.type}`, userEvent);
                 let action;
+                userEvent.status = constants.status.RECORDED;
                 switch (userEvent.type) {
                     case 'screenshot':
                         _lastScreenshot = (await takeScreenshot()).dataUrl;
