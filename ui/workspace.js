@@ -536,10 +536,17 @@ function updateStepInView(action) {
     updateThumb(action);
 }
 
+/** This will inject the content-script into the page we need to record.
+ * This is only needed for recording, which requires event monitoring.
+ */
 async function injectScript(url) {
-    console.debug(`injecting script into ${url}`);
+    if (port) {
+        postMessage({ type: 'start' });
+        return Promise.resolve(port);
+    }
 
-    await (new Promise(resolve => chrome.storage.local.set({ injectedArgs: { url } }, resolve)));
+    console.debug(`injecting script into ${url}`);
+     await (new Promise(resolve => chrome.storage.local.set({ injectedArgs: { url } }, resolve)));
     await (new Promise(resolve => chrome.scripting.executeScript({
         target: { tabId },
         files: ['content-recorder.js']
