@@ -224,7 +224,7 @@ export class TestAction {
         if (this.overlay) { // or this.status === constants.status.INPUT
             let o = this.overlay;
             html += `
-            <div class='overlay pulse-rectangle' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
+            <div class='overlay pulse' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
             <div class='action callout user-event' data-index='${this.index}' style='top:${o.top + o.height}%;left:${o.left}%;'>${this.description}</div>
             `;
         }
@@ -260,10 +260,13 @@ export class Step {
     }
 
     toHtml() {
-        let title = 'User action';
+        let title = '';
         switch (this.curr.status) {
             case constants.status.RECORDED:
                 title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
+                break;
+            default:
+                title = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action'; 
                 break;
         }
         let html = `
@@ -273,7 +276,7 @@ export class Step {
 
             if (this.next) {
             let src;
-            title = 'Expected result';
+            let title; 
             switch (this.next.status) {
                 case constants.status.WAITING: // we are waiting for this one (implies playing)
                     title = 'Waiting for actual next screen to match this.';
@@ -293,6 +296,12 @@ export class Step {
                 case constants.status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
                     title = `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
                     src = this.next.diffDataUrl ?? '../images/notfound.png'
+                    break;
+                default:
+                    title = 'Expected result';
+                    if(this.next.index === TestAction.instances.length - 1) {
+                        title += ' - final screenshot';
+                    }
                     break;
             }
             html += this.next.toHtml(title, src);

@@ -151,16 +151,16 @@ async function injectOnNavigation(obj) {
 function setInfoBarText(infobarText) {
     if(!infobarText) {
         if($('#recordButton').hasClass('active')) {
-            infobarText = 'recording...';
+            infobarText = '<span class="pulse">🔴</span> recording...';
         }
         else if($('#playButton').hasClass('active')) {
-            infobarText = 'playing...';
+            infobarText = '🟢 playing...';
         }
         else {
             infobarText = 'ready';
         }
     }
-    $('#infobar').text(infobarText);
+    $('#infobar').html(infobarText);
 }
 
 function setToolbarState() {
@@ -205,9 +205,8 @@ function setToolbarState() {
 
             iconState.Ready();
         }
-        
-        setInfoBarText();
     }
+    setInfoBarText();
 
     // buttons for editing allowable deltas in the second card.
     let editCard = $('#content .card:nth-of-type(2)');

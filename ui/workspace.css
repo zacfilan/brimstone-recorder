@@ -178,9 +178,13 @@ svg {
     50% {opacity: .5;}
     100% {opacity: 0};
 }
-.pulse-rectangle {
+
+.overlay {
     background: var(--action-color);
     position: absolute;
+}
+
+.pulse {
     animation: opacity2 2s infinite;
 }
 

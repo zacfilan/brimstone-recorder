@@ -429,11 +429,16 @@ export class Player {
         //await this._attachDebuggerPromise; // if there is one in flight wait for it.
 
         this._debugger_detatch_requested = true;
-        this._debuggerDetachPromise = new Promise(resolve => {
-            chrome.debugger.detach({ tabId: this.tab.id }, () => {
-                resolve(chrome.runtime.lastError);
+        if(!this.tab) {
+            this._debuggerDetachPromise = Promise.resolve();   
+        }
+        else {
+            this._debuggerDetachPromise = new Promise(resolve => {
+                chrome.debugger.detach({ tabId: this.tab.id }, () => {
+                    resolve(chrome.runtime.lastError);
+                });
             });
-        });
+        }
         await this._debuggerDetachPromise;
         console.debug("debugger detached");
     }
