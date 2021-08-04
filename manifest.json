@@ -1,7 +1,7 @@
 {
   "name": "Brimstone",
   "description": "Record and play Brimstone pixel-perfect webpage automation tests",
-  "version": "1.0",
+  "version": "0.1.0",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js"
@@ -27,5 +27,12 @@
   "icons": {
     "128": "images/orange_b_128.png"
   },
-  "options_page": "options_ui.html"
+  "options_page": "options_ui.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "all_frames": true,
+      "js": ["content-recorder.js"]
+    }
+  ]
 }

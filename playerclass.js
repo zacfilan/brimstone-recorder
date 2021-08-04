@@ -33,41 +33,6 @@ export class Player {
          * @type {Tab}
          */
         this.tab = null;
-
-        // this.beforeNavigation = Player.beforeNavigation.bind(this);
-        // this.completeNavigation = Player.beforeNavigation.bind(this);
-
-        // /** Call this to resolve the current navigation promise 
-        //  * @type {function => void]
-        // */
-        // this.resolveNavigation;
-
-        // /** Call this to reject the current navigation promise 
-        //  * @type {function => void]
-        // */
-        // this.rejectNavigation;
-
-    }
-
-    detachNavigationListeners() {
-        chrome.webNavigation.onBeforeNavigate.removeListener(this.beforeNavigation);
-        chrome.webNavigation.onCompleted.removeListener(this.completeNavigation);
-    }
-
-    attachNavigationListeners() {
-        this.detachNavigationListeners();
-        chrome.webNavigation.onBeforeNavigate.addListener(this.beforeNavigation);
-        chrome.webNavigation.onCompleted.addListener(this.completeNavigation);
-    }
-
-    /** Resolves when there are no navigations pending anymore */
-    async createNavigationsCompletePromise() {
-        that = this;
-        // create a deferred
-        return new Promise((resolve, reject) => {
-            that.resolveNavigation = resolve;
-            that.rejectNavigation = reject;
-        });
     }
 
     /** 
@@ -478,23 +443,6 @@ export class Player {
     };
 
 }
-
-Player.beforeNavigation = function () {
-    this._navigationsInFlight++;
-
-};
-
-Player.completeNavigation = function () {
-    this._navigationsInFlight--;
-    if (this._navigationsInFlight < 0) {
-        console.error('navigation accounting is broken');
-        this._navigationsInFlight = 0;
-    }
-
-    if (!this._navigationsInFlight) {
-        this.resolveNavigation();
-    }
-};
 
 Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
     let response = await fetch(dataUrl);

@@ -77,6 +77,9 @@ export class TestAction {
      */
     acceptablePixelDifferences;
 
+    /** Used to identify the tab being this action happened on. */
+    tabUrl = '';
+
     constructor(args) {
         Object.assign(this, args);
 

@@ -39,13 +39,11 @@ const tabId = parseInt(urlParams.get('tab'), 10);
 const player = new Player();
 
 var uiCardsElement = document.getElementById('cards');
-var currentUrl;
 
 /* Some globals */
 var _lastScreenshot;
 
 var zip;
-var infobarText = 'ready';
 /** The parsed test.json object, this will change in memory during use.
  * It represents the recorded user actions, and optionally the result
  * of playing them back. 
@@ -126,7 +124,7 @@ $('#step').on('click', '.screenshot.clickable',
             updateStepInView(TestAction.instances[action.index - 1]);
 
         }
-        else if(action.status === constants.status.EDIT) {
+        else if (action.status === constants.status.EDIT) {
             action.status = constants.status.EXPECTED;
             updateStepInView(TestAction.instances[action.index - 1]);
         }
@@ -140,20 +138,12 @@ $('#step').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
     $(`.overlay[data-index='${e.target.dataset.index}']`).toggle();
 });
 
-async function injectOnNavigation(obj) {
-    console.debug('inject on navigation called', obj);
-    if (obj.url !== currentUrl) {
-        currentUrl = obj.url;
-        await injectScript(obj.url);
-    }
-}
-
 function setInfoBarText(infobarText) {
-    if(!infobarText) {
-        if($('#recordButton').hasClass('active')) {
+    if (!infobarText) {
+        if ($('#recordButton').hasClass('active')) {
             infobarText = '<span class="pulse">🔴</span> recording...';
         }
-        else if($('#playButton').hasClass('active')) {
+        else if ($('#playButton').hasClass('active')) {
             infobarText = '🟢 playing...';
         }
         else {
@@ -252,7 +242,7 @@ $('#playButton').on('click', async () => {
         tab.width = actions[0].tabWidth;
         tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
-        await player.attachDebugger({ tab }); // in order to play we only need the debugger attached
+        await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached
 
         $('#playButton').addClass('active');
         setToolbarState();
@@ -262,10 +252,10 @@ $('#playButton').on('click', async () => {
         $('#playButton').removeClass('active');
         setToolbarState();
 
-        setInfoBarText(playedSuccessfully ? '✅ last run passed' : `❌ last run failed after user action ${player.currentAction.index + 1}` );
-        await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true } );
+        setInfoBarText(playedSuccessfully ? '✅ last run passed' : `❌ last run failed after user action ${player.currentAction.index + 1}`);
+        await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
 
-        if(playedSuccessfully) {
+        if (playedSuccessfully) {
             alert('Test passed.');
         }
     }
@@ -294,12 +284,6 @@ $('#last').on('click', function (e) {
     updateStepInView(TestAction.instances[TestAction.instances.length - 1]);
 });
 
-/** Called during playback or recording when the user input results in a navigation to another page.
- * e.g. for a SPA test this would only occur on login or logout of the app.
- */
-async function beforeNavigation(obj) {
-    console.debug(`before navigation: ${obj.url}`);
-}
 
 chrome.debugger.onDetach.addListener(async (source, reason) => {
     console.debug('The debugger was detached.', source, reason);
@@ -309,7 +293,7 @@ chrome.debugger.onDetach.addListener(async (source, reason) => {
         if (isRecording()) {
             stopRecording();
         }
-        if (isPlaying) {
+        if (isPlaying()) {
             stopPlaying(); // FIXME: refactor for less code
         }
     }
@@ -319,44 +303,52 @@ chrome.debugger.onDetach.addListener(async (source, reason) => {
     }
 });
 
-async function completeNavigation(obj) {
-    console.debug(`complete navigation: ${obj.url}`);
-    await injectOnNavigation(obj);
+async function startRecording(tab) {
+    console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+
+    //chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
+    //chrome.tabs.onUpdated.addListener(tabsOnUpdatedHandler);
+
+    // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
+    //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
+    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
+    chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
+
+    // establish the recording communication channel between the tab being recorded and the brimstone workspace window
+
+    // connect to all frames in the the active tab in this window. 
+    // the recorder is injected in all pages, all frames, and will respond to onconnect by starting the event handlers.
+    // https://developer.chrome.com/docs/extensions/reference/tabs/#method-connect
+    port = chrome.tabs.connect(tab.id, { name: "brimstone-recorder" });
+
+    // if the active tab navigates away or is closed the port will be disconected
+    // FIXME: is this needed?
+    port.onDisconnect.addListener(
+        /**
+         * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
+         * https://developer.chrome.com/docs/extensions/mv3/messaging/#port-lifetime
+         * @param {*} _port 
+         */
+        function (_port) {
+            console.debug('port was disconnected', _port, chrome.runtime.lastError);
+            port.onMessage.removeListener(onMessageHandler); // this particular port is no good anymore so, kill the listener on it. needed?
+            port = false;
+        });
+
+    port.onMessage.addListener(onMessageHandler);
+    console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
 }
 
-function detachNavigationListeners() {
-    chrome.webNavigation.onBeforeNavigate.removeListener(beforeNavigation);
-    chrome.webNavigation.onCompleted.removeListener(completeNavigation);
-}
-
-function attachNavigationListeners() {
-    detachNavigationListeners();
-    chrome.webNavigation.onBeforeNavigate.addListener(beforeNavigation);
-    chrome.webNavigation.onCompleted.addListener(completeNavigation);
-}
-
-/** Set up everything needed for the workspace to communicate with the content script and vice-versa. */
-async function startCommunication(tab) {
-    // inorder to simulate any events we need to attach the debugger
-    await player.attachDebugger({ tab });
-
-    // establish the communication channel between the tab being recorded and the brimstone workspace window
-    await listenOnPort(tab.url);
-
-    // during recording if we navigate to another page within the tab I will need to re-establish the connection
-    attachNavigationListeners();
-}
-
-async function stopCommunication(tab) {
-    // tell the endpoint to stop recording. i.e. disable the event handlers if possible.
+function stopRecording(tab) {
+    // tell all frames to stop recording. i.e. disable the event handlers if possible.
     try {
-        postMessage({ type: 'stop' });
-        // port.disconnect(); // why disconnect? I might want to play right after and reuse the port.
+        postMessage({ type: 'stop', broadcast: true });
     }
     catch (e) {
-        console.error(e);
+        console.warn(e);
     }
-    detachNavigationListeners(); // navigation listeners inject the content-script, which we ONLY want to do when we are recording anyway.
+    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
 }
 
 async function focusTab() {
@@ -374,22 +366,21 @@ $('#recordButton').on('click', async function () {
         button.removeClass('active'); // stop recording
         // before I take the last screenshot the window must have focus again.
         await focusTab();
-        let action = await userEventToAction({ 
+        let action = await userEventToAction({
             type: 'stop',
             x: -1,
-            y: -1 
+            y: -1
         });
         updateStepInView(action);
-        let x = await stopRecording();
-        //console.debug(x);
+        stopRecording();
         return;
     }
 
     try {
         await tab.fromChromeTabId(tabId);
-        console.debug(`recording tab ${tab.id} which is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+        await player.attachDebugger({ tab }); // required to play anything in the tab being recorded.
 
-        await startCommunication(tab);
+        await startRecording(tab);
 
         // update the UI: insert the first text card in the ui
         let userEvent = {
@@ -407,7 +398,7 @@ $('#recordButton').on('click', async function () {
         setToolbarState();
     }
     catch (e) {
-        await stopCommunication();
+        stopRecording();
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger first.");
         }
@@ -420,16 +411,9 @@ $('#recordButton').on('click', async function () {
     }
 });
 
-async function stopRecording() {
-    $('#recordButton').removeClass('active');
-    setToolbarState();
-    stopCommunication(tab);
-}
-
 async function stopPlaying() {
     $('#playButton').removeClass('active');
     setToolbarState();
-    stopCommunication(tab);
 }
 
 $('#clearButton').on('click', async () => {
@@ -536,37 +520,9 @@ function updateStepInView(action) {
     updateThumb(action);
 }
 
-/** This will inject the content-script into the page we need to record.
- * This is only needed for recording, which requires event monitoring.
- */
-async function injectScript(url) {
-    if (port) {
-        postMessage({ type: 'start' });
-        return Promise.resolve(port);
-    }
-
-    console.debug(`injecting script into ${url}`);
-     await (new Promise(resolve => chrome.storage.local.set({ injectedArgs: { url } }, resolve)));
-    await (new Promise(resolve => chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content-recorder.js']
-    }, resolve)));
-
-    // Leaving in case I want to add css at some point.
-    // await (new Promise(resolve => chrome.scripting.insertCSS({
-    //     target: { tabId },
-    //     files: ['unset-active.css']
-    // }, resolve)));
-
-
-    // (injectionResults) => {
-    //     for (const frameResult of injectionResults)
-    //         console.log('Injected script returns: ' + frameResult.result);
-    // }
-    //     );
-    // });
-}
-
+/** The recording channel port. This port connects to (broadcasts to) 
+ * every frame in the tab.
+*/
 var port = false;
 
 function setStepContent(step) {
@@ -609,6 +565,7 @@ async function userEventToAction(userEvent) {
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = tab.height;
     cardModel.tabWidth = tab.width;
+    cardModel.tabUrl = tab.url;
 
     if (element) {
         /** During recording we know the tab height and width, this will be the size of the screenshots captured.
@@ -632,11 +589,11 @@ async function userEventToAction(userEvent) {
         case 'wheel':
             let direction = '';
             let magnitude;
-            if(cardModel.deltaX) {
+            if (cardModel.deltaX) {
                 direction = cardModel.deltaY < 0 ? 'left' : 'right';
                 magnitude = Math.abs(cardModel.deltaY);
             }
-            else if(cardModel.deltaY) {
+            else if (cardModel.deltaY) {
                 direction = cardModel.deltaY < 0 ? 'up' : 'down';
                 magnitude = Math.abs(cardModel.deltaY);
             }
@@ -680,7 +637,7 @@ async function userEventToAction(userEvent) {
                 top: 0,
                 left: 0
             },
-            cardModel.status = constants.status.RECORDED;
+                cardModel.status = constants.status.RECORDED;
             break;
         }
         default:
@@ -691,16 +648,6 @@ async function userEventToAction(userEvent) {
 }
 
 async function takeScreenshot() {
-    // throttling sucks: https://developer.chrome.com/docs/extensions/reference/tabs/#property-MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND
-    // let dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-    //     format: 'png'
-    // });
-    // console.debug('\t\tscreenshot taken');
-    // return {
-    //     dataUrl
-    // };
-
-    // unthrottled? alternative method
     let result = await player.debuggerSendCommand('Page.captureScreenshot', {
         format: 'png'
     });
@@ -709,70 +656,58 @@ async function takeScreenshot() {
     };
 }
 
-/** 
- * Inject the content script into the tab we intend to interact with.
- * Wait for the content script to connect to us on the port named 'brimstone'.
- * 
- * If our port is already connected, restart the event listeners.
-*/
-async function listenOnPort(url) {
-    if (port) {
-        postMessage({ type: 'start' });
-        return Promise.resolve(port);
+async function onMessageHandler(userEvent) {
+    console.debug(`RX: ${userEvent.type}`, userEvent);
+    let action;
+    userEvent.status = constants.status.RECORDED;
+    switch (userEvent.type) {
+        case 'screenshot':
+            _lastScreenshot = (await takeScreenshot()).dataUrl;
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.from });
+            break;
+        case 'mousemove': // this does not ack, because it will always be followed by another operation.
+        case 'wheel': // this does not ack, because it will always be followed by another operation.
+            // update the UI with a screenshot
+            action = await userEventToAction(userEvent);
+            updateStepInView(action);
+            // no simulation required
+            break;
+        case 'click':
+        case 'keypress':
+        case 'contextmenu':
+        case 'dblclick':
+        case 'chord':
+            // update the UI with a screenshot
+            action = await userEventToAction(userEvent);
+            updateStepInView(action);
+            // Now simulate that event back in the recording, via the CDP
+            await player[userEvent.type](userEvent);
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.from }); // don't need to send the whole thing back
+            break;
+        case 'connect':
+            console.debug(`connection established from frame ${userEvent.from}`);
+            break;
+        default:
+            console.error(`unexpected userEvent received <${userEvent.type}>`);
+            break;
     }
+};
 
-    let p = new Promise(resolve => {
-        chrome.runtime.onConnect.addListener(function (_port) { // wait for a connect
-            if (_port.name !== 'brimstone') {
-                return;
-            }
-            port = _port; // make it global
-            port.onDisconnect.addListener(function (_port) {
-                console.debug('port was disconnected!', port);
-                port = false;
-            });
-            console.debug('port connected', port); // this will only happen once per window launch.
-            port.onMessage.addListener(async function (userEvent) {
-                console.debug(`RX: ${userEvent.type}`, userEvent);
-                let action;
-                userEvent.status = constants.status.RECORDED;
-                switch (userEvent.type) {
-                    case 'screenshot':
-                        _lastScreenshot = (await takeScreenshot()).dataUrl;
-                        postMessage({ type: 'complete', args: userEvent.type });
-                        break;
-                    case 'mousemove': // this does not ack, because it will always be followed by another operation.
-                    case 'wheel': // this does not ack, because it will always be followed by another operation.
-                        // update the UI with a screenshot
-                        action = await userEventToAction(userEvent);
-                        updateStepInView(action);
-                        // no simulation required
-                        break;
-                    case 'click':
-                    case 'keypress':
-                    case 'contextmenu':
-                    case 'dblclick':
-                    case 'chord':
-                        // update the UI with a screenshot
-                        action = await userEventToAction(userEvent);
-                        updateStepInView(action);
-                        // Now simulate that event back in the recording, via the CDP
-                        await player[userEvent.type](userEvent);
-                        postMessage({ type: 'complete', args: userEvent.type }); // don't need to send the whole thing back
-                        break;
-                    case 'hello':
-                        console.debug('got a new hello msg from injected content script');
-                        await tab.resizeViewport(); // if the debugger doesn't need to be attached, we still need to resize the viewport
-                        break;
-                    default:
-                        console.error(`unexpected userEvent received <${userEvent.type}>`);
-                        break;
-                }
-            });
-            resolve(port);
-        });
-    });
-
-    await injectScript(url); // inject a content script that will connect
-    return p;
+/**
+ * This only is active when we are actively recording.
+ * https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
+ */
+async function webNavigationOnCompleteHandler(details) {
+    console.debug(`tab ${details.tabId} navigation completed`, details);
+    if(details.url === 'about:blank') {
+        console.debug(`    - ignoring navigation to page url 'about:blank'`);
+        return;
+    }
+    //if (details.tabId === tab.id) { // we are recording, and a navigation completed in the tab we are recording 
+    const {height, width} = tab; // hang onto the original size
+    await tab.fromChromeTabId(details.tabId); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
+    tab.height = height;
+    tab.width = width;
+    await startRecording(tab);
+    //}
 }

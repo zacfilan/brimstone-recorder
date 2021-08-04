@@ -14,7 +14,7 @@
  */
 async function tabsOnActivatedHandler(activeInfo) {
   let tab = await chrome.tabs.get(activeInfo.tabId);
-  // tab.pendingUrl would be the identifier we will use eventuall
+  // tab.pendingUrl would be the identifier we will use eventually
   console.debug('active tab changed', activeInfo, tab);
 }
 
