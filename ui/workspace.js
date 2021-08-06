@@ -50,21 +50,6 @@ var zip;
  * 
 */
 
-/** Fixme not used. The struct returned from the content script is used directly  */
-class UserEvent {
-    /** A string identifier of the type of event, 'click', 'change' , ... */
-    type = '';
-}
-
-/** Fixme not used */
-class UserAction extends UserEvent {
-    /** The y-offset of the element the event occurred on */
-    clientX = 0;
-    /** The x-offset of the element this event occured on */
-    clientY = 0;
-}
-
-
 $('#ignoreDelta').on('click',
     /** Commit any volatile rectangles or individual pixel deltas. */
     async function ignoreDelta(e) {
@@ -426,6 +411,11 @@ $('#clearButton').on('click', async () => {
     $('#step').empty();
 });
 
+/**
+ * Send a msg back to the bristone workspace over the recording channel port. 
+ * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
+ * Note this automatically sends the Sender info.
+ */
 function postMessage(msg) {
     console.debug('TX', msg);
     port.postMessage(msg);
@@ -559,13 +549,53 @@ async function addScreenshot(step) {
  * Process a user event received from the content script (during recording)
  * screenshot, annotate event and convert to card
  */
-async function userEventToAction(userEvent) {
+async function userEventToAction(userEvent, senderUrl) {
+    let frameOffset = {
+        top: 0,
+        left: 0
+    };
+
+    if (senderUrl) { // FIXME: speedup by checking if it is the main url
+        /** https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames */
+        frames = await (new Promise(resolve => chrome.webNavigation.getAllFrames({ tabId: tab.id }, resolve)));
+        let childFrameInfo = frames.find(f => f.url === senderUrl);
+
+        if (childFrameInfo.frameId) {  // positive values are child frames, 0 is main frame
+            // this is some child frame so I need to adjust the x,y positions accordingly
+            let parentFrameId = childFrameInfo.parentFrameId;
+
+            // FIXME: what is faster, sending a message and getting the response or injecting code each time?
+            /** https://developer.chrome.com/docs/extensions/reference/scripting/#method-executeScript */
+            let injectionResult = await chrome.scripting.executeScript(
+                {
+                    target: { tabId: tab.id, frameIds: [parentFrameId] },
+                    func: (url) => {
+                        console.warn(`called with ${url}`);
+                        for (let i = 0; i < window.frames.length; ++i) {
+                            if (window.frames[i].location.href === url) {
+                                let ret = window.frames[i].frameElement.getBoundingClientRect()
+                                return { top: ret.top, left: ret.left };
+                            }
+                        }
+                    },
+                    args: [childFrameInfo.url]
+                });
+
+            // FIXME: this is only one frame deep, I need some looping!
+            frameOffset.left = injectionResult[0].result.left;
+            frameOffset.top = injectionResult[0].result.top;
+        }
+    }
+
     let cardModel = new TestAction(userEvent);
 
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = tab.height;
     cardModel.tabWidth = tab.width;
     cardModel.tabUrl = tab.url;
+
+    cardModel.x += frameOffset.left;
+    cardModel.y += frameOffset.top;
 
     if (element) {
         /** During recording we know the tab height and width, this will be the size of the screenshots captured.
@@ -575,8 +605,8 @@ async function userEventToAction(userEvent) {
         cardModel.overlay = {
             height: element.height * 100 / tab.height,
             width: element.width * 100 / tab.width,
-            top: element.top * 100 / tab.height,
-            left: element.left * 100 / tab.width
+            top: (element.top + frameOffset.top) * 100 / tab.height,
+            left: (element.left + frameOffset.left) * 100 / tab.width
         };
     }
 
@@ -656,7 +686,11 @@ async function takeScreenshot() {
     };
 }
 
-async function onMessageHandler(userEvent) {
+/** 
+ * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
+*/
+async function onMessageHandler(message, _port) {
+    let userEvent = message;
     console.debug(`RX: ${userEvent.type}`, userEvent);
     let action;
     userEvent.status = constants.status.RECORDED;
@@ -668,7 +702,7 @@ async function onMessageHandler(userEvent) {
         case 'mousemove': // this does not ack, because it will always be followed by another operation.
         case 'wheel': // this does not ack, because it will always be followed by another operation.
             // update the UI with a screenshot
-            action = await userEventToAction(userEvent);
+            action = await userEventToAction(userEvent, userEvent.from);
             updateStepInView(action);
             // no simulation required
             break;
@@ -678,10 +712,10 @@ async function onMessageHandler(userEvent) {
         case 'dblclick':
         case 'chord':
             // update the UI with a screenshot
-            action = await userEventToAction(userEvent);
+            action = await userEventToAction(userEvent, userEvent.from);
             updateStepInView(action);
             // Now simulate that event back in the recording, via the CDP
-            await player[userEvent.type](userEvent);
+            await player[action.type](action);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.from }); // don't need to send the whole thing back
             break;
         case 'connect':
@@ -693,21 +727,25 @@ async function onMessageHandler(userEvent) {
     }
 };
 
+/** Array of frames in the current tab 
+ https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames 
+ */
+var frames; // the whole frame hierarchy can be inferred from this, it also returns a URL for the frame.
+
 /**
  * This only is active when we are actively recording.
  * https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
  */
 async function webNavigationOnCompleteHandler(details) {
     console.debug(`tab ${details.tabId} navigation completed`, details);
-    if(details.url === 'about:blank') {
+    if (details.url === 'about:blank') {
         console.debug(`    - ignoring navigation to page url 'about:blank'`);
         return;
     }
-    //if (details.tabId === tab.id) { // we are recording, and a navigation completed in the tab we are recording 
-    const {height, width} = tab; // hang onto the original size
+    const { height, width } = tab; // hang onto the original size
     await tab.fromChromeTabId(details.tabId); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
     tab.height = height;
     tab.width = width;
+    await tab.resizeViewport();
     await startRecording(tab);
-    //}
 }

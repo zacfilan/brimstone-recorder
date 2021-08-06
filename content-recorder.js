@@ -16,7 +16,8 @@ function runtimeOnConnectHandler(port) {
     });
 
     //start listening for messages back from the workspace
-    this._port.onMessage.addListener(msg => {
+    /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port */
+    this._port.onMessage.addListener( msg => {
         if (msg.broadcast || msg.to === window.location.href) {
             console.debug('RX: ', msg);
             switch (msg.type) {
@@ -59,6 +60,8 @@ class Recorder {
 
     /**
      * Send a msg back to the bristone workspace over the recording channel port. 
+     * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
+     * Note this automatically sends the Sender info.
      */
     postMessage(msg) {
         msg.from = window.location.href;
@@ -167,8 +170,8 @@ class Recorder {
 
     /** Central callback for all bound event handlers */
     handleEvent(e) {
-        //  console.debug(`handle user input event: ${e.type}`, e);
-
+        //console.debug(`${e.type} ${window.location.href} handle user input event:`, e);
+        
         if (this._state === Recorder.state.BLOCK) {
             Recorder.block(e);
             return false;
@@ -188,14 +191,14 @@ class Recorder {
                 case 'contextmenu':
                 case 'keydown':
                     this._state = Recorder.state.RECORD;
-                    console.debug(`user input event: ${e.type} switches us to RECORD state`);
+                    //console.debug(`${e.type} ${window.location.href}} switches us to RECORD state`);
                     break;
                 case 'mouseover':
                     this._mouseEnterTime = performance.now(); // keep on accounting
                     return;
                 default:
                     // mouse move clutters things up
-                    console.debug(`passthru event: ${e.type} while waiting for user input event to switch us to record`);
+                    //console.debug(`${e.type} ${window.location.href} passthru while waiting for user input event to switch us to record`);
                     return;
             }
         }
@@ -203,7 +206,7 @@ class Recorder {
         if (this._state === Recorder.state.SIMULATE) {
             // FIXME: how do I know this event came from the debugger versus from from the user?!
             // FIXME: There is a race condition here!!                
-            console.debug(`${e.timeStamp} simulated event: ${e.type}`, e.target, e);
+            //console.debug(`${e.type} ${window.location.href} ${e.timeStamp} simulated`, e.target, e);
         }
         else {
             let msg;
@@ -388,10 +391,10 @@ Recorder.events = [
 
 Recorder.block = function block(e) {
     if (e.type !== 'mousemove') { // these saturate the logs
-        console.debug(`${e.timeStamp} blocking event: ${e.type}`, e.target, e);
+        //console.debug(`${e.type} ${window.location.href} blocking event: ${e.type}`, e.target, e);
     }
     else {
-        console.debug(`blocking event: ${e.type}`);
+        //console.debug(`${e.type} ${window.location.href} blocked event`);
     }
 
     e.preventDefault();
