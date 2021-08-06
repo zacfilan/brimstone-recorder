@@ -558,13 +558,13 @@ async function userEventToAction(userEvent, senderUrl) {
     if (senderUrl) { // FIXME: speedup by checking if it is the main url
         /** https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames */
         frames = await (new Promise(resolve => chrome.webNavigation.getAllFrames({ tabId: tab.id }, resolve)));
-        let childFrameInfo = frames.find(f => f.url === senderUrl);
+        
+        // fInfo.frameId: positive values are child frames, 0 is main frame
+        for(let fInfo = frames.find(f => f.url === senderUrl); fInfo.frameId; fInfo = fInfo.parentFrameId) {
+            // this is some child frame so I need to adjust the absolute x,y positions accordingly
+            let parentFrameId = fInfo.parentFrameId;
 
-        if (childFrameInfo.frameId) {  // positive values are child frames, 0 is main frame
-            // this is some child frame so I need to adjust the x,y positions accordingly
-            let parentFrameId = childFrameInfo.parentFrameId;
-
-            // FIXME: what is faster, sending a message and getting the response or injecting code each time?
+            // FIXME: speedup. what is faster, sending a message and getting the response or injecting code each time?
             /** https://developer.chrome.com/docs/extensions/reference/scripting/#method-executeScript */
             let injectionResult = await chrome.scripting.executeScript(
                 {
@@ -578,10 +578,9 @@ async function userEventToAction(userEvent, senderUrl) {
                             }
                         }
                     },
-                    args: [childFrameInfo.url]
+                    args: [fInfo.url]
                 });
 
-            // FIXME: this is only one frame deep, I need some looping!
             frameOffset.left = injectionResult[0].result.left;
             frameOffset.top = injectionResult[0].result.top;
         }
