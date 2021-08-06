@@ -41,7 +41,7 @@ export class Player {
      * 
      * Returns a deferred boolean that reflects the success of playing all the steps:
      * true if they all played successfully, false if one failed.*/
-    async play(actions, startIndex = 0) {
+    async play(actions, startIndex = 0, resume = false) {
         options = await loadOptions();
 
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
@@ -66,7 +66,12 @@ export class Player {
             delete action.actualScreenshot; // we are replaying this step, drop any previous results
             console.log(`[${action.index}] : ${action.description}`);
             start = performance.now();
-            await this[action.type](action); // really perform this in the browser (this action may start some navigations)
+
+            // if we are resume(ing) we are picking up from an error state, meaning we already
+            // performed the action, we just need to do the verification again for the first action.
+            if(!resume || i !== startIndex) {
+                await this[action.type](action); // really perform this in the browser (this action may start some navigations)
+            }            
 
             // remember any mousemoving operation, implicit or explicit
             switch (action.type) {

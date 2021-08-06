@@ -212,6 +212,9 @@ $('#previous').on('click', function (e) {
     }
 });
 
+/** Remember the state of the last play, so I can resume correctly. */
+var playedSuccessfully = true;
+
 $('#playButton').on('click', async () => {
     try {
         let actions = TestAction.instances;
@@ -232,7 +235,10 @@ $('#playButton').on('click', async () => {
         $('#playButton').addClass('active');
         setToolbarState();
 
-        let playedSuccessfully = await player.play(actions); // players gotta play...
+        let playFrom = currentStepIndex(); // we will start on the step showinging in the workspace.
+        // we can resume a failed step. FIXME:// I need to know the last play resulted in a failed step to set this.
+        let resume = !playedSuccessfully && playFrom>0; 
+        playedSuccessfully = await player.play(actions, playFrom, resume); // players gotta play...
 
         $('#playButton').removeClass('active');
         setToolbarState();
