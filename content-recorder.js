@@ -17,9 +17,9 @@ function runtimeOnConnectHandler(port) {
 
     //start listening for messages back from the workspace
     /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port */
-    this._port.onMessage.addListener( msg => {
-        if (msg.broadcast || msg.to === window.location.href) {
-            console.debug('RX: ', msg);
+    this._port.onMessage.addListener(msg => {
+        if (msg.broadcast || msg.to === this._frameId) {
+            console.debug(`RX: ${this._frameId}`, msg);
             switch (msg.type) {
                 case 'complete':
                     this._state = Recorder.state.READY;
@@ -31,7 +31,43 @@ function runtimeOnConnectHandler(port) {
         }
     });
 
+    /** 
+     * The main frame needs to post into the child x-origin frames their
+     * relative top, and left offsets. 
+     * This cannot be done with chrome extension messaging passing :(
+     * https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+     * 
+     * These are handled by the handleEvent method of this object.
+     * */
+    window.removeEventListener("message", this, { capture: true, passive: false });
+    window.addEventListener("message", this, { capture: true, passive: false });
+
     this.postMessage({ type: 'connect' });
+}
+
+/** 
+ * Chrome-extension API: For single one time messages . This can respond if neeed be.
+ * These can be targeted by frameId from the extension, or broadcast to all frames.
+ * https://developer.chrome.com/docs/extensions/reference/runtime/#event-onMessage  
+ * */
+function runtimeFrameIdSpecificOnMessageHandler(message, sender, sendResponse) {
+    // the sender will always be the extension, since the chrome extension api
+    // doesn't provide for content-script to content-script messaging. (For that
+    // I need to rely on windows.postMessage.)
+    switch (message.func) {
+        case 'postMessageOffsetIntoIframes': // received per frameId
+            this.postMessageOffsetIntoIframes();
+            sendResponse();
+            return;
+        case 'setFrameId':
+            this._frameId = message.args.to;
+            sendResponse();
+            break;
+        default:
+            console.warn('unknown message', message);
+            sendResponse('unknown');
+            break;
+    }
 }
 
 /**
@@ -39,6 +75,9 @@ function runtimeOnConnectHandler(port) {
  * and send them back over the postMessage connection to the UI.
  */
 class Recorder {
+    /** The chrome extension frameid this instance is running in. */
+    _frameId = 0;
+
     constructor() {
         /** The keys that have been pressed down in the current chord. */
         this.keysDown = [];
@@ -55,7 +94,39 @@ class Recorder {
         /** Used to wait and see if a sibgle click becomes a double click. */
         this.pendingClick = false;
 
+        chrome.runtime.onMessage.addListener(runtimeFrameIdSpecificOnMessageHandler.bind(this)); // extension sends message to one or all frames
         chrome.runtime.onConnect.addListener(runtimeOnConnectHandler.bind(this));
+    }
+
+    /**
+     * Use window.postMessage to post a message into
+     * each IFRAME in this document. The message will contain
+     * the offset of the IFRAME element from the perspective of
+     * this window.
+     * The iframe will relay this information along with its
+     * chrome frameID to the extension via chome.runtime.sendMessage.
+     *  The extension will then know all frame offsets within their
+     *parent. 
+     */
+    postMessageOffsetIntoIframes() {
+        console.debug(`TX: frame ${this._frameId}:${window.location.href} broadcasts to each child frame their own offset from this frame`);
+        let iframes = document.getElementsByTagName('IFRAME');
+        for (let i = 0; i < iframes.length; ++i) {
+            let iframe = iframes[i];
+            let rect = iframe.getBoundingClientRect();
+            iframe.contentWindow.postMessage(
+                {
+                    brimstoneRecorder: {
+                        func: 'relayFrameOffsetToExtension',
+                        args: {
+                            top: rect.top,
+                            left: rect.left
+                        }
+                    }
+                },
+                '*'
+            );
+        }
     }
 
     /**
@@ -64,7 +135,8 @@ class Recorder {
      * Note this automatically sends the Sender info.
      */
     postMessage(msg) {
-        msg.from = window.location.href;
+        msg.sender = { frameId: this._frameId };
+        console.debug(`TX: `, msg);
         this._port.postMessage(msg);
     }
 
@@ -170,8 +242,33 @@ class Recorder {
 
     /** Central callback for all bound event handlers */
     handleEvent(e) {
-        //console.debug(`${e.type} ${window.location.href} handle user input event:`, e);
-        
+        console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle user input event:`, e);
+
+        /** 
+         * A child (possibly x-origin) frame needs to know its
+         * relative top, and left offsets.
+         * 
+         * https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+         * */
+        if (e.type === 'message') {
+            let brimstoneRecorder = e.data.brimstoneRecorder;
+            if (!brimstoneRecorder) {
+                return; // some other non-brimstone postedMessage into this frame. We don't care about it.
+            }
+            switch (brimstoneRecorder.func) {
+                case 'relayFrameOffsetToExtension': // *all* children frames get this message
+                    this.postMessage({ type: 'frameOffset', func: 'frameOffset', args: brimstoneRecorder.args });
+                    break;
+            }
+
+            /**
+             * I want to eat this event, and have no-one else see it, but 'message' is not cancelable.
+             * https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel/message_event
+             */
+            Recorder.block(e); // does nothing :(
+            return false;
+        }
+
         if (this._state === Recorder.state.BLOCK) {
             Recorder.block(e);
             return false;

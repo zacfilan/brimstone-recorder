@@ -87,6 +87,7 @@ This list is subject to change, and will probably transition to a bug/issue trac
 * Only user actions in the page itself are recorded. e.g. The browser back and forward buttons are not recorded.
 * Click, double-click, right-click, single-keypresses, limited chords, and mouse wheel user inputs are recorded. e.g. Chords must start with a Ctrl. e.g. Ctrl-a will be recorded, but I haven' gotten around to Alt-a. 
 * Only one tab is recorded in a test, although that tab is free to navigate to different URLs and still be recorded. e.g. Web application spawned additional browser windows/tabs recording is not supported.
+* Nested frames are handled correctly for recording. However, to caclulate frame offsets they receive a message event from the brimstone recorder. This message has the potential to alter the behavior of the frame, if it contains naive message event handling code.
 
 
 

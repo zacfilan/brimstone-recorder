@@ -306,6 +306,13 @@ async function startRecording(tab) {
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
 
+    // tell all the content scripts what frame they are in
+    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tab.id }, response))); // get all frames
+    for(let i = 0; i < frames.length; ++i) {
+        let frame = frames[i];
+        await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: {to: frame.frameId} }, { frameId: frame.frameId });
+    }
+
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
 
     // connect to all frames in the the active tab in this window. 
@@ -555,42 +562,8 @@ async function addScreenshot(step) {
  * Process a user event received from the content script (during recording)
  * screenshot, annotate event and convert to card
  */
-async function userEventToAction(userEvent, senderUrl) {
-    let frameOffset = {
-        top: 0,
-        left: 0
-    };
-
-    if (senderUrl) { // FIXME: speedup by checking if it is the main url
-        /** https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames */
-        frames = await (new Promise(resolve => chrome.webNavigation.getAllFrames({ tabId: tab.id }, resolve)));
-        
-        // fInfo.frameId: positive values are child frames, 0 is main frame
-        for(let fInfo = frames.find(f => f.url === senderUrl); fInfo.frameId; fInfo = fInfo.parentFrameId) {
-            // this is some child frame so I need to adjust the absolute x,y positions accordingly
-            let parentFrameId = fInfo.parentFrameId;
-
-            // FIXME: speedup. what is faster, sending a message and getting the response or injecting code each time?
-            /** https://developer.chrome.com/docs/extensions/reference/scripting/#method-executeScript */
-            let injectionResult = await chrome.scripting.executeScript(
-                {
-                    target: { tabId: tab.id, frameIds: [parentFrameId] },
-                    func: (url) => {
-                        console.warn(`called with ${url}`);
-                        for (let i = 0; i < window.frames.length; ++i) {
-                            if (window.frames[i].location.href === url) {
-                                let ret = window.frames[i].frameElement.getBoundingClientRect()
-                                return { top: ret.top, left: ret.left };
-                            }
-                        }
-                    },
-                    args: [fInfo.url]
-                });
-
-            frameOffset.left = injectionResult[0].result.left;
-            frameOffset.top = injectionResult[0].result.top;
-        }
-    }
+async function userEventToAction(userEvent, frameId) {
+    let frameOffset = await getFrameOffset(frameId);
 
     let cardModel = new TestAction(userEvent);
 
@@ -700,14 +673,19 @@ async function onMessageHandler(message, _port) {
     let action;
     userEvent.status = constants.status.RECORDED;
     switch (userEvent.type) {
+        case 'frameOffset':
+            if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {
+                _resolvePostMessageResponsePromise(userEvent.args);
+            }
+            break;
         case 'screenshot':
             _lastScreenshot = (await takeScreenshot()).dataUrl;
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.from });
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId });
             break;
         case 'mousemove': // this does not ack, because it will always be followed by another operation.
         case 'wheel': // this does not ack, because it will always be followed by another operation.
             // update the UI with a screenshot
-            action = await userEventToAction(userEvent, userEvent.from);
+            action = await userEventToAction(userEvent, userEvent.sender.frameId);
             updateStepInView(action);
             // no simulation required
             break;
@@ -717,25 +695,20 @@ async function onMessageHandler(message, _port) {
         case 'dblclick':
         case 'chord':
             // update the UI with a screenshot
-            action = await userEventToAction(userEvent, userEvent.from);
+            action = await userEventToAction(userEvent, userEvent.sender.frameId);
             updateStepInView(action);
             // Now simulate that event back in the recording, via the CDP
             await player[action.type](action);
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.from }); // don't need to send the whole thing back
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // don't need to send the whole thing back
             break;
         case 'connect':
-            console.debug(`connection established from frame ${userEvent.from}`);
+            console.debug(`connection established from frame ${userEvent.sender.frameId}`);
             break;
         default:
             console.error(`unexpected userEvent received <${userEvent.type}>`);
             break;
     }
 };
-
-/** Array of frames in the current tab 
- https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames 
- */
-var frames; // the whole frame hierarchy can be inferred from this, it also returns a URL for the frame.
 
 /**
  * This only is active when we are actively recording.
@@ -753,4 +726,60 @@ async function webNavigationOnCompleteHandler(details) {
     tab.width = width;
     await tab.resizeViewport();
     await startRecording(tab);
+}
+
+/** Used to wait for all frameoffsets to be reported */
+var _waitForFrameOffsetMessageFromFrameId;
+
+/** used to resolve a promise via external function */
+var _resolvePostMessageResponsePromise;
+
+/** used to reject a promise via external function */
+var _rejectPostMessageResponsePromise;
+
+/**
+ * Return a frame offset structure for this frame.
+ * @param {number} frameId 0 is main frame, positive is a child frame.
+ * 
+ * FIXME: consider using https://chromedevtools.github.io/devtools-protocol/tot/Page/#event-frameAttached 
+ * to keep frame info in sync.
+ */
+ async function getFrameOffset(frameId) {
+    let frameOffset = {
+        left: 0,
+        top: 0
+    };
+
+    if (!frameId) {
+        return frameOffset; // main frame
+    }
+    // else - a child frame made this request
+
+    /** Array of frames in the current tab 
+     * https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames 
+     */
+    let frames = await (new Promise(resolve => chrome.webNavigation.getAllFrames({ tabId: tab.id }, resolve))); // get all frames
+
+    // find my offset and all my ancestors offsets too
+    for (let frame = frames.find(f => f.frameId === frameId); frame.parentFrameId >= 0; frame = frames.find(f => f.frameId === frame.parentFrameId)) {
+        /** https://developer.chrome.com/docs/extensions/reference/tabs/#method-sendMessage */
+        _waitForFrameOffsetMessageFromFrameId = frame.frameId; // I am waiting for my own offset to be broadcast from my parent
+
+        // create 'externally' resolved promise
+        let p = new Promise((resolve, reject) => {
+            _resolvePostMessageResponsePromise = resolve;
+            _rejectPostMessageResponsePromise = reject;
+        });
+
+        // tell my parent to broadcast down into his kids (including me) their offsets
+        await chrome.tabs.sendMessage(tab.id, { func: 'postMessageOffsetIntoIframes' }, { frameId: frame.parentFrameId });
+        // it's posted, but that doesn't mean much
+        
+        let response = await p; // eventually some 'frameOffset' messages come in, and when I see mine this promise is resolved with my offset.
+
+        frameOffset.left += response.left;
+        frameOffset.top += response.top;
+    }
+
+    return frameOffset;
 }
