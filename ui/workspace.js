@@ -380,14 +380,28 @@ $('#recordButton').on('click', async function () {
 
         await startRecording(tab);
 
-        // update the UI: insert the first text card in the ui
-        let userEvent = {
-            type: 'start', // start recording
-            url: tab.url
-        };
-        let action = await userEventToAction(userEvent);
-        zip = new JSZip(); // FIXME: refactor so this isn't needed here!
-        updateStepInView(action);
+        if(!TestAction.instances.length) {
+            // update the UI: insert the first text card in the ui
+            let userEvent = {
+                type: 'start', // start recording
+                url: tab.url
+            };
+            let action = await userEventToAction(userEvent);
+            zip = new JSZip(); // FIXME: refactor so this isn't needed here!
+            updateStepInView(action);
+        }
+        else {
+            // we are updating our recording: recording over or appending to an existing test
+            let index = currentStepIndex();
+            // see last screen, make mine look like that (play)
+            // hit record
+            // this screen needs to go, it will be replaced by the required screen for the next recorded action
+
+            // see some step - i need to make the screen look like the screen in the useraction
+            // hit record
+            // this action and screen need to go, i am doing a new recording.
+            TestAction.instances.splice(index); // remove the last 'action'. it is just an image w/o an action
+        }
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
@@ -645,7 +659,7 @@ async function userEventToAction(userEvent, frameId) {
                 top: 0,
                 left: 0
             },
-                cardModel.status = constants.status.RECORDED;
+            cardModel.status = constants.status.RECORDED;
             break;
         }
         default:

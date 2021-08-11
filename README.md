@@ -1,6 +1,8 @@
 
 # What?
 
+[Video Overview](https://youtu.be/oR31FK3DpmA)
+
 Brimstone is a web application test recorder, test player and **pixel-perfect** test validator all in one.
 
 1. Fire up the brimstone workspace for the current tab.
@@ -45,6 +47,11 @@ Still here? Cool. Go to some website. Poke the ![Brimstone Icon](/images/grey_b_
 
     Outside of Brimstone, I am in the habit of wiggling the mouse around while I wait for the next screen in the browser to render. I am easily bored. *Don't do this when recording in Brimstone.* Brimstone uses your movement of the mouse as an indication that the screen **is** ready for your next user action. 
 
+## Recording Workarounds
+
+* Brimstone cannot record inside of shadow dom components. Here are some possible workarounds.
+* For the \<select\> element dropdown: Rather than open the dropdown and scroll, get focus to the element via tab, click or doubleclick, then try a keypress directly on the select. e.g. If your choice starts with o, type o. This will cycle through the choices starting with o. Arrow keys also work. Experiment. 
+
 ## FAQ
 1. How do I record scrolling?
 
@@ -83,11 +90,13 @@ You can play back right after you end a recording, or when you load a saved test
 # Limitations
 This list is subject to change, and will probably transition to a bug/issue tracked. Nothing's perfect man. But we're trying.  
  
+* The [shadow DOM](https://developer.mozilla.org/en-US/docs/Web/Web_Components/Using_shadow_DOM) cannot be recorded. e.g. select dropdown, scroll bars, etc. Alternative user actions may be required to record around this limitation, see [recording workarounds](#recording-workarounds)
 * Each test is recorded and played back in a fixed resolution. If you want to test different resoutions you need to record different tests.
 * Only user actions in the page itself are recorded. e.g. The browser back and forward buttons are not recorded.
 * Click, double-click, right-click, single-keypresses, limited chords, and mouse wheel user inputs are recorded. e.g. Chords must start with a Ctrl. e.g. Ctrl-a will be recorded, but I haven' gotten around to Alt-a. 
 * Only one tab is recorded in a test, although that tab is free to navigate to different URLs and still be recorded. e.g. Web application spawned additional browser windows/tabs recording is not supported.
 * Nested frames are handled correctly for recording. However, to caclulate frame offsets they receive a message event from the brimstone recorder. This message has the potential to alter the behavior of the frame, if it contains naive message event handling code.
+
 
 
 
