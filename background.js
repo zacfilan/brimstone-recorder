@@ -1,10 +1,12 @@
+
+
 /**
  * Get the Brimstone workspace windowId and tabId, if it is open.
  * @returns {Promise<{windowId:number, tabId:number}>}
  */
- async function getWorkspaceInfo() {
+async function getWorkspaceInfo() {
   let result = await (new Promise(resolve => chrome.storage.local.get("workspace", resolve)));
-  let workspace = result?.workspace;
+  let workspace = result?.workspace || {};
   return workspace;
 }
 
@@ -15,7 +17,7 @@
 async function tabsOnActivatedHandler(activeInfo) {
   let tab = await chrome.tabs.get(activeInfo.tabId);
   // tab.pendingUrl would be the identifier we will use eventually
-  console.debug('active tab changed', activeInfo, tab);
+  //console.debug('active tab changed', activeInfo, tab);
 }
 
 /** 
@@ -23,7 +25,7 @@ async function tabsOnActivatedHandler(activeInfo) {
  * */
 async function tabsOnRemovedHandler(tabId, removeInfo) {
   // If it was the tab we used to open the workspace, then we need to close the workspace window.
-  console.debug('tab removed ', tabId, removeInfo);
+  //console.debug('tab removed ', tabId, removeInfo);
   let workspace = await getWorkspaceInfo();
   if (tabId === workspace?.tabId) {
     chrome.windows.remove(workspace.windowId);
@@ -34,39 +36,40 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
 * Pay attention to windows being removed.
 * */
 async function windowsOnRemovedHandler(windowId) {
+  //console.log(`window ${windowId} closed`);
+
   // was it the workspace window that was removed?
   let workspace = await getWorkspaceInfo();
-  if (windowId === workspace.windowId) {
+  if (windowId === workspace?.windowId) {
 
-    chrome.storage.local.remove('workspace');
     // update the extension icon
-    // FIXME: not sure how to import iconState module into here so, also is this a race condition?
-    await chrome.action.setTitle({ title: 'Brimstone is not active.' });
+    // not sure how to import iconState module into here so
+    await chrome.storage.local.remove('workspace');
     await chrome.action.setIcon({ path: 'images/grey_b_32.png' });
+    await chrome.action.setTitle({ title: 'Brimstone is not active.' });
 
     // disconnect the handlers
+    chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
     chrome.windows.onBoundsChanged.removeListener(windowsOnBoundsChangedHandler);
     chrome.windows.onCreated.removeListener(windowsOnCreatedHandler);
     chrome.tabs.onCreated.removeListener(tabsOnCreatedHandler);
-    chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
     chrome.tabs.onRemoved.removeListener(tabsOnRemovedHandler);
     chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
   }
-
 }
 
 /** 
 * Pay attention to tabs being created 
 * */
 function tabsOnCreatedHandler(tab) {
-  console.debug('a tab was created', tab);
+  //console.debug('a tab was created', tab);
 }
 
 /** 
 * Pay attention to windows being created.
 * */
 function windowsOnCreatedHandler(window) {
-  console.debug('window was created', window);
+  //console.debug('window was created', window);
 }
 
 /** 
@@ -93,7 +96,7 @@ async function windowsOnBoundsChangedHandler(window) {
  */
 async function actionOnClickedHandler(tab) {
   let workspace = await getWorkspaceInfo();
-  if (workspace) {
+  if (workspace?.windowId) {
     // focus an existing brimstone window, and return
     try {
       let window = await chrome.windows.get(workspace.windowId);

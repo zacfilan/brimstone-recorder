@@ -3,7 +3,8 @@ import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
-import { sleep } from "../utilities.js"
+import { sleep } from "../utilities.js";
+import { Screenshot} from "./screenshot.js";
 
 setToolbarState();
 
@@ -76,10 +77,10 @@ $('#ignoreRegion').on('click',
         screenshot.removeClass('clickable');
         Rectangle.setContainer(screenshot[0],
             () => {
-                console.debug('rectangle added');
+                //console.debug('rectangle added');
             },
             () => {
-                console.debug('rectangle deleted');
+                //console.debug('rectangle deleted');
             });
         // adds these to the DOM temporarily
     }
@@ -99,7 +100,7 @@ $('#step').on('click', '.screenshot.clickable',
     function cycleEditStates(e) {
         // flip the cards
         const { view, action } = getCard(e.currentTarget);
-        if (action.status === constants.status.EXPECTED) {
+        if (action.status === constants.status.EXPECTED || action.status === constants.status.INPUT) {
             action.status = constants.status.ACTUAL;
             updateStepInView(TestAction.instances[action.index - 1]);
 
@@ -253,7 +254,7 @@ $('#playButton').on('click', async () => {
     catch (e) {
         $('#playButton').removeClass('active');
         setToolbarState();
-        setInfoBarText('aborted!');
+        setInfoBarText('💀 aborted! ' +e?.message ?? '');
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
         }
@@ -277,7 +278,7 @@ $('#last').on('click', function (e) {
 
 
 chrome.debugger.onDetach.addListener(async (source, reason) => {
-    console.debug('The debugger was detached.', source, reason);
+    //console.debug('The debugger was detached.', source, reason);
     if (reason === 'canceled_by_user' || player._debugger_detatch_requested) {
         await sleep(500);
         await player.tab.resizeViewport();
@@ -295,8 +296,8 @@ chrome.debugger.onDetach.addListener(async (source, reason) => {
 });
 
 async function startRecording(tab) {
-    console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
-    console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+    //console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    //console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
     //chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
     //chrome.tabs.onUpdated.addListener(tabsOnUpdatedHandler);
@@ -329,13 +330,13 @@ async function startRecording(tab) {
          * @param {*} _port 
          */
         function (_port) {
-            console.debug('port was disconnected', _port, chrome.runtime.lastError);
+            //console.debug('port was disconnected', _port, chrome.runtime.lastError);
             port.onMessage.removeListener(onMessageHandler); // this particular port is no good anymore so, kill the listener on it. needed?
             port = false;
         });
 
     port.onMessage.addListener(onMessageHandler);
-    console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    //console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
 }
 
 function stopRecording(tab) {
@@ -344,7 +345,7 @@ function stopRecording(tab) {
         postMessage({ type: 'stop', broadcast: true });
     }
     catch (e) {
-        console.warn(e);
+        //console.warn(e);
     }
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
 }
@@ -444,12 +445,12 @@ $('#clearButton').on('click', async () => {
  * Note this automatically sends the Sender info.
  */
 function postMessage(msg) {
-    console.debug('TX', msg);
+    //console.debug('TX', msg);
     port.postMessage(msg);
 }
 
 $('#saveButton').on('click', async () => {
-    console.debug('create zip');
+    //console.debug('create zip');
     zip = new JSZip();
     zip.file('test.json', JSON.stringify({ steps: TestAction.instances }, null, 2)); // add the test.json file to archive
     var screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
@@ -461,11 +462,15 @@ $('#saveButton').on('click', async () => {
             let blob = await response.blob();
             screenshots.file(card.expectedScreenshot.fileName, blob, { base64: true });
         }
+
+        // only save the actual screenshot if it didn't match the expected, before checking for acceptable pixel differences
+        // in other words don't save the same image twice.
         if (card.actualScreenshot) {
             let response = await fetch(card.actualScreenshot.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
         }
+
         if (card.acceptablePixelDifferences) {
             let response = await fetch(card.acceptablePixelDifferences.dataUrl);
             let blob = await response.blob();
@@ -473,7 +478,7 @@ $('#saveButton').on('click', async () => {
         }
     }
 
-    console.debug('save zip to disk');
+    //console.debug('save zip to disk');
     let blobpromise = zip.generateAsync({ type: "blob" });
     const handle = await window.showSaveFilePicker({
         suggestedName: `test.zip`,
@@ -523,7 +528,7 @@ $('#loadButton').on('click', async () => {
         setToolbarState();
     }
     catch (e) {
-        console.error(e);
+        //console.error(e);
     }
 });
 
@@ -548,7 +553,7 @@ function setStepContent(step) {
 };
 
 /**
- * uUpdate the thumb from the given action
+ * Update the thumb from the given action
  * @param {Action} action 
  */
 function updateThumb(action) {
@@ -563,11 +568,6 @@ function updateThumb(action) {
     else {
         uiCardsElement.appendChild($thumb[0]);
     }
-}
-
-async function addScreenshot(step) {
-    let { dataUrl } = await takeScreenshot();
-    step.expectedScreenshot = { dataUrl, fileName: `step${step.index}_expected.png` };
 }
 
 /** 
@@ -602,11 +602,12 @@ async function userEventToAction(userEvent, frameId) {
         };
     }
 
+    let dataUrl = '';
     switch (userEvent.type) {
         case 'mousemove':
             cardModel.description = 'move mouse here';
-            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
-            await addScreenshot(cardModel);
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'wheel':
             let direction = '';
@@ -620,36 +621,37 @@ async function userEventToAction(userEvent, frameId) {
                 magnitude = Math.abs(cardModel.deltaY);
             }
             cardModel.description = `mouse here, scroll wheel ${magnitude}px ${direction}`;
-            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
-            //await addScreenshot(cardModel);
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'keypress':
             cardModel.description = `type ${userEvent.event.key}`;
-            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
-            await addScreenshot(cardModel);
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'chord':
             cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
-            await addScreenshot(cardModel);
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'click':
             cardModel.description = 'click';
-            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
-            await addScreenshot(cardModel);
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'contextmenu':
             cardModel.description = 'right click';
-            //cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
-            await addScreenshot(cardModel);
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'dblclick':
             cardModel.description = 'double click';
-            //            cardModel.expectedScreenshot = { dataUrl: _lastScreenshot, fileName: `step${cardModel.index}_expected.png` };
-            await addScreenshot(cardModel);
-            break
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
+            break;
         case 'stop':
             cardModel.description = 'stop recording';
-            await addScreenshot(cardModel);
+            dataUrl = await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'start': {
             cardModel.description = `goto ${cardModel.url}`;
@@ -669,13 +671,12 @@ async function userEventToAction(userEvent, frameId) {
     return cardModel;
 }
 
-async function takeScreenshot() {
+async function captureScreenshotAsDataUrl() {
     let result = await player.debuggerSendCommand('Page.captureScreenshot', {
         format: 'png'
     });
-    return {
-        dataUrl: 'data:image/png;base64,' + result.data
-    };
+    let dataUrl = 'data:image/png;base64,' + result.data;
+    return dataUrl;
 }
 
 /** 
@@ -683,7 +684,7 @@ async function takeScreenshot() {
 */
 async function onMessageHandler(message, _port) {
     let userEvent = message;
-    console.debug(`RX: ${userEvent.type}`, userEvent);
+    //console.debug(`RX: ${userEvent.type}`, userEvent);
     let action;
     userEvent.status = constants.status.RECORDED;
     switch (userEvent.type) {
@@ -693,7 +694,7 @@ async function onMessageHandler(message, _port) {
             }
             break;
         case 'screenshot':
-            _lastScreenshot = (await takeScreenshot()).dataUrl;
+            _lastScreenshot = await captureScreenshotAsDataUrl();
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId });
             break;
         case 'mousemove': // this does not ack, because it will always be followed by another operation.
@@ -716,10 +717,10 @@ async function onMessageHandler(message, _port) {
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // don't need to send the whole thing back
             break;
         case 'connect':
-            console.debug(`connection established from frame ${userEvent.sender.frameId}`);
+            //console.debug(`connection established from frame ${userEvent.sender.frameId}`);
             break;
         default:
-            console.error(`unexpected userEvent received <${userEvent.type}>`);
+            //console.error(`unexpected userEvent received <${userEvent.type}>`);
             break;
     }
 };
@@ -729,17 +730,18 @@ async function onMessageHandler(message, _port) {
  * https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
  */
 async function webNavigationOnCompleteHandler(details) {
-    console.debug(`tab ${details.tabId} navigation completed`, details);
+    //console.debug(`tab ${details.tabId} navigation completed`, details);
     if (details.url === 'about:blank') {
-        console.debug(`    - ignoring navigation to page url 'about:blank'`);
+        //console.debug(`    - ignoring navigation to page url 'about:blank'`);
         return;
     }
     const { height, width } = tab; // hang onto the original size
     await tab.fromChromeTabId(details.tabId); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
     tab.height = height;
     tab.width = width;
-    await tab.resizeViewport();
+
     await startRecording(tab);
+    await tab.resizeViewport();
 }
 
 /** Used to wait for all frameoffsets to be reported */

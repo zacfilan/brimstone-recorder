@@ -19,7 +19,7 @@ function runtimeOnConnectHandler(port) {
     /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port */
     this._port.onMessage.addListener(msg => {
         if (msg.broadcast || msg.to === this._frameId) {
-            console.debug(`RX: ${this._frameId}`, msg);
+            //console.debug(`RX: ${this._frameId}`, msg);
             switch (msg.type) {
                 case 'complete':
                     this._state = Recorder.state.READY;
@@ -64,7 +64,7 @@ function runtimeFrameIdSpecificOnMessageHandler(message, sender, sendResponse) {
             sendResponse();
             break;
         default:
-            console.warn('unknown message', message);
+            //console.warn('unknown message', message);
             sendResponse('unknown');
             break;
     }
@@ -109,7 +109,7 @@ class Recorder {
      *parent. 
      */
     postMessageOffsetIntoIframes() {
-        console.debug(`TX: frame ${this._frameId}:${window.location.href} broadcasts to each child frame their own offset from this frame`);
+        //console.debug(`TX: frame ${this._frameId}:${window.location.href} broadcasts to each child frame their own offset from this frame`);
         let iframes = document.getElementsByTagName('IFRAME');
         for (let i = 0; i < iframes.length; ++i) {
             let iframe = iframes[i];
@@ -136,19 +136,19 @@ class Recorder {
      */
     postMessage(msg) {
         msg.sender = { frameId: this._frameId };
-        console.debug(`TX: `, msg);
+        //console.debug(`TX: `, msg);
         this._port.postMessage(msg);
     }
 
     /** Clean up */
     exit() {
-        console.debug('exit called');
+        //console.debug('exit called');
         this.removeEventListeners();
     }
 
     // FIXME: this 'e' should have a better defined type.
     buildMsg(e) {
-        console.debug('building msg from', e);
+        //console.debug('building msg from', e);
 
         // JSON.stringify bails as soon as it hits a circular reference, so we must project out a subset of the properties
         // rather than just augment the e object.
@@ -180,7 +180,7 @@ class Recorder {
                 msg.hoverTime = performance.now() - this._mouseEnterTime;
                 if (msg.hoverTime > 5000) {
                     msg.hoverTime = 5000;
-                    console.warn("hover time is limited to 5 seconds");
+                    //console.warn("hover time is limited to 5 seconds");
                 }
                 msg.x = e.clientX;
                 msg.y = e.clientY;
@@ -225,7 +225,7 @@ class Recorder {
 
     /** Add event listeners to the window, some events will be passed*/
     addEventListeners() {
-        console.debug('removing + adding event listeners');
+        //console.debug('removing + adding event listeners');
         Recorder.events.forEach(event => {
             window.removeEventListener(event, this, { capture: true, passive: false });
             window.addEventListener(event, this, { capture: true, passive: false });
@@ -234,7 +234,7 @@ class Recorder {
 
     /** Remove previous bound event listeners */
     removeEventListeners() {
-        console.debug('removing event listeners');
+        //console.debug('removing event listeners');
         Recorder.events.forEach(event => {
             window.removeEventListener(event, this, { capture: true, passive: false });
         });
@@ -242,7 +242,7 @@ class Recorder {
 
     /** Central callback for all bound event handlers */
     handleEvent(e) {
-        console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle user input event:`, e);
+        //console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle user input event:`, e);
 
         /** 
          * A child (possibly x-origin) frame needs to know its
@@ -412,7 +412,7 @@ class Recorder {
                         // this is the second single click within 500ms. It should generate a double click.
                         this.pendingClick = false;
                         if (e.detail != 2) {
-                            console.error('sanity check fails. got a 2nd single click within 500ms but not marked as 2nd click.')
+                            //console.error('sanity check fails. got a 2nd single click within 500ms but not marked as 2nd click.')
                         }
                     }
                     break;

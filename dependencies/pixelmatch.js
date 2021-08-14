@@ -5,12 +5,12 @@
 const defaultOptions = {
     threshold: 0.1,         // matching threshold (0 to 1); smaller is more sensitive
     includeAA: false,       // whether to skip anti-aliasing detection
-    alpha: 0.1,             // opacity of original image in diff ouput
-    aaColor: [255, 255, 0], // color of anti-aliased pixels in diff output
-    diffColor: [255, 0, 0], // color of different pixels in diff output
+    alpha: 0.2,             // opacity of original image in diff ouput
+    aaColor: [255, 255, 0], // color of anti-aliased pixels in diff output (yellow)
+    diffColor: [255, 0, 0], // color of different pixels in diff output (red)
     diffColorAlt: null,     // whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two
     diffMask: false,         // draw the diff over a transparent background (a mask)
-    ignoreMask: false
+    ignoreMask: false   // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
 };
 
 export function pixelmatch(img1, img2, output, width, height, options) {
@@ -68,13 +68,24 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                 } else {
                     // found substantial difference not caused by anti-aliasing; draw it as such
                     if (output) {
-                        // before I draw a red one, see if that one is 'ok' due to the mask, and then draw it green
+                        // before i declare it's a mismatch and draw a red one in the result,
+                        //  see if that one is 'ok' due to the ignoreMask
+                        // okay means the masked red pixel is 255 which matches red or orange.
+                        // it will be orange, after I give a thumbs up to detected areas.
                         if(options.ignoreMask) {
-                            let red = options.ignoreMask[pos + 0];
-                            // const orange = [255, 165, 0];
-                            if(red === 255) { // match orange or red
-                                _drawPixel(output, pos, 255, 165, 0, 255); // orange pixel
+                            // the mask is coming directly from the delta picture we show the user.
+                            let red   = options.ignoreMask[pos + 0];
+                            let green = options.ignoreMask[pos + 1];
+                            let blue  = options.ignoreMask[pos + 2];
+                            if( (red === 255 && green ===   0 && blue === 0) || // red or
+                                (red === 255 && green === 165 && blue === 0)) { // orange
+
+                                _drawPixel(output, pos, 255, 165, 0, 255); // becomes orange
                                 masked++;
+                            }
+                            else {
+                                drawPixel(output, pos, ...(delta < 0 && options.diffColorAlt || options.diffColor));
+                                diff++;
                             }
                         }
                         else {
@@ -92,12 +103,13 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                 if (!options.diffMask) {
 
                     if(options.ignoreMask) {
-                        let red = options.ignoreMask[pos + 0];
+                        let red   = options.ignoreMask[pos + 0];
                         let green = options.ignoreMask[pos + 1];
-                        let blue = options.ignoreMask[pos + 2]
+                        let blue  = options.ignoreMask[pos + 2];
                         // const orange = [255, 165, 0];
-                        if(red === 255 && green === 165 && blue === 0) { // orange, is our volatile region
-                            _drawPixel(output, pos, 255, 165, 0, 128); // orange but lighter for volatile that didn't match
+                        if( (red === 255 && green === 165 && blue === 0)) {
+                            // it was an ignorable pixel, but didn't need to be, so lighten it to indicate that.
+                            _drawPixel(output, pos, 255, 165, 0, 128);   
                         }
                         else {
                             drawGrayPixel(img1, pos, options.alpha, output);

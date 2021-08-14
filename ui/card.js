@@ -1,4 +1,6 @@
 import { Player } from "../playerclass.js"
+import { Screenshot } from "./screenshot.js";
+
 const PNG = png.PNG;
 
 /** A user input, type, click, context, double, etc.*/
@@ -32,31 +34,6 @@ export const constants = {
     }
 };
 
-/** A container for properties of a screenshot */
-class Screenshot {
-    /** 
-     * A dataurl for the screenshot.
-     * @type {string}  
-     * */
-    dataUrl;
-
-    /** A PNG of the Screenshot.
-     * @type {PNG}
-     */
-    png;
-
-    /** The filename in the zip under the screenshots/ directory *
-     * @type {string}
-     */
-    fileName;
-
-    constructor(args = {}) {
-        this.dataUrl = args.dataUrl;
-        this.png = args.png;
-        this.fileName = args.fileName;
-    }
-}
-
 export class TestAction {
     /** The status of the test step. */
     status;
@@ -80,6 +57,17 @@ export class TestAction {
     /** Used to identify the tab being this action happened on. */
     tabUrl = '';
 
+    /**
+     * The number of pixels that were different between the expected screenshot and the actual screenshot.
+     */
+    numDiffPixels = 0;
+
+    /**
+     * The number of pixels that were different between the expected screenhot and the actual screenshot
+     * but were allowed because of the acceptablePixelDifferences mask.
+     */
+    numMaskedPixels = 0;
+
     constructor(args) {
         Object.assign(this, args);
 
@@ -94,33 +82,53 @@ export class TestAction {
     }
 
     /** 
-     * Some properties are populated async, which we can't do in a constructor so... */
+     * Some properties are populated async, which we can't do in a constructor.
+     * */
     async hydrate(screenshots) {
-        if (this.expectedScreenshot && !this.expectedScreenshot.dataUrl) {
-            this.expectedScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.expectedScreenshot.fileName).async('base64');
+        if (this.expectedScreenshot) {
+            this.expectedScreenshot = new Screenshot(this.expectedScreenshot, screenshots);
+            await this.expectedScreenshot.createDataUrl(); // needed to see any image during loading
+            this.expectedScreenshot.createPng(); 
+        }
+
+        if (this.acceptablePixelDifferences) {
+            this.acceptablePixelDifferences = new Screenshot(this.acceptablePixelDifferences, screenshots);
+            this.acceptablePixelDifferences.hydrate(); // don't await it, we can await the png or dataUrl later
         }
 
         if (this.actualScreenshot) {
-            if (!this.actualScreenshot.dataUrl) {
-                this.actualScreenshot.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.actualScreenshot.fileName).async('base64');
-            }
-            if (this.acceptablePixelDifferences && !this.acceptablePixelDifferences.dataUrl) {
-                this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + await screenshots.file(this.acceptablePixelDifferences.fileName).async('base64');
-            }
+            this.actualScreenshot = new Screenshot(this.actualScreenshot,screenshots);
+            // only needed when the user edits the step before running. less likely. but could
+            // be used in the case where a failure is passed to someone else to look at.
+            //dataUrlPromises.push(this.actualScreenshot.createDataUrl()); 
 
-            await this.pixelDiff();
+            //await this.actualScreenshot.hydrate(); // expensive
+            //await this.pixelDiff();
         }
+
         return this;
+    }
+
+    addExpectedScreenshot(dataUrl) {
+        this.expectedScreenshot = new Screenshot({
+            dataUrl: dataUrl,
+            fileName: `step${this.index}_expected.png`
+            // png: await Player.dataUrlToPNG(dataUrl) // this is expensive to calculate, defer until you really need it.
+        });
+        this.expectedScreenshot.createPng(); // kick it off but don't wait
     }
 
     toJSON() {
         let clone = Object.assign({}, this);
+        //console.debug(this);
         if (this.expectedScreenshot) {
             clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
         }
+
         if (this.actualScreenshot) {
             clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
         }
+
         if (clone.acceptablePixelDifferences) {
             clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
         }
@@ -128,7 +136,6 @@ export class TestAction {
         delete clone.diffDataUrl;
         delete clone.numDiffPixels;
         delete clone.percentDiffPixels;
-        delete clone.acceptableErrorsPng;
         // FIXME: rather than add and delete can I prevent this by construction or make it easier to delete via encapsulation
 
         return clone;
@@ -140,12 +147,12 @@ export class TestAction {
     */
     async addMask($card) { // FIMXE: don't pass the card in...
         if (!this.acceptablePixelDifferences) {
-            this.acceptablePixelDifferences = {};
+            this.acceptablePixelDifferences = new Screenshot();
         }
-        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl; // what is shown currently. .
+        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl; // what is shown currently. at this point what we see, will become the new acceptable mask.
         this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
         if (this.acceptablePixelDifferences?.dataUrl) {
-            this.acceptableErrorsPng = (await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl)).png; // convert to png
+            this.acceptablePixelDifferences.png = await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl); // convert to png
         }
 
         // manipulate the PNG
@@ -155,8 +162,8 @@ export class TestAction {
             let image = $image[0].getBoundingClientRect();
 
             // this is scaled
-            let xscale = this.acceptableErrorsPng.width / image.width;
-            let yscale = this.acceptableErrorsPng.height / image.height;
+            let xscale = this.acceptablePixelDifferences.png.width / image.width;
+            let yscale = this.acceptablePixelDifferences.png.height / image.height;
 
             volatileRegions.each((index, rectangle) => {
                 // viewport relative measurements with scaled lengths
@@ -170,20 +177,21 @@ export class TestAction {
                     height: Math.floor(rec.height * yscale)
                 };
 
-                addRectangle.call(this.acceptableErrorsPng, pngRectangle);
+                addRectangle.call(this.acceptablePixelDifferences.png, pngRectangle);
             });
         }
-        // once this is done I need to turn this back into the diffDataUrl, since that is what will be show...and I do in pixelDiff function
+
+        // once this is done I need to turn this back into the diffDataUrl, since that is what will be shown...and I do in pixelDiff function
         return await this.pixelDiff();
     }
 
     /** (Re)calculate the difference between the expected screenshot
-    * and the actual screenshot, then apply mask
+    * and the actual screenshot, then apply the current acceptableErrors mask.
     */
     async pixelDiff() {
-        let { png: expectedPng } = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
-        let { png: actualPng } = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
-        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, this.acceptableErrorsPng);
+        let expectedPng = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
+        let actualPng = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
+        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, this.acceptablePixelDifferences?.png);
 
         this.numDiffPixels = numDiffPixels;
         let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
@@ -239,6 +247,10 @@ export class TestAction {
     }
 
 }
+
+/**
+ * @type {TestAction[]}
+ */
 TestAction.instances = [];
 
 /**
@@ -269,7 +281,7 @@ export class Step {
                 title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
                 break;
             default:
-                title = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action'; 
+                title = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action';
                 break;
         }
         let html = `
@@ -277,9 +289,9 @@ export class Step {
             ${this.curr.toHtml(title)}
             `;
 
-            if (this.next) {
+        if (this.next) {
             let src;
-            let title; 
+            let title;
             switch (this.next.status) {
                 case constants.status.WAITING: // we are waiting for this one (implies playing)
                     title = 'Waiting for actual next screen to match this.';
@@ -302,7 +314,7 @@ export class Step {
                     break;
                 default:
                     title = 'Expected result';
-                    if(this.next.index === TestAction.instances.length - 1) {
+                    if (this.next.index === TestAction.instances.length - 1) {
                         title += ' - final screenshot';
                     }
                     break;
