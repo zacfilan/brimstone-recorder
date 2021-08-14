@@ -4,7 +4,7 @@ import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep } from "../utilities.js";
-import { Screenshot} from "./screenshot.js";
+import { Screenshot } from "./screenshot.js";
 
 setToolbarState();
 
@@ -97,16 +97,21 @@ $('#cards').on('click', '.thumb',
 
 $('#step').on('click', '.screenshot.clickable',
     /** When clicking on an editable action, cycle through expected, actual, and edit states. */
-    function cycleEditStates(e) {
+    async function cycleEditStates(e) {
         // flip the cards
         const { view, action } = getCard(e.currentTarget);
         if (action.status === constants.status.EXPECTED || action.status === constants.status.INPUT) {
             action.status = constants.status.ACTUAL;
+            if (!action.actualScreenshot.dataUrl && action.actualScreenshot?.fileName) {
+                await action.actualScreenshot.hydrate();
+            }
             updateStepInView(TestAction.instances[action.index - 1]);
-
         }
         else if (action.status === constants.status.ACTUAL) {
             action.status = constants.status.EDIT;
+            if (!action.editViewDataUrl && action.acceptablePixelDifferences?.png) {
+                await action.pixelDiff();
+            }
             updateStepInView(TestAction.instances[action.index - 1]);
 
         }
@@ -238,7 +243,7 @@ $('#playButton').on('click', async () => {
 
         let playFrom = currentStepIndex(); // we will start on the step showinging in the workspace.
         // we can resume a failed step. FIXME:// I need to know the last play resulted in a failed step to set this.
-        let resume = !playedSuccessfully && playFrom>0; 
+        let resume = !playedSuccessfully && playFrom > 0;
         playedSuccessfully = await player.play(actions, playFrom, resume); // players gotta play...
 
         $('#playButton').removeClass('active');
@@ -254,7 +259,7 @@ $('#playButton').on('click', async () => {
     catch (e) {
         $('#playButton').removeClass('active');
         setToolbarState();
-        setInfoBarText('💀 aborted! ' +e?.message ?? '');
+        setInfoBarText('💀 aborted! ' + e?.message ?? '');
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
         }
@@ -309,9 +314,9 @@ async function startRecording(tab) {
 
     // tell all the content scripts what frame they are in
     let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tab.id }, response))); // get all frames
-    for(let i = 0; i < frames.length; ++i) {
+    for (let i = 0; i < frames.length; ++i) {
         let frame = frames[i];
-        await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: {to: frame.frameId} }, { frameId: frame.frameId });
+        await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
     }
 
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
@@ -381,7 +386,7 @@ $('#recordButton').on('click', async function () {
 
         await startRecording(tab);
 
-        if(!TestAction.instances.length) {
+        if (!TestAction.instances.length) {
             // update the UI: insert the first text card in the ui
             let userEvent = {
                 type: 'start', // start recording
@@ -457,7 +462,7 @@ $('#saveButton').on('click', async () => {
     // add all the expected screenshots to the screenshots directory in the archive
     for (let i = 0; i < TestAction.instances.length; ++i) {
         let card = TestAction.instances[i];
-        if (card.expectedScreenshot) {
+        if (card.expectedScreenshot?.dataUrl) {
             let response = await fetch(card.expectedScreenshot.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.expectedScreenshot.fileName, blob, { base64: true });
@@ -465,13 +470,13 @@ $('#saveButton').on('click', async () => {
 
         // only save the actual screenshot if it didn't match the expected, before checking for acceptable pixel differences
         // in other words don't save the same image twice.
-        if (card.actualScreenshot) {
+        if (card.actualScreenshot?.dataUrl) {
             let response = await fetch(card.actualScreenshot.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
         }
 
-        if (card.acceptablePixelDifferences) {
+        if (card.acceptablePixelDifferences?.dataUrl) {
             let response = await fetch(card.acceptablePixelDifferences.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.acceptablePixelDifferences.fileName, blob, { base64: true });
@@ -661,7 +666,7 @@ async function userEventToAction(userEvent, frameId) {
                 top: 0,
                 left: 0
             },
-            cardModel.status = constants.status.RECORDED;
+                cardModel.status = constants.status.RECORDED;
             break;
         }
         default:
@@ -760,7 +765,7 @@ var _rejectPostMessageResponsePromise;
  * FIXME: consider using https://chromedevtools.github.io/devtools-protocol/tot/Page/#event-frameAttached 
  * to keep frame info in sync.
  */
- async function getFrameOffset(frameId) {
+async function getFrameOffset(frameId) {
     let frameOffset = {
         left: 0,
         top: 0
@@ -790,7 +795,7 @@ var _rejectPostMessageResponsePromise;
         // tell my parent to broadcast down into his kids (including me) their offsets
         await chrome.tabs.sendMessage(tab.id, { func: 'postMessageOffsetIntoIframes' }, { frameId: frame.parentFrameId });
         // it's posted, but that doesn't mean much
-        
+
         let response = await p; // eventually some 'frameOffset' messages come in, and when I see mine this promise is resolved with my offset.
 
         frameOffset.left += response.left;

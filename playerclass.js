@@ -346,8 +346,8 @@ export class Player {
 
             differencesPng = diffPng;
             if (numDiffPixels === 0) { // it matched
-                // and the editable image.
-                nextStep.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
+                nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
+                nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
 
                 if (numMaskedPixels) { // it matched only because of the masking we allowed
                     nextStep.status = constants.status.ALLOWED;
@@ -364,13 +364,14 @@ export class Player {
 
         // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing. 
         if (differencesPng) {
-            // and the editable image.
-            nextStep.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
+            nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
+            nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
         }
         else {
             // else we can't update the actual nor the diff
             delete nextStep.actualScreenshot;
-            delete nextStep.diffDataUrl;
+            delete nextStep.lastVerifyScreenshotDiffDataUrl;
+            delete nextStep.editViewDataUrl;
         }
 
         return false;

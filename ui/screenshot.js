@@ -55,7 +55,6 @@ export class Screenshot {
 
     /**
      * This is expensive so only create it when needed.
-     * It is needd when playing back a recording in the verifyScreenshot function.
      */
     async createPng() {
         let that = this;

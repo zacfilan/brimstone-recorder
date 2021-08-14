@@ -68,6 +68,17 @@ export class TestAction {
      */
     numMaskedPixels = 0;
 
+    /** 
+     * This is the raw output of the last verifyScreenshot. It may be copied, edited and the result assigned into the
+     * acceptablePixelDifferences. 
+     * */
+    lastVerifyScreenshotDiffDataUrl;
+
+    /**
+     * It is used for display in the card view of the edit screenshot. 
+     */
+    editViewDataUrl;
+
     constructor(args) {
         Object.assign(this, args);
 
@@ -88,22 +99,16 @@ export class TestAction {
         if (this.expectedScreenshot) {
             this.expectedScreenshot = new Screenshot(this.expectedScreenshot, screenshots);
             await this.expectedScreenshot.createDataUrl(); // needed to see any image during loading
-            this.expectedScreenshot.createPng(); 
+            this.expectedScreenshot.createPng(); // in due course
         }
 
         if (this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = new Screenshot(this.acceptablePixelDifferences, screenshots);
-            this.acceptablePixelDifferences.hydrate(); // don't await it, we can await the png or dataUrl later
+            this.acceptablePixelDifferences.hydrate(); // in due course
         }
 
         if (this.actualScreenshot) {
             this.actualScreenshot = new Screenshot(this.actualScreenshot,screenshots);
-            // only needed when the user edits the step before running. less likely. but could
-            // be used in the case where a failure is passed to someone else to look at.
-            //dataUrlPromises.push(this.actualScreenshot.createDataUrl()); 
-
-            //await this.actualScreenshot.hydrate(); // expensive
-            //await this.pixelDiff();
         }
 
         return this;
@@ -133,7 +138,7 @@ export class TestAction {
             clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
         }
 
-        delete clone.diffDataUrl;
+        delete clone.lastVerifyScreenshotDiffDataUrl;
         delete clone.numDiffPixels;
         delete clone.percentDiffPixels;
         // FIXME: rather than add and delete can I prevent this by construction or make it easier to delete via encapsulation
@@ -149,11 +154,13 @@ export class TestAction {
         if (!this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = new Screenshot();
         }
-        this.acceptablePixelDifferences.dataUrl = this.diffDataUrl; // what is shown currently. at this point what we see, will become the new acceptable mask.
-        this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
-        if (this.acceptablePixelDifferences?.dataUrl) {
-            this.acceptablePixelDifferences.png = await Player.dataUrlToPNG(this.acceptablePixelDifferences.dataUrl); // convert to png
+
+        if(this.lastVerifyScreenshotDiffDataUrl) {
+            this.acceptablePixelDifferences.dataUrl = this.lastVerifyScreenshotDiffDataUrl;
+            this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
+            await this.acceptablePixelDifferences.createPng();
         }
+        // else we use whatever is already in acceptablePixelDifferences (editing before playing)
 
         // manipulate the PNG
         let volatileRegions = $card.find('.rectangle');
@@ -181,27 +188,25 @@ export class TestAction {
             });
         }
 
-        // once this is done I need to turn this back into the diffDataUrl, since that is what will be shown...and I do in pixelDiff function
         return await this.pixelDiff();
     }
 
     /** (Re)calculate the difference between the expected screenshot
-    * and the actual screenshot, then apply the current acceptableErrors mask.
+    * and the actual screenshot, then apply the acceptablePixelDifferences mask.
     */
     async pixelDiff() {
-        let expectedPng = await Player.dataUrlToPNG(this.expectedScreenshot.dataUrl);
-        let actualPng = await Player.dataUrlToPNG(this.actualScreenshot.dataUrl);
-        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, actualPng, this.acceptablePixelDifferences?.png);
+        this.expectedScreenshot.png || await this.expectedScreenshot._pngPromise;
+        this.actualScreenshot.png || await this.actualScreenshot._pngPromise;
 
+        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(this.expectedScreenshot.png, this.actualScreenshot.png, this.acceptablePixelDifferences.png);
+        this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
+        this.acceptablePixelDifferences.png = diffPng;
+
+        // view models stuff
         this.numDiffPixels = numDiffPixels;
-        let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
+        let UiPercentDelta = (numDiffPixels * 100) / (this.expectedScreenshot.png.width * this.expectedScreenshot.png.height);
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
-
-        /** 
-         * This is what will be shown when the card is rendered in the UI. It is not persisted. 
-         * When loaded it is set. When played it can be set.
-        */
-        this.diffDataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
+        this.editViewDataUrl = this.acceptablePixelDifferences.dataUrl;
         if (numMaskedPixels) {
             this.status = constants.status.ALLOWED;
         }
@@ -310,7 +315,7 @@ export class Step {
                     break;
                 case constants.status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
                     title = `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
-                    src = this.next.diffDataUrl ?? '../images/notfound.png'
+                    src = this.next.editViewDataUrl ?? '../images/notfound.png';
                     break;
                 default:
                     title = 'Expected result';
