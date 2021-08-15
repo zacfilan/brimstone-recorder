@@ -137,25 +137,27 @@ svg {
 
 /** card defaults */
 .card .meter {
-    visibility: hidden;
+    visibility: hidden; /* not seen but takes up layout space */
 }
 
-
-.card.waiting .meter {
+.card.waiting .meter, .card.failed .meter {
     visibility: visible;
 }
 
-
-.card.expected, .card.actual {
-    background: red;
+/** show the failed progress bar as red for failed states */
+.card.expected.failed .progress, .card.actual.failed .progress {
+    background-color: red;
+    animation: unset;
+    animation-fill-mode:unset; 
 }
 
-.card.edit {
-    background: orange;
+/** hide that one */
+.card.edit.failed .meter {
+    visibility: hidden;
 }
 
-.card.allowed {
-    background: orange;
+#allowed-differences {
+    color: orange;
 }
 
 /** only show the meter on the next card when playing back */

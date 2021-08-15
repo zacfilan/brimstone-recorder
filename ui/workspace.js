@@ -4,7 +4,9 @@ import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep } from "../utilities.js";
-import { Screenshot } from "./screenshot.js";
+import { enableConsole, disableConsole } from "./console.js";
+
+//disableConsole(); // can be reenabled in the debugger later
 
 setToolbarState();
 
@@ -60,8 +62,6 @@ $('#ignoreDelta').on('click',
         // add a mask
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
         await action.addMask(view);
-        action.status = constants.status.EDIT; // stay on edit
-
         updateStepInView(TestAction.instances[action.index - 1]);
     }
 );
@@ -77,10 +77,10 @@ $('#ignoreRegion').on('click',
         screenshot.removeClass('clickable');
         Rectangle.setContainer(screenshot[0],
             () => {
-                //console.debug('rectangle added');
+                console.debug('rectangle added');
             },
             () => {
-                //console.debug('rectangle deleted');
+                console.debug('rectangle deleted');
             });
         // adds these to the DOM temporarily
     }
@@ -100,23 +100,24 @@ $('#step').on('click', '.screenshot.clickable',
     async function cycleEditStates(e) {
         // flip the cards
         const { view, action } = getCard(e.currentTarget);
-        if (action.status === constants.status.EXPECTED || action.status === constants.status.INPUT) {
-            action.status = constants.status.ACTUAL;
-            if (!action.actualScreenshot.dataUrl && action.actualScreenshot?.fileName) {
+        let index;
+        if ((index = action.class.indexOf(constants.class.EXPECTED)) >= 0) {
+            action.class[index] = constants.class.ACTUAL;
+            if (!action.actualScreenshot?.dataUrl && action.actualScreenshot?.fileName) {
                 await action.actualScreenshot.hydrate();
             }
             updateStepInView(TestAction.instances[action.index - 1]);
         }
-        else if (action.status === constants.status.ACTUAL) {
-            action.status = constants.status.EDIT;
+        else if ((index = action.class.indexOf(constants.class.ACTUAL)) >= 0) {
+            action.class[index] = constants.class.EDIT;
             if (!action.editViewDataUrl && action.acceptablePixelDifferences?.png) {
                 await action.pixelDiff();
             }
             updateStepInView(TestAction.instances[action.index - 1]);
 
         }
-        else if (action.status === constants.status.EDIT) {
-            action.status = constants.status.EXPECTED;
+        else if ((index = action.class.indexOf(constants.class.EDIT)) >= 0) {
+            action.class[index] = constants.class.EXPECTED;
             updateStepInView(TestAction.instances[action.index - 1]);
         }
     }
@@ -165,6 +166,8 @@ function setToolbarState() {
         }
         else {
             // not playing, not recoding
+            $('#helpButton').prop('disabled', false); // help is always given to those at hogwarts who ask for it.
+            $('#issuesButton').prop('disabled', false);
             rb.prop('disabled', false);
             document.documentElement.style.setProperty('--action-color', 'blue');
 
@@ -193,16 +196,9 @@ function setToolbarState() {
     let editCard = $('#content .card:nth-of-type(2)');
     if (editCard.length) {
         const { action } = getCard(editCard);
-        switch (action?.status) {
-            case constants.status.EXPECTED:
-            case constants.status.ACTUAL:
-            case constants.status.ALLOWED:
-                $('#edit').prop('disabled', false);
-                break;
-            case constants.status.EDIT:
-                $('#ignoreDelta').prop('disabled', false);
-                $('#ignoreRegion').prop('disabled', false);
-                break;
+        if (action?.class.includes(constants.class.EDIT)) {
+            $('#ignoreDelta').prop('disabled', false);
+            $('#ignoreRegion').prop('disabled', false);
         }
     }
 }
@@ -224,11 +220,6 @@ var playedSuccessfully = true;
 $('#playButton').on('click', async () => {
     try {
         let actions = TestAction.instances;
-        for (let i = 0; i < actions.length; ++i) {
-            let action = actions[i];
-            action.status = constants.status.INPUT;
-            updateThumb(action);
-        }
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
         await tab.fromChromeTabId(tabId);
@@ -253,7 +244,7 @@ $('#playButton').on('click', async () => {
         await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
 
         if (playedSuccessfully) {
-            alert('Test passed.');
+            alert('✅ Test passed.');
         }
     }
     catch (e) {
@@ -283,7 +274,7 @@ $('#last').on('click', function (e) {
 
 
 chrome.debugger.onDetach.addListener(async (source, reason) => {
-    //console.debug('The debugger was detached.', source, reason);
+    console.debug('The debugger was detached.', source, reason);
     if (reason === 'canceled_by_user' || player._debugger_detatch_requested) {
         await sleep(500);
         await player.tab.resizeViewport();
@@ -301,8 +292,8 @@ chrome.debugger.onDetach.addListener(async (source, reason) => {
 });
 
 async function startRecording(tab) {
-    //console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
-    //console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+    console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
     //chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
     //chrome.tabs.onUpdated.addListener(tabsOnUpdatedHandler);
@@ -335,13 +326,13 @@ async function startRecording(tab) {
          * @param {*} _port 
          */
         function (_port) {
-            //console.debug('port was disconnected', _port, chrome.runtime.lastError);
+            console.debug('port was disconnected', _port, chrome.runtime.lastError);
             port.onMessage.removeListener(onMessageHandler); // this particular port is no good anymore so, kill the listener on it. needed?
             port = false;
         });
 
     port.onMessage.addListener(onMessageHandler);
-    //console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
 }
 
 function stopRecording(tab) {
@@ -350,7 +341,7 @@ function stopRecording(tab) {
         postMessage({ type: 'stop', broadcast: true });
     }
     catch (e) {
-        //console.warn(e);
+        console.warn(e);
     }
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
 }
@@ -450,12 +441,12 @@ $('#clearButton').on('click', async () => {
  * Note this automatically sends the Sender info.
  */
 function postMessage(msg) {
-    //console.debug('TX', msg);
+    console.debug('TX', msg);
     port.postMessage(msg);
 }
 
 $('#saveButton').on('click', async () => {
-    //console.debug('create zip');
+    console.debug('create zip');
     zip = new JSZip();
     zip.file('test.json', JSON.stringify({ steps: TestAction.instances }, null, 2)); // add the test.json file to archive
     var screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
@@ -483,7 +474,7 @@ $('#saveButton').on('click', async () => {
         }
     }
 
-    //console.debug('save zip to disk');
+    console.debug('save zip to disk');
     let blobpromise = zip.generateAsync({ type: "blob" });
     const handle = await window.showSaveFilePicker({
         suggestedName: `test.zip`,
@@ -499,6 +490,18 @@ $('#saveButton').on('click', async () => {
     await writable.write(blob);  // Write the contents of the file to the stream.    
     await writable.close(); // Close the file and write the contents to disk.
     window.document.title = `Brimstone - ${handle.name}`;
+});
+
+$('#helpButton').on('click', () => {
+    chrome.tabs.create({
+        url: 'https://github.com/zacfilan/brimstone-recorder/wiki'
+    });
+});
+
+$('#issuesButton').on('click', () => {
+    chrome.tabs.create({
+        url: 'https://github.com/zacfilan/brimstone-recorder/issues'
+    });
 });
 
 $('#loadButton').on('click', async () => {
@@ -533,7 +536,7 @@ $('#loadButton').on('click', async () => {
         setToolbarState();
     }
     catch (e) {
-        //console.error(e);
+        console.error(e);
     }
 });
 
@@ -665,8 +668,8 @@ async function userEventToAction(userEvent, frameId) {
                 width: 0,
                 top: 0,
                 left: 0
-            },
-                cardModel.status = constants.status.RECORDED;
+            };
+            cardModel.class = [constants.class.RECORDED];
             break;
         }
         default:
@@ -689,9 +692,9 @@ async function captureScreenshotAsDataUrl() {
 */
 async function onMessageHandler(message, _port) {
     let userEvent = message;
-    //console.debug(`RX: ${userEvent.type}`, userEvent);
+    console.debug(`RX: ${userEvent.type}`, userEvent);
     let action;
-    userEvent.status = constants.status.RECORDED;
+    userEvent.class = [constants.class.RECORDED];
     switch (userEvent.type) {
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {
@@ -722,10 +725,10 @@ async function onMessageHandler(message, _port) {
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // don't need to send the whole thing back
             break;
         case 'connect':
-            //console.debug(`connection established from frame ${userEvent.sender.frameId}`);
+            console.debug(`connection established from frame ${userEvent.sender.frameId}`);
             break;
         default:
-            //console.error(`unexpected userEvent received <${userEvent.type}>`);
+            console.error(`unexpected userEvent received <${userEvent.type}>`);
             break;
     }
 };
@@ -735,9 +738,9 @@ async function onMessageHandler(message, _port) {
  * https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
  */
 async function webNavigationOnCompleteHandler(details) {
-    //console.debug(`tab ${details.tabId} navigation completed`, details);
+    console.debug(`tab ${details.tabId} navigation completed`, details);
     if (details.url === 'about:blank') {
-        //console.debug(`    - ignoring navigation to page url 'about:blank'`);
+        console.debug(`    - ignoring navigation to page url 'about:blank'`);
         return;
     }
     const { height, width } = tab; // hang onto the original size

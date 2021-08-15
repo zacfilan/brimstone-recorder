@@ -7,6 +7,7 @@ import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
+
 var options;
 
 export class Player {
@@ -42,7 +43,9 @@ export class Player {
      * at a time or in chunks. 
      * 
      * Returns a deferred boolean that reflects the success of playing all the steps:
-     * true if they all played successfully, false if one failed.*/
+     * true if they all played successfully, false if one failed.
+     * @param {TestAction[]} actions the actions to play
+     * */
     async play(actions, startIndex = 0, resume = false) {
         options = await loadOptions();
 
@@ -58,13 +61,13 @@ export class Player {
         for (let i = startIndex; playedSuccessfully && (i < actions.length - 1); ++i) {
             let action = actions[i];
             this.currentAction = action;
-            action.status = constants.status.INPUT;
+            action.class = []; // FIXME this loses something
             let next = actions[i + 1];
-            next.status = constants.status.WAITING;
+            next.class = [constants.class.WAITING];
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
             }
-            //console.log(`[${action.index}] : ${action.description}`);
+            console.log(`[${action.index}] : ${action.description}`);
             start = performance.now();
 
             // if we are resume(ing) we are picking up from an error state, meaning we already
@@ -87,13 +90,13 @@ export class Player {
 
             let match = await this.verifyScreenshot(next);
             stop = performance.now();
-            action.status = constants.status.INPUT;
+            action.class = [];
             if (match) {
-                //console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
-                next.status = constants.status.INPUT;
+                console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
+                next.class = [];
             }
             else {
-                //console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
+                console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                 playedSuccessfully = false;
             }
             if (this.onAfterPlay) {
@@ -105,7 +108,7 @@ export class Player {
     }
 
     async start(action) {
-        //console.debug("player: start");
+        console.debug("player: start");
         // If we just recorded it and want to play it back, we can reuse the window we recorded it from
         // We can reuse the tab we launched the UI from.
         await chrome.tabs.update(this.tab.id, {
@@ -226,7 +229,7 @@ export class Player {
     }
 
     async mousemove(action) {
-        // //console.debug(`player: dispatch mouseMoved (${action.x},${action.y})`);
+        // console.debug(`player: dispatch mouseMoved (${action.x},${action.y})`);
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseMoved',
             x: action.x,
@@ -236,7 +239,7 @@ export class Player {
     }
 
     async wheel(action) {
-        //console.debug(`player: dispatch mouseWheel from ${action.x}, ${action.y}`);
+        console.debug(`player: dispatch mouseWheel from ${action.x}, ${action.y}`);
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseWheel',
             x: action.x,
@@ -330,7 +333,7 @@ export class Player {
 
             nextStep.actualScreenshot = await this.takeScreenshot(expectedPng.width, expectedPng.height);
             if (!nextStep.actualScreenshot) {
-                //console.debug('unable to obtain screenshot!');
+                console.debug('unable to obtain screenshot!');
                 continue; // couldn't get screenshot for some reason - well it didn't match then. loop.
             }
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
@@ -350,17 +353,17 @@ export class Player {
                 nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
 
                 if (numMaskedPixels) { // it matched only because of the masking we allowed
-                    nextStep.status = constants.status.ALLOWED;
+                    nextStep.class = [constants.class.EXPECTED, constants.class.ALLOWED];
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
                 let avgIteration = (doneIn / i).toFixed(1);
-                //console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
+                console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
                 return true;
             }
         }
 
         // The screenshots don't match
-        nextStep.status = constants.status.EXPECTED;
+        nextStep.class = [constants.class.EXPECTED, constants.class.FAILED];
 
         // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing. 
         if (differencesPng) {
@@ -390,7 +393,7 @@ export class Player {
             let dataUrl = 'data:image/png;base64,' + result.data;
             let png = await Player.dataUrlToPNG(dataUrl);
             if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
-                //console.debug(`require ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}`);
+                console.debug(`require ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}`);
                 this.tab.resizeViewport();
                 throw 'resize and try again'; // try one more time after a resize?
             }
@@ -400,7 +403,7 @@ export class Player {
             });
         }
         catch (e) {
-            //console.warn(`unable to obtain screenshot: `, e);
+            console.warn(`unable to obtain screenshot: `, e);
         }
     }
 
@@ -420,7 +423,7 @@ export class Player {
 
     /** Schedule detaching the debugger from the current tab.*/
     async detachDebugger() {
-        //console.debug("schedule detaching debugger");
+        console.debug("schedule detaching debugger");
         //await this._attachDebuggerPromise; // if there is one in flight wait for it.
 
         this._debugger_detatch_requested = true;
@@ -435,14 +438,14 @@ export class Player {
             });
         }
         await this._debuggerDetachPromise;
-        //console.debug("debugger detached");
+        console.debug("debugger detached");
     }
 
     /** Schedule attaching the debugger to the given tab.
     * @param {Tab} tab The tab to attach to
     */
     async attachDebugger({ tab }) {
-        //console.debug(`schedule attach debugger`);
+        console.debug(`schedule attach debugger`);
         await this._debuggerDetachPromise; // if there is one in flight wait for it.
         this._debugger_detatch_requested = false;
         this.tab = tab;
@@ -457,7 +460,7 @@ export class Player {
                 // As long as the user didn't manually attach a debugger to this tab, then we are ok to reuse it, which is a better experience for the user
                 // However if, the user (or me as a dev) attach the devtools manually to page being recorded that will confuse this logic, 
                 // and we might not be able control the browser. FIXME: I can't yet tell the difference programatically.
-                //console.debug(`a debugger is already attached to tab ${tab.id}`);
+                console.debug(`a debugger is already attached to tab ${tab.id}`);
                 resolve('the debugger is already attached');
             }
         }));
@@ -468,7 +471,7 @@ export class Player {
         this._debuggerAttachPromise = this.tab.resizeViewport();  // reset the viewport - I wish chrome did this.
 
         await this._debuggerAttachPromise;
-        //console.debug(`debugger attached`);
+        console.debug(`debugger attached`);
         return this._debuggerAttachPromise;
     };
 

@@ -9,10 +9,8 @@ class Input {
 }
 
 export const constants = {
-    status: {
-        /** the action card */
-        INPUT: 'input',
-
+    /** properties of the instance. it can have more than one set, these are converted to classes.*/
+    class: {
         // PLAYING STATES
         /** we are waiting for this one (implies playing) */
         WAITING: 'waiting',
@@ -30,13 +28,16 @@ export const constants = {
         EDIT: 'edit',
 
         /** We are recording, this card was recorded. */
-        RECORDED: 'recorded'
-    }
+        RECORDED: 'recorded',
+
+        /** this card failed to match the last time it was played */
+        FAILED: 'failed',
+   }
 };
 
 export class TestAction {
-    /** The status of the test step. */
-    status;
+    /** some special properties of the action */
+    class = [];
 
     /** 
      * What the screen should look like before the input action can be performed.
@@ -82,8 +83,8 @@ export class TestAction {
     constructor(args) {
         Object.assign(this, args);
 
-        if (!this.status) {
-            this.status = constants.status.INPUT;
+        if (!this.class) {
+            this.class = [];
         }
         // make sure it has a step number
         if (this.index === undefined) {
@@ -100,11 +101,13 @@ export class TestAction {
             this.expectedScreenshot = new Screenshot(this.expectedScreenshot, screenshots);
             await this.expectedScreenshot.createDataUrl(); // needed to see any image during loading
             this.expectedScreenshot.createPng(); // in due course
+            this.class = [constants.class.EXPECTED];
         }
 
         if (this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = new Screenshot(this.acceptablePixelDifferences, screenshots);
             this.acceptablePixelDifferences.hydrate(); // in due course
+            this.class.push(constants.class.ALLOWED);
         }
 
         if (this.actualScreenshot) {
@@ -208,17 +211,17 @@ export class TestAction {
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
         this.editViewDataUrl = this.acceptablePixelDifferences.dataUrl;
         if (numMaskedPixels) {
-            this.status = constants.status.ALLOWED;
+            this.class = [constants.class.EDIT, constants.class.ALLOWED];
         }
         else if (this.numDiffPixels) {
-            this.status = constants.status.EXPECTED;
+            this.class = [constants.class.EDIT, constants.class.FAILED];
         }
     }
 
     toThumb() {
         let src = this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
         return `
-        <div class='card ${this.status} thumb' data-index=${this.index}>
+        <div class='card ${this.class.join(' ')} thumb' data-index=${this.index}>
             <img draggable='false' src='${src}'>
         </div>`;
     }
@@ -228,16 +231,17 @@ export class TestAction {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
 
         let html = `
-    <div class='card ${this.status}' data-index=${this.index}>
+    <div class='card ${this.class.join(' ')}' data-index=${this.index}>
         <div class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
+            <span style="width:100%;"><span class="match-status"></span></span>
         </div>
         <div class='screenshot clickable'>
             <img src='${src}'>`;
 
         // FIXME: calculate the best location for the callout, based on the location of the overlay
-        if (this.overlay) { // or this.status === constants.status.INPUT
+        if (this.overlay) { 
             let o = this.overlay;
             html += `
             <div class='overlay pulse' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
@@ -281,14 +285,13 @@ export class Step {
 
     toHtml() {
         let title = '';
-        switch (this.curr.status) {
-            case constants.status.RECORDED:
-                title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
-                break;
-            default:
-                title = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action';
-                break;
+        if(this.curr.class.includes(constants.class.RECORDED)) {
+            title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
         }
+        else {
+            title = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action';
+        }
+
         let html = `
         <div id="content">
             ${this.curr.toHtml(title)}
@@ -296,34 +299,38 @@ export class Step {
 
         if (this.next) {
             let src;
-            let title;
-            switch (this.next.status) {
-                case constants.status.WAITING: // we are waiting for this one (implies playing)
-                    title = 'Waiting for actual next screen to match this.';
-                    break;
-                case constants.status.ALLOWED: // it has beed edited, and has allowed errors
-                    title = "Expected result. This screen has allowed differences.";
-                    break;
+            let title = '<span>';
 
-                // these are all 'fail states'
-                case constants.status.EXPECTED: // it doesn't match. (here is what we expected)
-                    title = 'Expected result (last play failed here, click image to toggle)';
-                    break;
-                case constants.status.ACTUAL: // it doesn't match. (here is what we got)
-                    title = 'Actual result (last play failed here, click image to toggle)';
-                    src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
-                    break;
-                case constants.status.EDIT: // it doesn't match. (let's make it okay to have some differences between expected and actual)
-                    title = `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
-                    src = this.next.editViewDataUrl ?? '../images/notfound.png';
-                    break;
-                default:
-                    title = 'Expected result';
-                    if (this.next.index === TestAction.instances.length - 1) {
-                        title += ' - final screenshot';
-                    }
-                    break;
+            if(this.next.class.includes(constants.class.FAILED)) {
+                title += '❌ failed match. ';
             }
+
+            if(this.next.class.includes(constants.class.WAITING)) {
+                title += 'Waiting for actual next screen to match this.';
+            }
+            else if(this.next.class.includes(constants.class.EXPECTED)) {
+                title += 'Expected result.';
+            }
+            else if(this.next.class.includes(constants.class.ACTUAL)) {
+                title += 'Actual result.';
+                src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png'; 
+            }
+            else if(this.next.class.includes(constants.class.EDIT)) {
+                title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
+                src = this.next.editViewDataUrl ?? '../images/notfound.png';
+            }
+            else {
+                title += 'Expected result.';
+                if (this.next.index === TestAction.instances.length - 1) {
+                    title += ' - final screenshot.';
+                }
+            }
+       
+            if(this.next.class.includes(constants.class.ALLOWED)) {
+                title += ` <span id='allowed-differences'>Has allowed differences.</span>`;
+            }
+
+            title += '</span>';
             html += this.next.toHtml(title, src);
         }
         html += `
