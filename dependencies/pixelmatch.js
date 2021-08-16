@@ -36,9 +36,26 @@ export function pixelmatch(img1, img2, output, width, height, options) {
     }
     if (identical) { // fast path if identical
         if (output && !options.diffMask) {
-            for (let i = 0; i < len; i++) drawGrayPixel(img1, 4 * i, options.alpha, output);
+            for (let i = 0; i < len; i++) {
+                if (options.ignoreMask) {
+                    let red   = options.ignoreMask[4*i + 0];
+                    let green = options.ignoreMask[4*i + 1];
+                    let blue  = options.ignoreMask[4*i + 2];
+                    // const orange = [255, 165, 0];
+                    if (red === 255 && green === 165 && blue === 0) {
+                        // it was an ignorable pixel, but didn't need to be, so lighten it to indicate that.
+                        _drawPixel(output, 4 * i, 255, 165, 0, 128);
+                    }
+                    else {
+                        drawGrayPixel(img1, 4 * i, options.alpha, output);
+                    }
+                }
+                else {
+                    drawGrayPixel(img1, 4 * i, options.alpha, output);
+                }
+            }
         }
-        return {numDiffPixels: 0, numMaskedPixels:0};
+        return { numDiffPixels: 0, numMaskedPixels: 0 };
     }
 
     // maximum acceptable square distance between two colors;
@@ -60,7 +77,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
             if (Math.abs(delta) > maxDelta) {
                 // check it's a real rendering difference or just anti-aliasing
                 if (!options.includeAA && (antialiased(img1, x, y, width, height, img2) ||
-                                           antialiased(img2, x, y, width, height, img1))) {
+                    antialiased(img2, x, y, width, height, img1))) {
                     // one of the pixels is anti-aliasing; draw as yellow and do not count as difference
                     // note that we do not include such pixels in a mask
                     if (output && !options.diffMask) drawPixel(output, pos, ...options.aaColor);
@@ -72,12 +89,12 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                         //  see if that one is 'ok' due to the ignoreMask
                         // okay means the masked red pixel is 255 which matches red or orange.
                         // it will be orange, after I give a thumbs up to detected areas.
-                        if(options.ignoreMask) {
+                        if (options.ignoreMask) {
                             // the mask is coming directly from the delta picture we show the user.
-                            let red   = options.ignoreMask[pos + 0];
+                            let red = options.ignoreMask[pos + 0];
                             let green = options.ignoreMask[pos + 1];
-                            let blue  = options.ignoreMask[pos + 2];
-                            if( (red === 255 && green ===   0 && blue === 0) || // red or
+                            let blue = options.ignoreMask[pos + 2];
+                            if ((red === 255 && green === 0 && blue === 0) || // red or
                                 (red === 255 && green === 165 && blue === 0)) { // orange
 
                                 _drawPixel(output, pos, 255, 165, 0, 255); // becomes orange
@@ -92,7 +109,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                             drawPixel(output, pos, ...(delta < 0 && options.diffColorAlt || options.diffColor));
                             diff++;
                         }
-                    } 
+                    }
                     else {
                         diff++;
                     }
@@ -102,14 +119,14 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                 // pixels are similar; draw background as grayscale image blended with white
                 if (!options.diffMask) {
 
-                    if(options.ignoreMask) {
-                        let red   = options.ignoreMask[pos + 0];
+                    if (options.ignoreMask) {
+                        let red = options.ignoreMask[pos + 0];
                         let green = options.ignoreMask[pos + 1];
-                        let blue  = options.ignoreMask[pos + 2];
+                        let blue = options.ignoreMask[pos + 2];
                         // const orange = [255, 165, 0];
-                        if( (red === 255 && green === 165 && blue === 0)) {
+                        if ((red === 255 && green === 165 && blue === 0)) {
                             // it was an ignorable pixel, but didn't need to be, so lighten it to indicate that.
-                            _drawPixel(output, pos, 255, 165, 0, 128);   
+                            _drawPixel(output, pos, 255, 165, 0, 128);
                         }
                         else {
                             drawGrayPixel(img1, pos, options.alpha, output);
@@ -124,7 +141,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
     }
 
     // return the number of different pixels
-    return { numDiffPixels: diff, numMaskedPixels: masked};
+    return { numDiffPixels: diff, numMaskedPixels: masked };
 }
 
 function isPixelData(arr) {
@@ -160,13 +177,13 @@ function antialiased(img, x1, y1, width, height, img2) {
                 // if found more than 2 equal siblings, it's definitely not anti-aliasing
                 if (zeroes > 2) return false;
 
-            // remember the darkest pixel
+                // remember the darkest pixel
             } else if (delta < min) {
                 min = delta;
                 minX = x;
                 minY = y;
 
-            // remember the brightest pixel
+                // remember the brightest pixel
             } else if (delta > max) {
                 max = delta;
                 maxX = x;
@@ -181,7 +198,7 @@ function antialiased(img, x1, y1, width, height, img2) {
     // if either the darkest or the brightest pixel has 3+ equal siblings in both images
     // (definitely not anti-aliased), this pixel is anti-aliased
     return (hasManySiblings(img, minX, minY, width, height) && hasManySiblings(img2, minX, minY, width, height)) ||
-           (hasManySiblings(img, maxX, maxY, width, height) && hasManySiblings(img2, maxX, maxY, width, height));
+        (hasManySiblings(img, maxX, maxY, width, height) && hasManySiblings(img2, maxX, maxY, width, height));
 }
 
 // check if a pixel has 3+ adjacent pixels of the same color.

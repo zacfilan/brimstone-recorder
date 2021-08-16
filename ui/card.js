@@ -1,12 +1,6 @@
 import { Player } from "../playerclass.js"
 import { Screenshot } from "./screenshot.js";
-
 const PNG = png.PNG;
-
-/** A user input, type, click, context, double, etc.*/
-class Input {
-
-}
 
 export const constants = {
     /** properties of the instance. it can have more than one set, these are converted to classes.*/
@@ -27,12 +21,9 @@ export const constants = {
         /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
         EDIT: 'edit',
 
-        /** We are recording, this card was recorded. */
-        RECORDED: 'recorded',
-
         /** this card failed to match the last time it was played */
         FAILED: 'failed',
-   }
+    }
 };
 
 export class TestAction {
@@ -91,39 +82,51 @@ export class TestAction {
             this.index = TestAction.instances.length;
         }
         TestAction.instances[this.index] = this;
+
     }
 
     /** 
-     * Some properties are populated async, which we can't do in a constructor.
+     * hydrate the expectedScreenshot property from the zip file
      * */
-    async hydrate(screenshots) {
-        if (this.expectedScreenshot) {
-            this.expectedScreenshot = new Screenshot(this.expectedScreenshot, screenshots);
-            await this.expectedScreenshot.createDataUrl(); // needed to see any image during loading
-            this.expectedScreenshot.createPng(); // in due course
-            this.class = [constants.class.EXPECTED];
+    hydrateExpected() {
+        if (!this.expectedScreenshot) {
+            return; // the very first action doesn't have an expectedScreenshot
         }
 
-        if (this.acceptablePixelDifferences) {
-            this.acceptablePixelDifferences = new Screenshot(this.acceptablePixelDifferences, screenshots);
-            this.acceptablePixelDifferences.hydrate(); // in due course
-            this.class.push(constants.class.ALLOWED);
-        }
-
-        if (this.actualScreenshot) {
-            this.actualScreenshot = new Screenshot(this.actualScreenshot,screenshots);
-        }
-
-        return this;
+        this.expectedScreenshot = new Screenshot(this.expectedScreenshot);
+        this.class = [constants.class.EXPECTED];
+        return this.expectedScreenshot.loadDataUrlFromFile(); // needed to see any image during loading
     }
 
+    /** 
+    * hydrate the acceptablePixelDifferences property from the zip file
+    * */
+    hydrateAcceptable() {
+        this.acceptablePixelDifferences = new Screenshot(this.acceptablePixelDifferences);
+        return this.acceptablePixelDifferences.hydrate(); 
+    }
+
+    /** needed only if we edit a action before playing it in a session.
+     * insures that there is an actualScreenshot with a dataUrl.
+     */
+    createActualScreenshotWithDataUrl() {
+        this.actualScreenshot = new Screenshot(this.actualScreenshot);
+        if(this.actualScreenshot.fileName) {
+            return this.actualScreenshot.loadDataUrlFromFile(); 
+        }
+        return this.actualScreenshot.dataUrl = this.expectedScreenshot.dataUrl; // copy from expected
+    }
+
+    /**
+     * Called when the extension is given a user action that has been recorded.
+     */
     addExpectedScreenshot(dataUrl) {
         this.expectedScreenshot = new Screenshot({
             dataUrl: dataUrl,
             fileName: `step${this.index}_expected.png`
             // png: await Player.dataUrlToPNG(dataUrl) // this is expensive to calculate, defer until you really need it.
         });
-        this.expectedScreenshot.createPng(); // kick it off but don't wait
+        this.expectedScreenshot.createPngFromDataUrl(); // kick it off but don't wait
     }
 
     toJSON() {
@@ -158,10 +161,10 @@ export class TestAction {
             this.acceptablePixelDifferences = new Screenshot();
         }
 
-        if(this.lastVerifyScreenshotDiffDataUrl) {
+        if (this.lastVerifyScreenshotDiffDataUrl) {
             this.acceptablePixelDifferences.dataUrl = this.lastVerifyScreenshotDiffDataUrl;
             this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
-            await this.acceptablePixelDifferences.createPng();
+            await this.acceptablePixelDifferences.createPngFromDataUrl();
         }
         // else we use whatever is already in acceptablePixelDifferences (editing before playing)
 
@@ -196,12 +199,11 @@ export class TestAction {
 
     /** (Re)calculate the difference between the expected screenshot
     * and the actual screenshot, then apply the acceptablePixelDifferences mask.
+    * this is called via the path when we add changes, or are planning to.
+    * so this.acceptablePixelDifferences, must exist
     */
     async pixelDiff() {
-        this.expectedScreenshot.png || await this.expectedScreenshot._pngPromise;
-        this.actualScreenshot.png || await this.actualScreenshot._pngPromise;
-
-        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(this.expectedScreenshot.png, this.actualScreenshot.png, this.acceptablePixelDifferences.png);
+        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(this.expectedScreenshot.png, this.actualScreenshot.png, this.acceptablePixelDifferences?.png);
         this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         this.acceptablePixelDifferences.png = diffPng;
 
@@ -241,7 +243,7 @@ export class TestAction {
             <img src='${src}'>`;
 
         // FIXME: calculate the best location for the callout, based on the location of the overlay
-        if (this.overlay) { 
+        if (this.overlay) {
             let o = this.overlay;
             html += `
             <div class='overlay pulse' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
@@ -283,9 +285,9 @@ export class Step {
         this.next = args.next || TestAction.instances[this.curr.index + 1];
     }
 
-    toHtml() {
+    toHtml({ isRecording }) {
         let title = '';
-        if(this.curr.class.includes(constants.class.RECORDED)) {
+        if (isRecording) {
             title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
         }
         else {
@@ -301,21 +303,21 @@ export class Step {
             let src;
             let title = '<span>';
 
-            if(this.next.class.includes(constants.class.FAILED)) {
+            if (this.next.class.includes(constants.class.FAILED)) {
                 title += '❌ failed match. ';
             }
 
-            if(this.next.class.includes(constants.class.WAITING)) {
+            if (this.next.class.includes(constants.class.WAITING)) {
                 title += 'Waiting for actual next screen to match this.';
             }
-            else if(this.next.class.includes(constants.class.EXPECTED)) {
+            else if (this.next.class.includes(constants.class.EXPECTED)) {
                 title += 'Expected result.';
             }
-            else if(this.next.class.includes(constants.class.ACTUAL)) {
+            else if (this.next.class.includes(constants.class.ACTUAL)) {
                 title += 'Actual result.';
-                src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png'; 
+                src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
             }
-            else if(this.next.class.includes(constants.class.EDIT)) {
+            else if (this.next.class.includes(constants.class.EDIT)) {
                 title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
                 src = this.next.editViewDataUrl ?? '../images/notfound.png';
             }
@@ -325,8 +327,8 @@ export class Step {
                     title += ' - final screenshot.';
                 }
             }
-       
-            if(this.next.class.includes(constants.class.ALLOWED)) {
+
+            if (this.next.class.includes(constants.class.ALLOWED)) {
                 title += ` <span id='allowed-differences'>Has allowed differences.</span>`;
             }
 

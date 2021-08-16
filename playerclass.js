@@ -7,6 +7,7 @@ import { Tab } from "./tab.js"
 import { sleep } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
+import { getHydratedForPlayPromise } from "./ui/loader.js";
 
 var options;
 
@@ -47,9 +48,12 @@ export class Player {
      * @param {TestAction[]} actions the actions to play
      * */
     async play(actions, startIndex = 0, resume = false) {
-        options = await loadOptions();
+        this._actions = actions;
 
+        options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
+
+        let v = await getHydratedForPlayPromise();
 
         this._actions = actions;
         this.mouseLocation = { x: -1, y: -1 }; // off the viewport I guess
@@ -301,10 +305,6 @@ export class Player {
     async verifyScreenshot(nextStep) {
         let start = performance.now();
 
-        // FIXME: this is a source of slowdown during playback. creating a PNG from a dataurl is slow. I can 
-        const expectedPng              = nextStep.expectedScreenshot.png          || await nextStep.expectedScreenshot._pngPromise;
-        const acceptableDifferencesPng = nextStep.acceptablePixelDifferences?.png || await nextStep.acceptablePixelDifferences?._pngPromise;
-
         /** Used to display the results of applying the acceptableDifferences to the actual image. */
         let differencesPng;
         let i = 0;
@@ -331,18 +331,18 @@ export class Player {
                     break;
             }
 
-            nextStep.actualScreenshot = await this.takeScreenshot(expectedPng.width, expectedPng.height);
+            nextStep.actualScreenshot = await this.takeScreenshot(nextStep.expectedScreenshot.png.width, nextStep.expectedScreenshot.png.height);
             if (!nextStep.actualScreenshot) {
                 console.debug('unable to obtain screenshot!');
                 continue; // couldn't get screenshot for some reason - well it didn't match then. loop.
             }
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
 
-            let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(expectedPng, nextStep.actualScreenshot.png, acceptableDifferencesPng);
-            
+            let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(nextStep.expectedScreenshot.png, nextStep.actualScreenshot.png, nextStep.acceptablePixelDifferences?.png);
+
             // FIXME: this should be factored into the card I think
             nextStep.numDiffPixels = numDiffPixels;
-            let UiPercentDelta = (numDiffPixels * 100) / (expectedPng.width * expectedPng.height);
+            let UiPercentDelta = (numDiffPixels * 100) / (nextStep.expectedScreenshot.png.width * nextStep.expectedScreenshot.png.height);
             nextStep.percentDiffPixels = UiPercentDelta.toFixed(2);
 
             nextStep.numMaskedPixels = numMaskedPixels;
@@ -481,7 +481,7 @@ export class Player {
  * Given a data URL we return a PNG of from it.
  */
 Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
-    if(!dataUrl) {
+    if (!dataUrl) {
         throw 'oh dear!';
     }
     let response = await fetch(dataUrl);

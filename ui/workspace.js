@@ -5,6 +5,8 @@ import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep } from "../utilities.js";
 import { enableConsole, disableConsole } from "./console.js";
+import { loadFile, saveFile } from "./loader.js";
+import { Screenshot } from "./screenshot.js";
 
 //disableConsole(); // can be reenabled in the debugger later
 
@@ -46,7 +48,6 @@ var uiCardsElement = document.getElementById('cards');
 /* Some globals */
 var _lastScreenshot;
 
-var zip;
 /** The parsed test.json object, this will change in memory during use.
  * It represents the recorded user actions, and optionally the result
  * of playing them back. 
@@ -95,6 +96,8 @@ $('#cards').on('click', '.thumb',
     }
 );
 
+let diffPromise = false;
+
 $('#step').on('click', '.screenshot.clickable',
     /** When clicking on an editable action, cycle through expected, actual, and edit states. */
     async function cycleEditStates(e) {
@@ -103,16 +106,31 @@ $('#step').on('click', '.screenshot.clickable',
         let index;
         if ((index = action.class.indexOf(constants.class.EXPECTED)) >= 0) {
             action.class[index] = constants.class.ACTUAL;
-            if (!action.actualScreenshot?.dataUrl && action.actualScreenshot?.fileName) {
-                await action.actualScreenshot.hydrate();
+
+            // need to insure there is an actual.dataUrl to show
+            if(!action.actualScreenshot?.dataUrl) {
+                await action.createActualScreenshotWithDataUrl();
+
+                // odds are we will want to look at the edit screen too.
+                diffPromise = action.actualScreenshot
+                    .createPngFromDataUrl()
+                    .then( () => {
+                        // pixeldiff requires an acceptablePixelDiffernces png
+                        if (!action.acceptablePixelDifferences) {
+                            action.acceptablePixelDifferences = new Screenshot();
+                        }
+                        return action.pixelDiff();
+                     });
             }
             updateStepInView(TestAction.instances[action.index - 1]);
         }
         else if ((index = action.class.indexOf(constants.class.ACTUAL)) >= 0) {
             action.class[index] = constants.class.EDIT;
-            if (!action.editViewDataUrl && action.acceptablePixelDifferences?.png) {
-                await action.pixelDiff();
+
+            if (!action.editViewDataUrl) {
+                await diffPromise;
             }
+
             updateStepInView(TestAction.instances[action.index - 1]);
 
         }
@@ -446,50 +464,8 @@ function postMessage(msg) {
 }
 
 $('#saveButton').on('click', async () => {
-    console.debug('create zip');
-    zip = new JSZip();
-    zip.file('test.json', JSON.stringify({ steps: TestAction.instances }, null, 2)); // add the test.json file to archive
-    var screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
-    // add all the expected screenshots to the screenshots directory in the archive
-    for (let i = 0; i < TestAction.instances.length; ++i) {
-        let card = TestAction.instances[i];
-        if (card.expectedScreenshot?.dataUrl) {
-            let response = await fetch(card.expectedScreenshot.dataUrl);
-            let blob = await response.blob();
-            screenshots.file(card.expectedScreenshot.fileName, blob, { base64: true });
-        }
-
-        // only save the actual screenshot if it didn't match the expected, before checking for acceptable pixel differences
-        // in other words don't save the same image twice.
-        if (card.actualScreenshot?.dataUrl) {
-            let response = await fetch(card.actualScreenshot.dataUrl);
-            let blob = await response.blob();
-            screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
-        }
-
-        if (card.acceptablePixelDifferences?.dataUrl) {
-            let response = await fetch(card.acceptablePixelDifferences.dataUrl);
-            let blob = await response.blob();
-            screenshots.file(card.acceptablePixelDifferences.fileName, blob, { base64: true });
-        }
-    }
-
-    console.debug('save zip to disk');
-    let blobpromise = zip.generateAsync({ type: "blob" });
-    const handle = await window.showSaveFilePicker({
-        suggestedName: `test.zip`,
-        types: [
-            {
-                description: 'A ZIP archive that can be run by Brimstone',
-                accept: { 'application/zip': ['.zip'] }
-            }
-        ]
-    });
-    const writable = await handle.createWritable();
-    let blob = await blobpromise;
-    await writable.write(blob);  // Write the contents of the file to the stream.    
-    await writable.close(); // Close the file and write the contents to disk.
-    window.document.title = `Brimstone - ${handle.name}`;
+   await saveFile();
+   window.document.title = `Brimstone - ${handle.name}`;
 });
 
 $('#helpButton').on('click', () => {
@@ -505,49 +481,18 @@ $('#issuesButton').on('click', () => {
 });
 
 $('#loadButton').on('click', async () => {
-    try {
-        let [fileHandle] = await window.showOpenFilePicker({
-            suggestedName: `test.zip`,
-            types: [
-                {
-                    description: 'A ZIP archive that can be run by Brimstone',
-                    accept: { 'application/zip': ['.zip'] }
-                }
-            ]
-        });
-        const blob = await fileHandle.getFile();
-        window.document.title = `Brimstone - ${blob.name}`;
-        zip = await (new JSZip()).loadAsync(blob);
-        let screenshots = await zip.folder('screenshots');
-        let test = JSON.parse(await zip.file("test.json").async("string"));
-
-        let actions = test.steps;
-
-        for (let i = 0; i < actions.length; ++i) {
-            let firstAction = await (new TestAction(actions[i])).hydrate(screenshots);
-            ++i; // load them in pairs so I can watch the steps animate during load
-            if (i < actions.length) {
-                await (new TestAction(actions[i])).hydrate(screenshots);
-                updateStepInView(firstAction);
-            }
-        }
+    let file = await loadFile();
+    if (file) {
+        window.document.title = `Brimstone - ${file.name}`;
         updateStepInView(TestAction.instances[0]);
-
         setToolbarState();
-    }
-    catch (e) {
-        console.error(e);
     }
 });
 
-/**
- * Updates the UI, step (two cards) and the thumbnail for the given action.
- * @param {TestAction} action The modified action.
- */
 function updateStepInView(action) {
+    // immediately show if there is nothing pending
     let step = new Step({ curr: action });
     setStepContent(step);
-    updateThumb(action);
 }
 
 /** The recording channel port. This port connects to (broadcasts to) 
@@ -556,7 +501,7 @@ function updateStepInView(action) {
 var port = false;
 
 function setStepContent(step) {
-    $('#step').html(step.toHtml()); // two cards in a step
+    $('#step').html(step.toHtml({ recording: isRecording() })); // two cards in a step
     setToolbarState();
 };
 
@@ -669,7 +614,7 @@ async function userEventToAction(userEvent, frameId) {
                 top: 0,
                 left: 0
             };
-            cardModel.class = [constants.class.RECORDED];
+            cardModel.class = [constants.class.EXPECTED];
             break;
         }
         default:
@@ -694,7 +639,7 @@ async function onMessageHandler(message, _port) {
     let userEvent = message;
     console.debug(`RX: ${userEvent.type}`, userEvent);
     let action;
-    userEvent.class = [constants.class.RECORDED];
+    userEvent.class = [constants.class.EXPECTED];
     switch (userEvent.type) {
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {

@@ -1,4 +1,5 @@
 import { Player } from "../playerclass.js";
+import { getScreenshots } from "./loader.js";
 
 /** A container for properties of a screenshot */
 export class Screenshot {
@@ -19,20 +20,13 @@ export class Screenshot {
     fileName;
 
     /**
-     * zipfile location from which we can load the screenshots later
-     */
-    screenshots;
-
-    /**
      * 
      * @param {object} args 
-     * @param {*} screenshots zipfile location from which we can load the screenshots later
      */
-    constructor(args = {}, screenshots) {
+    constructor(args = {}) {
         this.dataUrl = args.dataUrl;
         this.png = args.png;
         this.fileName = args.fileName;
-        this.screenshots = screenshots;
     }
 
     /** A promise that is resolved once we have loaded the dataUrl */
@@ -45,27 +39,29 @@ export class Screenshot {
      * create the dataUrl property by reading the zipfile
      * @returns string
      */
-    async createDataUrl() {
+     async loadDataUrlFromFile() {
         let that = this;
-        this._dataUrlPromise = 
-            this.screenshots.file(this.fileName).async('base64')
-                .then( data => that.dataUrl = ('data:image/png;base64,' + data));
+
+        this._dataUrlPromise =
+            getScreenshots().file(this.fileName).async('base64')
+                .then(data => that.dataUrl = ('data:image/png;base64,' + data));
         return this._dataUrlPromise;
     }
 
     /**
      * This is expensive so only create it when needed.
+     * It's up to the caller to insure there is a dataUrl
      */
-    async createPng() {
+    async createPngFromDataUrl() {
         let that = this;
-        this._pngPromise = 
+        this._pngPromise =
             Player.dataUrlToPNG(this.dataUrl)
-                .then( png => that.png = png );
+                .then(png => that.png = png);
         return this._pngPromise;
     }
 
-    async hydrate() {
-        await this.createDataUrl();
-        await this.createPng();
+    hydrate() {
+        return this.loadDataUrlFromFile()
+            .then( () => this.createPngFromDataUrl());
     }
 }
