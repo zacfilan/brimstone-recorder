@@ -1,4 +1,5 @@
 import { constants, TestAction } from "./card.js";
+import { Screenshot } from "./screenshot.js";
 
 /** the zipfile */
 var zip;
@@ -38,8 +39,25 @@ export async function loadFile() {
     let actions = test.steps;
     let screenshotPromises = [];
     for (let i = 0; i < actions.length; ++i) {
-        let screenshotPromise = (new TestAction(actions[i])).hydrateExpected();
-        screenshotPromises.push(screenshotPromise);
+        let action = new TestAction(actions[i]);
+        let screenshotPromise;
+        
+        if (action.expectedScreenshot?.fileName) {
+            action.expectedScreenshot = new Screenshot(action.expectedScreenshot);
+            action.class = [constants.class.EXPECTED];
+            screenshotPromise = action.expectedScreenshot.loadDataUrlFromFile();
+            screenshotPromises.push(screenshotPromise); // needed to see any image during loading
+        }
+
+        // create the container for the other screenshots to be hydrated, 
+        // thus, if these props exist on the action, they def have a fileName
+        // but may not be hydrated. if they don't exist, they weren't in the file, nor has this action been played
+        if(action.acceptablePixelDifferences?.fileName) {
+            action.acceptablePixelDifferences = new Screenshot(action.acceptablePixelDifferences);
+        }
+        if(action.actualScreenshot?.fileName) {
+            action.actualScreenshot = new Screenshot(action.actualScreenshot);
+        }
     }
     if (screenshotPromises.length) {
         await Promise.all(screenshotPromises);
@@ -68,12 +86,14 @@ export function hydrateForPlay() {
     let screenshotPromise;
     for (let i = 0; i < TestAction.instances.length; ++i) {
         let action = TestAction.instances[i];
-        if (action.acceptablePixelDifferences) {
+        if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
             action.class.push(constants.class.ALLOWED);
-            screenshotPromise = action.hydrateAcceptable();
-            screenshotPromises.push(screenshotPromise);
+            if(action.acceptablePixelDifferences) {
+                screenshotPromise = action.acceptablePixelDifferences.hydrate();
+                screenshotPromises.push(screenshotPromise);
+            } 
         }
-        if (action.expectedScreenshot) {
+        if (action.expectedScreenshot && !action.expectedScreenshot.png) {
             screenshotPromise = action.expectedScreenshot.createPngFromDataUrl();
             screenshotPromises.push(screenshotPromise);
         }
@@ -103,7 +123,7 @@ export async function saveFile() {
 
         // only save the actual screenshot if it didn't match the expected, before checking for acceptable pixel differences
         // in other words don't save the same image twice.
-        if (card.actualScreenshot?.dataUrl) {
+        if (card.actualScreenshot && card.numDiffPixels && card.actualScreenshot.fileName && card.actualScreenshot.dataUrl) {
             let response = await fetch(card.actualScreenshot.dataUrl);
             let blob = await response.blob();
             screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
@@ -131,4 +151,5 @@ export async function saveFile() {
     let blob = await blobpromise;
     await writable.write(blob);  // Write the contents of the file to the stream.    
     await writable.close(); // Close the file and write the contents to disk.
+    return handle;
 }

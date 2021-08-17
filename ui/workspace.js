@@ -105,34 +105,38 @@ $('#step').on('click', '.screenshot.clickable',
         const { view, action } = getCard(e.currentTarget);
         let index;
         if ((index = action.class.indexOf(constants.class.EXPECTED)) >= 0) {
+            
             action.class[index] = constants.class.ACTUAL;
-
-            // need to insure there is an actual.dataUrl to show
-            if(!action.actualScreenshot?.dataUrl) {
-                await action.createActualScreenshotWithDataUrl();
-
-                // odds are we will want to look at the edit screen too.
-                diffPromise = action.actualScreenshot
-                    .createPngFromDataUrl()
-                    .then( () => {
-                        // pixeldiff requires an acceptablePixelDiffernces png
-                        if (!action.acceptablePixelDifferences) {
-                            action.acceptablePixelDifferences = new Screenshot();
-                        }
-                        return action.pixelDiff();
-                     });
+            if (!action.actualScreenshot) {
+                action.actualScreenshot = new Screenshot({
+                    fileName: '',
+                    dataUrl: action.expectedScreenshot.dataUrl,
+                    png: action.expectedScreenshot.png
+                });
+                if(action.acceptablePixelDifferences) {
+                    action.class[index] = constants.class.EDIT;
+                    await action.acceptablePixelDifferences.hydrate();
+                    action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
+                }
             }
+            else {
+                await action.actualScreenshot.hydrate();
+            }
+
             updateStepInView(TestAction.instances[action.index - 1]);
         }
         else if ((index = action.class.indexOf(constants.class.ACTUAL)) >= 0) {
             action.class[index] = constants.class.EDIT;
-
             if (!action.editViewDataUrl) {
-                await diffPromise;
+                if(!action.acceptablePixelDifferences) {
+                    action.acceptablePixelDifferences = new Screenshot();
+                }
+                else {
+                    await action.acceptablePixelDifferences.hydrate();
+                }
+                await action.pixelDiff();
             }
-
             updateStepInView(TestAction.instances[action.index - 1]);
-
         }
         else if ((index = action.class.indexOf(constants.class.EDIT)) >= 0) {
             action.class[index] = constants.class.EXPECTED;
@@ -464,8 +468,8 @@ function postMessage(msg) {
 }
 
 $('#saveButton').on('click', async () => {
-   await saveFile();
-   window.document.title = `Brimstone - ${handle.name}`;
+    let file = await saveFile();
+    window.document.title = `Brimstone - ${file.name}`;
 });
 
 $('#helpButton').on('click', () => {
@@ -485,6 +489,10 @@ $('#loadButton').on('click', async () => {
     if (file) {
         window.document.title = `Brimstone - ${file.name}`;
         updateStepInView(TestAction.instances[0]);
+        for (let i = 1; i < TestAction.instances.length; ++i) {
+            let action = TestAction.instances[i];
+            updateThumb(action)
+        }
         setToolbarState();
     }
 });
@@ -500,14 +508,19 @@ function updateStepInView(action) {
 */
 var port = false;
 
+/**
+ * 
+ * @param {Step} step the step
+ */
 function setStepContent(step) {
     $('#step').html(step.toHtml({ recording: isRecording() })); // two cards in a step
     setToolbarState();
+    updateThumb(step.curr);
 };
 
 /**
  * Update the thumb from the given action
- * @param {Action} action 
+ * @param {TestAction} action 
  */
 function updateThumb(action) {
     let $thumb = $(action.toThumb()); // smaller view
@@ -515,8 +528,6 @@ function updateThumb(action) {
     if (card.length) {
         // replace
         card.replaceWith($thumb);
-        $('#cards').scrollLeft(0);
-        $('#cards').scrollLeft(card.position().left - 150);
     }
     else {
         uiCardsElement.appendChild($thumb[0]);

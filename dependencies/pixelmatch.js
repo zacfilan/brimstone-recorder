@@ -13,7 +13,9 @@ const defaultOptions = {
     ignoreMask: false   // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
 };
 
+
 export function pixelmatch(img1, img2, output, width, height, options) {
+    let numUnusedMaskedPixels = 0;
 
     if (!isPixelData(img1) || !isPixelData(img2) || (output && !isPixelData(output)))
         throw new Error('Image data: Uint8Array, Uint8ClampedArray or Buffer expected.');
@@ -45,6 +47,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                     if (red === 255 && green === 165 && blue === 0) {
                         // it was an ignorable pixel, but didn't need to be, so lighten it to indicate that.
                         _drawPixel(output, 4 * i, 255, 165, 0, 128);
+                        ++numUnusedMaskedPixels;
                     }
                     else {
                         drawGrayPixel(img1, 4 * i, options.alpha, output);
@@ -55,7 +58,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                 }
             }
         }
-        return { numDiffPixels: 0, numMaskedPixels: 0 };
+        return { numDiffPixels: 0, numMaskedPixels: 0, numUnusedMaskedPixel: numUnusedMaskedPixels };
     }
 
     // maximum acceptable square distance between two colors;
@@ -127,6 +130,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                         if ((red === 255 && green === 165 && blue === 0)) {
                             // it was an ignorable pixel, but didn't need to be, so lighten it to indicate that.
                             _drawPixel(output, pos, 255, 165, 0, 128);
+                            ++numUnusedMaskedPixels;
                         }
                         else {
                             drawGrayPixel(img1, pos, options.alpha, output);
@@ -141,7 +145,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
     }
 
     // return the number of different pixels
-    return { numDiffPixels: diff, numMaskedPixels: masked };
+    return { numDiffPixels: diff, numMaskedPixels: masked, numUnusedMaskedPixels: numUnusedMaskedPixels };
 }
 
 function isPixelData(arr) {

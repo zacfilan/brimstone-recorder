@@ -60,8 +60,19 @@ export class Screenshot {
         return this._pngPromise;
     }
 
+    /**
+     * populate the dataUrl and the png fields if they are not already
+     * 
+     * @returns 
+     */
     hydrate() {
-        return this.loadDataUrlFromFile()
-            .then( () => this.createPngFromDataUrl());
+        if(!this.dataUrl) {
+            return this.loadDataUrlFromFile()
+                .then( () => this.createPngFromDataUrl());  
+        }
+        if(!this.png) {
+            return this.createPngFromDataUrl();
+        }
     }
+
 }

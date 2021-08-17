@@ -85,38 +85,6 @@ export class TestAction {
 
     }
 
-    /** 
-     * hydrate the expectedScreenshot property from the zip file
-     * */
-    hydrateExpected() {
-        if (!this.expectedScreenshot) {
-            return; // the very first action doesn't have an expectedScreenshot
-        }
-
-        this.expectedScreenshot = new Screenshot(this.expectedScreenshot);
-        this.class = [constants.class.EXPECTED];
-        return this.expectedScreenshot.loadDataUrlFromFile(); // needed to see any image during loading
-    }
-
-    /** 
-    * hydrate the acceptablePixelDifferences property from the zip file
-    * */
-    hydrateAcceptable() {
-        this.acceptablePixelDifferences = new Screenshot(this.acceptablePixelDifferences);
-        return this.acceptablePixelDifferences.hydrate(); 
-    }
-
-    /** needed only if we edit a action before playing it in a session.
-     * insures that there is an actualScreenshot with a dataUrl.
-     */
-    createActualScreenshotWithDataUrl() {
-        this.actualScreenshot = new Screenshot(this.actualScreenshot);
-        if(this.actualScreenshot.fileName) {
-            return this.actualScreenshot.loadDataUrlFromFile(); 
-        }
-        return this.actualScreenshot.dataUrl = this.expectedScreenshot.dataUrl; // copy from expected
-    }
-
     /**
      * Called when the extension is given a user action that has been recorded.
      */
@@ -136,7 +104,7 @@ export class TestAction {
             clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
         }
 
-        if (this.actualScreenshot) {
+        if (this.actualScreenshot && this.numDiffPixels && this.actualScreenshot.fileName  ) {
             clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
         }
 
@@ -160,10 +128,11 @@ export class TestAction {
         if (!this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = new Screenshot();
         }
+        
+        this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
 
         if (this.lastVerifyScreenshotDiffDataUrl) {
             this.acceptablePixelDifferences.dataUrl = this.lastVerifyScreenshotDiffDataUrl;
-            this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
             await this.acceptablePixelDifferences.createPngFromDataUrl();
         }
         // else we use whatever is already in acceptablePixelDifferences (editing before playing)
@@ -203,7 +172,7 @@ export class TestAction {
     * so this.acceptablePixelDifferences, must exist
     */
     async pixelDiff() {
-        let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(this.expectedScreenshot.png, this.actualScreenshot.png, this.acceptablePixelDifferences?.png);
+        let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(this.expectedScreenshot.png, this.actualScreenshot.png, this.acceptablePixelDifferences?.png);
         this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         this.acceptablePixelDifferences.png = diffPng;
 
@@ -212,7 +181,7 @@ export class TestAction {
         let UiPercentDelta = (numDiffPixels * 100) / (this.expectedScreenshot.png.width * this.expectedScreenshot.png.height);
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
         this.editViewDataUrl = this.acceptablePixelDifferences.dataUrl;
-        if (numMaskedPixels) {
+        if (numMaskedPixels || numUnusedMaskedPixels) {
             this.class = [constants.class.EDIT, constants.class.ALLOWED];
         }
         else if (this.numDiffPixels) {

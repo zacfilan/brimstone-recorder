@@ -338,7 +338,7 @@ export class Player {
             }
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
 
-            let { numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(nextStep.expectedScreenshot.png, nextStep.actualScreenshot.png, nextStep.acceptablePixelDifferences?.png);
+            let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(nextStep.expectedScreenshot.png, nextStep.actualScreenshot.png, nextStep.acceptablePixelDifferences?.png);
 
             // FIXME: this should be factored into the card I think
             nextStep.numDiffPixels = numDiffPixels;
@@ -352,7 +352,7 @@ export class Player {
                 nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
                 nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
 
-                if (numMaskedPixels) { // it matched only because of the masking we allowed
+                if (numMaskedPixels || numUnusedMaskedPixels) { // it matched only because of the masking we allowed
                     nextStep.class = [constants.class.EXPECTED, constants.class.ALLOWED];
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
@@ -498,8 +498,9 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
     }
 
     const diffPng = new PNG({ width, height }); // new 
-    var { numDiffPixels, numMaskedPixels } = pixelmatch(expectedPng.data, actualPng.data, diffPng.data, width, height, { threshold: .1, ignoreMask: maskPng?.data });
+    var { numDiffPixels, numMaskedPixels, numUnusedMaskedPixels } = pixelmatch(expectedPng.data, actualPng.data, diffPng.data, width, height, { threshold: .1, ignoreMask: maskPng?.data });
     return {
+        numUnusedMaskedPixels,
         numDiffPixels,
         numMaskedPixels,
         diffPng
