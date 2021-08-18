@@ -4,14 +4,7 @@ const PNG = png.PNG;
 
 export const constants = {
     /** properties of the instance. it can have more than one set, these are converted to classes.*/
-    class: {
-        // PLAYING STATES
-        /** we are waiting for this one (implies playing) */
-        WAITING: 'waiting',
-
-        /** it has been edited, and has allowed errors */
-        ALLOWED: 'allowed',
-
+    view: {
         /** it doesn't match. (here is what we expected) */
         EXPECTED: 'expected',
 
@@ -19,16 +12,67 @@ export const constants = {
         ACTUAL: 'actual',
 
         /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
-        EDIT: 'edit',
+        EDIT: 'edit'
+    },
 
-        /** this card failed to match the last time it was played */
-        FAILED: 'failed',
+    match: {
+        PASS: 'pass',
+        PLAY: 'play',
+        ALLOW: 'allow',
+        FAIL: 'fail'
     }
 };
 
 export class TestAction {
-    /** some special properties of the action */
-    class = [];
+    /** 
+     * @type {object}
+     * @property {number} frameId frame in the tab that generated this action */
+    sender;
+
+    /**
+     * object that descobes the boundingClientRect in percentages
+     * so that it can render when the UI is resized.
+     */
+    overlay;
+
+    /** how long the mouse hovered over this element before it was clicked.
+     * helps replay wait long enough to trigger (custom) tooltips.
+     */
+    hoverTime;
+
+    /** text to display in UI about this action */
+    description;
+
+    /** the tabHeight when this action was recorded. */
+    tabHeight;
+
+    /** the tabWidth when this action was recorded. */
+    tabWidth;
+
+    /** the index of this action within the full test */
+    index;
+
+    /**
+     * used to distinguish 1st from 2nd click for single double clicks
+     */
+    detail;
+
+    /**
+     * the element that is the target of this action
+     */
+    boundingClientRect;
+
+    /** the x coordinate of this action*/
+    x;
+
+    /** the y corrdinate of this action */
+    y;
+
+    /** raw copy of the event that generated this action */
+    event;
+
+    /** string id of the type of the action (e.g. event.type) */
+    type;
 
     /** 
      * What the screen should look like before the input action can be performed.
@@ -46,9 +90,6 @@ export class TestAction {
      */
     acceptablePixelDifferences;
 
-    /** Used to identify the tab being this action happened on. */
-    tabUrl = '';
-
     /**
      * The number of pixels that were different between the expected screenshot and the actual screenshot.
      */
@@ -62,21 +103,28 @@ export class TestAction {
 
     /** 
      * This is the raw output of the last verifyScreenshot. It may be copied, edited and the result assigned into the
-     * acceptablePixelDifferences. 
+     * acceptablePixelDifferences, 
      * */
     lastVerifyScreenshotDiffDataUrl;
 
     /**
-     * It is used for display in the card view of the edit screenshot. 
+     * It is used for display in the card view of the edit screenshot.
+     * Why would this be different than the acceptblePixelDifference.dataUrl? 
      */
     editViewDataUrl;
+
+    /**
+     * the result of the last time we tried to match expected against actual with the mask 
+     * one of 'fail', 'allow', 'pass', 'play',  undefined. the last meaning we don't have that info.
+     */
+    _match;
+
+    /** The view view of the card, really which image src to use */
+    _view;
 
     constructor(args) {
         Object.assign(this, args);
 
-        if (!this.class) {
-            this.class = [];
-        }
         // make sure it has a step number
         if (this.index === undefined) {
             this.index = TestAction.instances.length;
@@ -98,24 +146,31 @@ export class TestAction {
     }
 
     toJSON() {
-        let clone = Object.assign({}, this);
-        //console.debug(this);
+        let clone = {
+            type: this.type,
+            boundingClientRect: this.boundingClientRect,
+            event: this.event,
+            x: this.x,
+            y: this.y,
+            sender: this.sender,
+            index: this.index,
+            tabHeight: this.tabHeight,
+            tabWidth: this.tabWidth,
+            overlay: this.overlay,
+            description: this.description
+        };
+
         if (this.expectedScreenshot) {
             clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
         }
 
-        if (this.actualScreenshot && this.numDiffPixels && this.actualScreenshot.fileName  ) {
+        if (this.actualScreenshot && this.numDiffPixels && this.actualScreenshot.fileName) {
             clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
         }
 
-        if (clone.acceptablePixelDifferences) {
+        if (this.acceptablePixelDifferences) {
             clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
         }
-
-        delete clone.lastVerifyScreenshotDiffDataUrl;
-        delete clone.numDiffPixels;
-        delete clone.percentDiffPixels;
-        // FIXME: rather than add and delete can I prevent this by construction or make it easier to delete via encapsulation
 
         return clone;
     }
@@ -128,12 +183,13 @@ export class TestAction {
         if (!this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = new Screenshot();
         }
-        
+
         this.acceptablePixelDifferences.fileName = `step${this.index}_acceptablePixelDifferences.png`;
 
         if (this.lastVerifyScreenshotDiffDataUrl) {
             this.acceptablePixelDifferences.dataUrl = this.lastVerifyScreenshotDiffDataUrl;
             await this.acceptablePixelDifferences.createPngFromDataUrl();
+            delete this.lastVerifyScreenshotDiffDataUrl;
         }
         // else we use whatever is already in acceptablePixelDifferences (editing before playing)
 
@@ -182,19 +238,26 @@ export class TestAction {
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
         this.editViewDataUrl = this.acceptablePixelDifferences.dataUrl;
         if (numMaskedPixels || numUnusedMaskedPixels) {
-            this.class = [constants.class.EDIT, constants.class.ALLOWED];
+            this._view = constants.view.EDIT;
+            this._match = constants.match.ALLOW;
         }
         else if (this.numDiffPixels) {
-            this.class = [constants.class.EDIT, constants.class.FAILED];
+            this._view = constants.view.EDIT;
+            this._match = constants.match.FAIL;
         }
     }
 
     toThumb() {
         let src = this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
         return `
-        <div class='card ${this.class.join(' ')} thumb' data-index=${this.index}>
+        <div class='card ${this.classes()} thumb' data-index=${this.index}>
             <img draggable='false' src='${src}'>
         </div>`;
+    }
+
+    /** calculate the classes to put on the DOM element */
+    classes() {
+        return `${this?._view || ''} ${this?._match || ''}`;
     }
 
     /** Return the html for the edit card view. */
@@ -202,7 +265,7 @@ export class TestAction {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
 
         let html = `
-    <div class='card ${this.class.join(' ')}' data-index=${this.index}>
+    <div class='card ${this.classes()}' data-index=${this.index}>
         <div class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
@@ -272,32 +335,34 @@ export class Step {
             let src;
             let title = '<span>';
 
-            if (this.next.class.includes(constants.class.FAILED)) {
-                title += '❌ failed match. ';
+            switch (this.next._match) {
+                case constants.match.FAIL:
+                    title += '❌ failed match. ';
+                    break;
+                case constants.match.PLAY:
+                    title += 'Waiting for actual next screen to match this.';
+                    break;
             }
 
-            if (this.next.class.includes(constants.class.WAITING)) {
-                title += 'Waiting for actual next screen to match this.';
-            }
-            else if (this.next.class.includes(constants.class.EXPECTED)) {
-                title += 'Expected result.';
-            }
-            else if (this.next.class.includes(constants.class.ACTUAL)) {
-                title += 'Actual result.';
-                src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
-            }
-            else if (this.next.class.includes(constants.class.EDIT)) {
-                title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
-                src = this.next.editViewDataUrl ?? '../images/notfound.png';
-            }
-            else {
-                title += 'Expected result.';
-                if (this.next.index === TestAction.instances.length - 1) {
-                    title += ' - final screenshot.';
-                }
+            switch (this.next._view) {
+                case constants.view.EXPECTED:
+                    title += 'Expected result';
+                    if (this.next.index === TestAction.instances.length - 1) {
+                        title += ' - final screenshot';
+                    }
+                    title += '.';
+                    break;
+                case constants.view.ACTUAL:
+                    title += 'Actual result.';
+                    src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
+                    break;
+                case constants.view.EDIT:
+                    title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
+                    src = this.next.editViewDataUrl ?? '../images/notfound.png';
+                    break;
             }
 
-            if (this.next.class.includes(constants.class.ALLOWED)) {
+            if (this.next._match === constants.match.ALLOW) {
                 title += ` <span id='allowed-differences'>Has allowed differences.</span>`;
             }
 

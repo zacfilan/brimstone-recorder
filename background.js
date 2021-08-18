@@ -115,10 +115,10 @@ async function actionOnClickedHandler(tab) {
   // else, create the brimstone workspace window, with remembered size/position data, or defaults
   let currentWindow = await chrome.windows.getCurrent();
   let result = await (new Promise(resolve => chrome.storage.local.get("window", resolve)));
-  let height = result?.window?.height ?? Math.floor(currentWindow.height * .75);
-  let width = result?.window?.width ?? Math.floor(currentWindow.width * .75);
-  let left = result?.window?.left ?? currentWindow.left + 100;
-  let top = result?.window?.top ?? currentWindow.top + 100;
+  let height = result?.window?.height ?? 480;
+  let width = result?.window?.width ?? 640;
+  let left = result?.window?.left;
+  let top = result?.window?.top;
   let window = await chrome.windows.create({
     url: chrome.runtime.getURL(`ui/workspace.html?parent=${currentWindow.id}&tab=${tab.id}`),
     type: "popup",

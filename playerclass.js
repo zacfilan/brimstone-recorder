@@ -65,9 +65,10 @@ export class Player {
         for (let i = startIndex; playedSuccessfully && (i < actions.length - 1); ++i) {
             let action = actions[i];
             this.currentAction = action;
-            action.class = []; // FIXME this loses something
+            action._view = constants.view.EXPECTED;
+
             let next = actions[i + 1];
-            next.class = [constants.class.WAITING];
+            next._match = constants.match.PLAY; 
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
             }
@@ -94,10 +95,10 @@ export class Player {
 
             let match = await this.verifyScreenshot(next);
             stop = performance.now();
-            action.class = [];
+            action._view = constants.view.EXPECTED;
             if (match) {
                 console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
-                next.class = [];
+                next._view = constants.view.EXPECTED;
             }
             else {
                 console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
@@ -349,11 +350,14 @@ export class Player {
 
             differencesPng = diffPng;
             if (numDiffPixels === 0) { // it matched
+                nextStep._match = constants.match.PASS;
+
                 nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
                 nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
 
                 if (numMaskedPixels || numUnusedMaskedPixels) { // it matched only because of the masking we allowed
-                    nextStep.class = [constants.class.EXPECTED, constants.class.ALLOWED];
+                    nextStep._view = constants.view.EXPECTED;
+                    nextStep._match = constants.match.ALLOW;
                 }
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
                 let avgIteration = (doneIn / i).toFixed(1);
@@ -363,7 +367,8 @@ export class Player {
         }
 
         // The screenshots don't match
-        nextStep.class = [constants.class.EXPECTED, constants.class.FAILED];
+        nextStep._match = constants.match.FAIL;
+        nextStep._view = constants.view.EXPECTED;
 
         // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing. 
         if (differencesPng) {

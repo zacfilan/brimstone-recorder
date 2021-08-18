@@ -104,43 +104,43 @@ $('#step').on('click', '.screenshot.clickable',
         // flip the cards
         const { view, action } = getCard(e.currentTarget);
         let index;
-        if ((index = action.class.indexOf(constants.class.EXPECTED)) >= 0) {
-            
-            action.class[index] = constants.class.ACTUAL;
-            if (!action.actualScreenshot) {
-                action.actualScreenshot = new Screenshot({
-                    fileName: '',
-                    dataUrl: action.expectedScreenshot.dataUrl,
-                    png: action.expectedScreenshot.png
-                });
-                if(action.acceptablePixelDifferences) {
-                    action.class[index] = constants.class.EDIT;
-                    await action.acceptablePixelDifferences.hydrate();
-                    action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
-                }
-            }
-            else {
-                await action.actualScreenshot.hydrate();
-            }
-
-            updateStepInView(TestAction.instances[action.index - 1]);
-        }
-        else if ((index = action.class.indexOf(constants.class.ACTUAL)) >= 0) {
-            action.class[index] = constants.class.EDIT;
-            if (!action.editViewDataUrl) {
-                if(!action.acceptablePixelDifferences) {
-                    action.acceptablePixelDifferences = new Screenshot();
+        switch (action._view) {
+            case constants.view.EXPECTED:
+                action._view = constants.view.ACTUAL;
+                if (!action.actualScreenshot) {
+                    action.actualScreenshot = new Screenshot({
+                        fileName: '',
+                        dataUrl: action.expectedScreenshot.dataUrl,
+                        png: action.expectedScreenshot.png
+                    });
+                    if (action.acceptablePixelDifferences) {
+                        action._view = constants.view.EDIT;
+                        await action.acceptablePixelDifferences.hydrate();
+                        action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
+                    }
                 }
                 else {
-                    await action.acceptablePixelDifferences.hydrate();
+                    await action.actualScreenshot.hydrate();
                 }
-                await action.pixelDiff();
-            }
-            updateStepInView(TestAction.instances[action.index - 1]);
-        }
-        else if ((index = action.class.indexOf(constants.class.EDIT)) >= 0) {
-            action.class[index] = constants.class.EXPECTED;
-            updateStepInView(TestAction.instances[action.index - 1]);
+                updateStepInView(TestAction.instances[action.index - 1]);
+                break;
+            case constants.view.ACTUAL:
+                action._view = constants.view.EDIT;
+                if (!action.editViewDataUrl) {
+                    if (!action.acceptablePixelDifferences) {
+                        action.acceptablePixelDifferences = new Screenshot();
+                    }
+                    else {
+                        await action.acceptablePixelDifferences.hydrate();
+                    }
+                    await action.pixelDiff();
+                }
+                updateStepInView(TestAction.instances[action.index - 1]);
+                break;
+            case constants.view.EDIT:
+                action._view = constants.view.EXPECTED;
+                updateStepInView(TestAction.instances[action.index - 1]);
+                break;
         }
     }
 );
@@ -218,7 +218,7 @@ function setToolbarState() {
     let editCard = $('#content .card:nth-of-type(2)');
     if (editCard.length) {
         const { action } = getCard(editCard);
-        if (action?.class.includes(constants.class.EDIT)) {
+        if (action?._view === constants.view.EDIT) {
             $('#ignoreDelta').prop('disabled', false);
             $('#ignoreRegion').prop('disabled', false);
         }
@@ -406,7 +406,6 @@ $('#recordButton').on('click', async function () {
                 url: tab.url
             };
             let action = await userEventToAction(userEvent);
-            zip = new JSZip(); // FIXME: refactor so this isn't needed here!
             updateStepInView(action);
         }
         else {
@@ -548,7 +547,6 @@ async function userEventToAction(userEvent, frameId) {
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = tab.height;
     cardModel.tabWidth = tab.width;
-    cardModel.tabUrl = tab.url;
 
     cardModel.x += frameOffset.left;
     cardModel.y += frameOffset.top;
@@ -625,7 +623,7 @@ async function userEventToAction(userEvent, frameId) {
                 top: 0,
                 left: 0
             };
-            cardModel.class = [constants.class.EXPECTED];
+            cardModel._view = constants.view.EXPECTED;
             break;
         }
         default:
@@ -650,7 +648,7 @@ async function onMessageHandler(message, _port) {
     let userEvent = message;
     console.debug(`RX: ${userEvent.type}`, userEvent);
     let action;
-    userEvent.class = [constants.class.EXPECTED];
+    userEvent._view = constants.view.EXPECTED;
     switch (userEvent.type) {
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {

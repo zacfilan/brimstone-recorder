@@ -44,7 +44,7 @@ export async function loadFile() {
         
         if (action.expectedScreenshot?.fileName) {
             action.expectedScreenshot = new Screenshot(action.expectedScreenshot);
-            action.class = [constants.class.EXPECTED];
+            action._view = constants.view.EXPECTED;
             screenshotPromise = action.expectedScreenshot.loadDataUrlFromFile();
             screenshotPromises.push(screenshotPromise); // needed to see any image during loading
         }
@@ -53,9 +53,12 @@ export async function loadFile() {
         // thus, if these props exist on the action, they def have a fileName
         // but may not be hydrated. if they don't exist, they weren't in the file, nor has this action been played
         if(action.acceptablePixelDifferences?.fileName) {
+            action._match = constants.match.ALLOW;
             action.acceptablePixelDifferences = new Screenshot(action.acceptablePixelDifferences);
         }
-        if(action.actualScreenshot?.fileName) {
+        if(action.actualScreenshot?.fileName) { 
+            action._match = constants.match.FAIL; // if it failed, do I really care to know there are allowed differences too?
+            // if you have an actual one to load it means that the last time this was run it failed.
             action.actualScreenshot = new Screenshot(action.actualScreenshot);
         }
     }
@@ -87,7 +90,6 @@ export function hydrateForPlay() {
     for (let i = 0; i < TestAction.instances.length; ++i) {
         let action = TestAction.instances[i];
         if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
-            action.class.push(constants.class.ALLOWED);
             if(action.acceptablePixelDifferences) {
                 screenshotPromise = action.acceptablePixelDifferences.hydrate();
                 screenshotPromises.push(screenshotPromise);
@@ -114,6 +116,7 @@ export async function saveFile() {
     screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
     // add all the expected screenshots to the screenshots directory in the archive
     for (let i = 0; i < TestAction.instances.length; ++i) {
+        console.log(`saving files for ${i}`);
         let card = TestAction.instances[i];
         if (card.expectedScreenshot?.dataUrl) {
             let response = await fetch(card.expectedScreenshot.dataUrl);

@@ -58,7 +58,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                 }
             }
         }
-        return { numDiffPixels: 0, numMaskedPixels: 0, numUnusedMaskedPixel: numUnusedMaskedPixels };
+        return { numDiffPixels: 0, numMaskedPixels: 0, numUnusedMaskedPixels: numUnusedMaskedPixels };
     }
 
     // maximum acceptable square distance between two colors;

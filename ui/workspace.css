@@ -140,19 +140,19 @@ svg {
     visibility: hidden; /* not seen but takes up layout space */
 }
 
-.card.waiting .meter, .card.failed .meter {
+.card.play .meter, .card.fail .meter {
     visibility: visible;
 }
 
 /** show the failed progress bar as red for failed states */
-.card.expected.failed .progress, .card.actual.failed .progress {
+.card.expected.fail .progress, .card.actual.fail .progress {
     background-color: red;
     animation: unset;
     animation-fill-mode:unset; 
 }
 
 /** hide that one */
-.card.edit.failed .meter {
+.card.edit.fail .meter {
     visibility: hidden;
 }
 
