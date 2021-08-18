@@ -145,13 +145,6 @@ $('#step').on('click', '.screenshot.clickable',
     }
 );
 
-/** highlist the element that was acted on in the screenshot
- * when the user hovers over the text of a user-event
- */
-$('#step').on('mouseenter mouseleave', '.user-event[data-index]', function (e) {
-    $(`.overlay[data-index='${e.target.dataset.index}']`).toggle();
-});
-
 function setInfoBarText(infobarText) {
     if (!infobarText) {
         if ($('#recordButton').hasClass('active')) {

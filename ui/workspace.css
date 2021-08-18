@@ -1,214 +1,170 @@
 html {
-    height: 100%;
+  height: 100%;
 }
 
 :root {
-    --screenshot-timeout: 15s;
-    --action-color: red;
+  --screenshot-timeout: 15s;
+  --action-color: red;
 }
 
 body {
-    height:100%;
-    margin:0;
+  height: 100%;
+  margin: 0;
 }
 
-  .themed {
-      background: rgba(0,0,0,0.75);
-      color: white;
-  }
+.themed {
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+}
 
 #toolbar {
-    padding: 0px;
-    display: flex;
-    flex-direction: row;
-    height: 40px;
-    justify-content: space-between;
+  padding: 0px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  height: 40px;
+  -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+          justify-content: space-between;
 }
 
 #toolbar button {
-    background: unset;
-    color: unset;
-    border-radius: 3px;
-    border:0;
-    margin:4px;
-    font-size: larger;
-    height: 31px;
+  background: unset;
+  color: unset;
+  border-radius: 3px;
+  border: 0;
+  margin: 4px;
+  font-size: larger;
+  height: 31px;
 }
-#toolbar button[disabled], #toolbar button[disabled] i {
-    opacity: .3;
-    /* cursor: not-allowed; */
+
+#toolbar button[disabled],
+#toolbar button[disabled] i {
+  opacity: 0.3;
 }
-#toolbar button[disabled]:hover {
-    background: unset;
-    cursor: unset;
+
+#toolbar button[disabled]:hover,
+#toolbar button[disabled] i:hover {
+  background: unset;
+  cursor: unset;
 }
 
 #toolbar button:hover {
-    background: rgba(0,0,0,0.3);
-    cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
 }
 
-svg {
-    height:20px;
-    width:20px;
-    fill: white;
+#toolbar button svg {
+  height: 20px;
+  width: 20px;
+  fill: white;
 }
 
-#content {
-    display: flex;
-    flex-direction: row;
+#toolbar #recordButton,
+#toolbar #playButton {
+  position: relative;
+  /** let the recording overlay in this **/
 }
 
+#toolbar #recordButton.active {
+  background: red;
+}
+
+#toolbar #playButton.active {
+  background: green;
+}
+
+/* these are the thumbnails */
 #cards {
-    display:flex;
-    flex: row;
-    overflow: auto;
-    height: 110px;
-    background: rgba(0,0,0,0.2);
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-flex: row;
+      -ms-flex: row;
+          flex: row;
+  overflow: auto;
+  height: 110px;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 #cards img {
-    object-fit: contain;
-    width:100%;
-    height: 100%;
-}
-
-.card {
-    padding: 1em;
-    width: 50%;
-    display: flex;
-    flex-direction: column;
-    margin: 1em;
-    border-radius: .6em;
-    border: 1px solid;
-    background: linear-gradient(to right, rgba(116, 116, 191, .3), rgba(52, 138, 199, .3));
-}
-
-.card.empty {
-    height: 200px;
-    background: grey;
+  -o-object-fit: contain;
+     object-fit: contain;
+  width: 100%;
+  height: 100%;
 }
 
 #cards .card {
-    width:100px;
-    padding: 5px;
-    min-width: 100px;
+  width: 100px;
+  padding: 5px;
+  min-width: 100px;
+}
+
+/*********************/
+/* common to cards   */
+/*********************/
+.card {
+  padding: 1em;
+  width: 50%;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  margin: 1em;
+  border-radius: 0.6em;
+  border: 1px solid;
+  background: -webkit-gradient(linear, left top, right top, from(rgba(116, 116, 191, 0.3)), to(rgba(52, 138, 199, 0.3)));
+  background: linear-gradient(to right, rgba(116, 116, 191, 0.3), rgba(52, 138, 199, 0.3));
 }
 
 .card .screenshot {
-    position: relative; /* for the action overlay to float positioned to this when absolute positioned */
-    padding: none;
-}
-
-.card.edit .screenshot {
-    position: unset;
-}
-
-.card .screenshot:hover {
-    cursor: pointer;
-}
-
-.card .title {
-    color: white;
-    padding: 1em 0em;
+  position: relative;
+  /* for the action overlay to float positioned to this when absolute positioned */
+  padding: none;
 }
 
 .card .screenshot img {
-    width: 100%;
+  width: 100%;
 }
 
 .card .screenshot .overlay {
-    position: absolute;
+  position: absolute;
+  background: var(--action-color);
 }
 
-.card:nth-of-type(2) .screenshot .overlay {
-    display:none
+.card.empty {
+  height: 200px;
+  background: grey;
 }
 
-.card:nth-of-type(2) .screenshot .action {
-    display:none
+.card .screenshot:hover {
+  cursor: pointer;
+}
+
+.card .title {
+  color: white;
+  padding: 1em 0em;
 }
 
 .card .user-events {
-    color: white;
-    border-top: 1px solid black;
-    padding: 1em 1em 1em 0;
+  color: white;
+  border-top: 1px solid black;
+  padding: 1em 1em 1em 0;
 }
 
-/** card defaults */
 .card .meter {
-    visibility: hidden; /* not seen but takes up layout space */
+  visibility: hidden;
+  /* not seen but takes up layout space */
 }
 
-.card.play .meter, .card.fail .meter {
-    visibility: visible;
-}
-
-/** show the failed progress bar as red for failed states */
-.card.expected.fail .progress, .card.actual.fail .progress {
-    background-color: red;
-    animation: unset;
-    animation-fill-mode:unset; 
-}
-
-/** hide that one */
-.card.edit.fail .meter {
-    visibility: hidden;
-}
-
-#allowed-differences {
-    color: orange;
-}
-
-/** only show the meter on the next card when playing back */
-#step {
-    height: calc(100% - 172px);
-}
-
-#recordButton, #playButton {
-    position: relative; /** let the recording overlay in this **/
-}
-#recordButton.active {
-    background: red;
-}
-#playButton.active {
-    background: green;
-}
-
-@keyframes opacity2 {
-    0% { opacity: 0;}
-    50% {opacity: .5;}
-    100% {opacity: 0};
-}
-
-.overlay {
-    background: var(--action-color);
-    position: absolute;
-}
-
-.pulse {
-    animation: opacity2 2s infinite;
-}
-
-.meter { 
-    height: 5px;
-    position: relative;
-    background: #f3efe6;
-    overflow: hidden;
-}
-
-.meter span {
-    display: block;
-    height: 100%;
-}
-
-.progress {
-    background-color: #e4c465;
-    animation: progressBar var(--screenshot-timeout) ease-in-out;
-    animation-fill-mode:both; 
-}
-
-@keyframes progressBar { 
+@-webkit-keyframes progressBar {
   0% {
     width: 0;
     background-color: green;
@@ -216,33 +172,162 @@ svg {
   75% {
     background-color: orange;
   }
-  100% { 
+  100% {
     width: 100%;
     background-color: red;
   }
 }
 
-#infobar {
-    background: #1571b3;
-    color:white;
-    height: 12px;
-    padding: 5px;
-    line-height: 1em;
+@keyframes progressBar {
+  0% {
+    width: 0;
+    background-color: green;
+  }
+  75% {
+    background-color: orange;
+  }
+  100% {
+    width: 100%;
+    background-color: red;
+  }
 }
 
-.action {
-    position: absolute;
-    text-align: center;
-    font-size:18px;
-    background: var(--action-color);
-    margin: 3px;
-    border: 1px solid black;
-    border-radius:  6px;
-    padding: 5px;
+/***********************/
+/* second card in step */
+/***********************/
+#content {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  /***********************/
+  /* second card in step */
+  /***********************/
+}
+
+#content .card:first-of-type {
+  /** only the first card should see the action */
+}
+
+#content .card:first-of-type .action {
+  position: absolute;
+  text-align: center;
+  font-size: 18px;
+  background: var(--action-color);
+  margin: 3px;
+  border: 1px solid black;
+  border-radius: 6px;
+  padding: 5px;
+}
+
+#content .card:last-of-type {
+  /** show the failed progress bar as red for failed states */
+  /** hide that one */
+  /** the text that says "allowed differences..*/
+}
+
+#content .card:last-of-type .screenshot .overlay.pulse {
+  display: none;
+}
+
+#content .card:last-of-type .screenshot .action {
+  display: none;
+}
+
+#content .card:last-of-type.edit .screenshot {
+  position: unset;
+}
+
+#content .card:last-of-type.play .meter,
+#content .card:last-of-type.fail .meter {
+  visibility: visible;
+}
+
+#content .card:last-of-type.expected.fail .progress,
+#content .card:last-of-type.actual.fail .progress {
+  background-color: red;
+  -webkit-animation: unset;
+          animation: unset;
+  -webkit-animation-fill-mode: unset;
+          animation-fill-mode: unset;
+}
+
+#content .card:last-of-type.edit.fail .meter {
+  visibility: hidden;
+}
+
+#content .card:last-of-type #allowed-differences {
+  color: orange;
+}
+
+#content .card:last-of-type .meter {
+  height: 5px;
+  position: relative;
+  background: #f3efe6;
+  overflow: hidden;
+}
+
+#content .card:last-of-type .meter span {
+  display: block;
+  height: 100%;
+}
+
+#content .card:last-of-type .progress {
+  background-color: #e4c465;
+  -webkit-animation: progressBar var(--screenshot-timeout) ease-in-out;
+          animation: progressBar var(--screenshot-timeout) ease-in-out;
+  -webkit-animation-fill-mode: both;
+          animation-fill-mode: both;
+}
+
+/** only show the meter on the next card when playing back */
+#step {
+  height: calc(100% - 172px);
+}
+
+@-webkit-keyframes opacity2 {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes opacity2 {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.pulse {
+  -webkit-animation: opacity2 2s infinite;
+          animation: opacity2 2s infinite;
 }
 
 #footer {
-    position: fixed;
-    bottom:  0%;
-    width: 100%;
+  position: fixed;
+  bottom: 0%;
+  width: 100%;
 }
+
+#footer #infobar {
+  background: #1571b3;
+  color: white;
+  height: 12px;
+  padding: 5px;
+  line-height: 1em;
+}
+/*# sourceMappingURL=workspace.css.map */

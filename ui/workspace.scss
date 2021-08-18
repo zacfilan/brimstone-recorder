@@ -1,0 +1,269 @@
+html {
+    height: 100%;
+}
+
+:root {
+    --screenshot-timeout: 15s;
+    --action-color: red;
+}
+
+body {
+    height: 100%;
+    margin: 0;
+}
+
+.themed {
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+}
+
+#toolbar {
+    padding: 0px;
+    display: flex;
+    flex-direction: row;
+    height: 40px;
+    justify-content: space-between;
+
+    button {
+        background: unset;
+        color: unset;
+        border-radius: 3px;
+        border: 0;
+        margin: 4px;
+        font-size: larger;
+        height: 31px;
+
+        &[disabled],
+        &[disabled] i {
+            opacity: 0.3;
+            &:hover {
+                background: unset;
+                cursor: unset;
+            }
+        }
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+
+        svg {
+            height: 20px;
+            width: 20px;
+            fill: white;
+        }
+    }
+
+    #recordButton,
+    #playButton {
+        position: relative; /** let the recording overlay in this **/
+    }
+    #recordButton.active {
+        background: red;
+    }
+    #playButton.active {
+        background: green;
+    }
+}
+
+/* these are the thumbnails */
+#cards {
+    display: flex;
+    flex: row;
+    overflow: auto;
+    height: 110px;
+    background: rgba(0, 0, 0, 0.2);
+
+    img {
+        object-fit: contain;
+        width: 100%;
+        height: 100%;
+    }
+
+    .card {
+        width: 100px;
+        padding: 5px;
+        min-width: 100px;
+    }
+}
+
+/*********************/
+/* common to cards   */
+/*********************/
+.card {
+    padding: 1em;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    margin: 1em;
+    border-radius: 0.6em;
+    border: 1px solid;
+    background: linear-gradient(to right, rgba(116, 116, 191, 0.3), rgba(52, 138, 199, 0.3));
+
+    .screenshot {
+        position: relative; /* for the action overlay to float positioned to this when absolute positioned */
+        padding: none;
+        img {
+            width: 100%;
+        }
+
+        .overlay {
+            position: absolute;
+            background: var(--action-color);
+        }
+    }
+
+    &.empty {
+        height: 200px;
+        background: grey;
+    }
+
+    .screenshot:hover {
+        cursor: pointer;
+    }
+
+    .title {
+        color: white;
+        padding: 1em 0em;
+    }
+
+    .user-events {
+        color: white;
+        border-top: 1px solid black;
+        padding: 1em 1em 1em 0;
+    }
+
+    .meter {
+        visibility: hidden; /* not seen but takes up layout space */
+    }
+
+}
+
+@keyframes progressBar {
+    0% {
+        width: 0;
+        background-color: green;
+    }
+    75% {
+        background-color: orange;
+    }
+    100% {
+        width: 100%;
+        background-color: red;
+    }
+}
+
+/***********************/
+/* second card in step */ 
+/***********************/
+#content {
+    display: flex;
+    flex-direction: row;
+
+    .card:first-of-type {
+        /** only the first card should see the action */
+        .action {
+            position: absolute;
+            text-align: center;
+            font-size: 18px;
+            background: var(--action-color);
+            margin: 3px;
+            border: 1px solid black;
+            border-radius: 6px;
+            padding: 5px;
+        }
+    }
+
+    /***********************/ 
+    /* second card in step */
+    /***********************/
+    .card:last-of-type {
+        .screenshot {
+            .overlay.pulse { 
+                display: none;
+            }
+            .action {
+                display: none;
+            }
+        }
+        &.edit .screenshot {
+            position: unset;
+        }
+
+        &.play .meter,
+        &.fail .meter {
+            visibility: visible;
+        }
+
+        /** show the failed progress bar as red for failed states */
+        &.expected.fail .progress,
+        &.actual.fail .progress {
+            background-color: red;
+            animation: unset;
+            animation-fill-mode: unset;
+        }
+
+        /** hide that one */
+        &.edit.fail .meter {
+            visibility: hidden;
+        }
+
+        /** the text that says "allowed differences..*/
+        #allowed-differences {
+            color: orange;
+        }
+
+        .meter {
+            height: 5px;
+            position: relative;
+            background: #f3efe6;
+            overflow: hidden;
+
+            span {
+                display: block;
+                height: 100%;
+            }
+        }
+
+        .progress {
+            background-color: #e4c465;
+            animation: progressBar var(--screenshot-timeout) ease-in-out;
+            animation-fill-mode: both;
+        }
+    }
+}
+
+/** only show the meter on the next card when playing back */
+#step {
+    height: calc(100% - 172px);
+}
+
+@keyframes opacity2 {
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+ 
+.pulse {
+    animation: opacity2 2s infinite;
+}
+
+#footer {
+    position: fixed;
+    bottom: 0%;
+    width: 100%;
+
+    #infobar {
+        background: #1571b3;
+        color: white;
+        height: 12px;
+        padding: 5px;
+        line-height: 1em;
+    }
+}

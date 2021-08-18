@@ -335,31 +335,32 @@ export class Step {
             let src;
             let title = '<span>';
 
-            switch (this.next._match) {
-                case constants.match.FAIL:
-                    title += '❌ failed match. ';
-                    break;
-                case constants.match.PLAY:
-                    title += 'Waiting for actual next screen to match this.';
-                    break;
+            if(this.next._match === constants.match.PLAY) {
+                title += 'Wait for actual to match.';
             }
+            else {
 
-            switch (this.next._view) {
-                case constants.view.EXPECTED:
-                    title += 'Expected result';
-                    if (this.next.index === TestAction.instances.length - 1) {
-                        title += ' - final screenshot';
-                    }
-                    title += '.';
-                    break;
-                case constants.view.ACTUAL:
-                    title += 'Actual result.';
-                    src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
-                    break;
-                case constants.view.EDIT:
-                    title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
-                    src = this.next.editViewDataUrl ?? '../images/notfound.png';
-                    break;
+                if(this.next._match === constants.match.FAIL) {
+                    title += '❌ failed match. ';
+                }
+
+                switch (this.next._view) {
+                    case constants.view.EXPECTED:
+                        title += 'Expected result';
+                        if (this.next.index === TestAction.instances.length - 1) {
+                            title += ' - final screenshot';
+                        }
+                        title += '.';
+                        break;
+                    case constants.view.ACTUAL:
+                        title += 'Actual result.';
+                        src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
+                        break;
+                    case constants.view.EDIT:
+                        title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
+                        src = this.next.editViewDataUrl ?? '../images/notfound.png';
+                        break;
+                }
             }
 
             if (this.next._match === constants.match.ALLOW) {
