@@ -36,11 +36,13 @@ function isPlaying() {
 // grab the parent window id from the query parameter
 const urlParams = new URLSearchParams(window.location.search);
 
-/** The tab being recorded
+/** The tab being recorded/played
  * @type {Tab}
  */
 var tab = new Tab();
-const tabId = parseInt(urlParams.get('tab'), 10);
+
+/** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
+const windowId = parseInt(urlParams.get('parent'), 10)
 const player = new Player();
 
 var uiCardsElement = document.getElementById('cards');
@@ -67,9 +69,9 @@ $('#ignoreDelta').on('click',
     }
 );
 
-$('#undo').on('click', async function() {
+$('#undo').on('click', async function () {
     // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
-    const {view, action} = getCard('#content .waiting');
+    const { view, action } = getCard('#content .waiting');
     action.acceptablePixelDifferences = new Screenshot();
     await action.pixelDiff();
     updateStepInView(TestAction.instances[action.index - 1]);
@@ -141,7 +143,7 @@ $('#step').on('click', '.waiting .click-to-change-view',
                     await action.pixelDiff();
                 }
                 updateStepInView(TestAction.instances[action.index - 1]);
-                    /** Add rectangles where we don't care about pixel differences. */
+                /** Add rectangles where we don't care about pixel differences. */
                 addVolatileRegions();
                 break;
             case constants.view.EDIT:
@@ -239,22 +241,59 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playedSuccessfully = true;
 
+async function attachDebuggerToActiveTabForPlay({ width, height, url }) {
+    // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
+    let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+
+    // make sure it isn't in a //chrome tab since it won't let me attach the debugger (which is needed to screen capture often)
+    if (activeChromeTab.url.startsWith('chrome')) {
+        //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
+        var resolveNavigationPromise;
+        let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
+        chrome.webNavigation.onCommitted.addListener(function navCommit(details) {
+            chrome.webNavigation.onCommitted.removeListener(navCommit);
+            resolveNavigationPromise(details);
+        });
+        await chrome.tabs.update(activeChromeTab.id, { url: url });
+        let details = await navPromise; // the above nav is really done.
+    }
+    await tab.fromChromeTabId(activeChromeTab.id);
+    tab.height = height; // FIXME: ugly. the attachDebugger uses this tab instance to resize the tab, to the correct dimensions
+    tab.width = width;
+    tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
+
+    await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached
+    return true;
+}
+
+async function attachDebuggerToActiveTabForRecord() {
+    // attach for record
+    let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+    if (activeChromeTab.url.startsWith('chrome')) {
+        alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
+        return false;
+    }
+    await tab.fromChromeTabId(activeChromeTab.id);
+    await player.attachDebugger({ tab }); // required to play anything in the tab being recorded.
+    return true;
+}
+
 $('#playButton').on('click', async () => {
     try {
-        let actions = TestAction.instances;
-        player.onBeforePlay = updateStepInView;
-        player.onAfterPlay = updateStepInView;
-        await tab.fromChromeTabId(tabId);
-        tab.height = actions[0].tabHeight;
-        tab.width = actions[0].tabWidth;
-        tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
-
-        await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached
-
         $('#playButton').addClass('active');
         setToolbarState();
 
-        let playFrom = currentStepIndex(); // we will start on the step showinging in the workspace.
+        let actions = TestAction.instances;
+        player.onBeforePlay = updateStepInView;
+        player.onAfterPlay = updateStepInView;
+
+        await attachDebuggerToActiveTabForPlay({
+            width: actions[0].tabWidth,
+            height: actions[0].tabHeight,
+            url: actions[0].url
+        });
+
+        let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
         // we can resume a failed step. FIXME:// I need to know the last play resulted in a failed step to set this.
         let resume = !playedSuccessfully && playFrom > 0;
         playedSuccessfully = await player.play(actions, playFrom, resume); // players gotta play...
@@ -394,8 +433,9 @@ $('#recordButton').on('click', async function () {
     }
 
     try {
-        await tab.fromChromeTabId(tabId);
-        await player.attachDebugger({ tab }); // required to play anything in the tab being recorded.
+        if (!await attachDebuggerToActiveTabForRecord()) {
+            return;
+        }
 
         await startRecording(tab);
         button.addClass('active');

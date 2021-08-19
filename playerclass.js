@@ -399,7 +399,7 @@ export class Player {
             let png = await Player.dataUrlToPNG(dataUrl);
             if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
                 console.debug(`require ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}`);
-                this.tab.resizeViewport();
+                await this.tab.resizeViewport();
                 throw 'resize and try again'; // try one more time after a resize?
             }
             return new Screenshot({
