@@ -160,8 +160,17 @@ body {
 }
 
 .card .meter {
+  height: 5px;
+  position: relative;
+  background: #f3efe6;
+  overflow: hidden;
   visibility: hidden;
   /* not seen but takes up layout space */
+}
+
+.card .meter span {
+  display: block;
+  height: 100%;
 }
 
 @-webkit-keyframes progressBar {
@@ -208,11 +217,11 @@ body {
   /***********************/
 }
 
-#content .card:first-of-type {
+#content .card.action {
   /** only the first card should see the action */
 }
 
-#content .card:first-of-type .action {
+#content .card.action .action {
   position: absolute;
   text-align: center;
   font-size: 18px;
@@ -223,31 +232,31 @@ body {
   padding: 5px;
 }
 
-#content .card:last-of-type {
+#content .card.waiting {
   /** show the failed progress bar as red for failed states */
   /** hide that one */
   /** the text that says "allowed differences..*/
 }
 
-#content .card:last-of-type .screenshot .overlay.pulse {
+#content .card.waiting .screenshot .overlay {
   display: none;
 }
 
-#content .card:last-of-type .screenshot .action {
+#content .card.waiting .screenshot .action {
   display: none;
 }
 
-#content .card:last-of-type.edit .screenshot {
+#content .card.waiting.edit .screenshot {
   position: unset;
 }
 
-#content .card:last-of-type.play .meter,
-#content .card:last-of-type.fail .meter {
+#content .card.waiting.play .meter,
+#content .card.waiting.fail .meter {
   visibility: visible;
 }
 
-#content .card:last-of-type.expected.fail .progress,
-#content .card:last-of-type.actual.fail .progress {
+#content .card.waiting.expected.fail .progress,
+#content .card.waiting.actual.fail .progress {
   background-color: red;
   -webkit-animation: unset;
           animation: unset;
@@ -255,27 +264,15 @@ body {
           animation-fill-mode: unset;
 }
 
-#content .card:last-of-type.edit.fail .meter {
+#content .card.waiting.edit.fail .meter {
   visibility: hidden;
 }
 
-#content .card:last-of-type #allowed-differences {
+#content .card.waiting #allowed-differences {
   color: orange;
 }
 
-#content .card:last-of-type .meter {
-  height: 5px;
-  position: relative;
-  background: #f3efe6;
-  overflow: hidden;
-}
-
-#content .card:last-of-type .meter span {
-  display: block;
-  height: 100%;
-}
-
-#content .card:last-of-type .progress {
+#content .card.waiting .progress {
   background-color: #e4c465;
   -webkit-animation: progressBar var(--screenshot-timeout) ease-in-out;
           animation: progressBar var(--screenshot-timeout) ease-in-out;

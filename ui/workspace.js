@@ -391,6 +391,8 @@ $('#recordButton').on('click', async function () {
         await player.attachDebugger({ tab }); // required to play anything in the tab being recorded.
 
         await startRecording(tab);
+        button.addClass('active');
+        setToolbarState();
 
         if (!TestAction.instances.length) {
             // update the UI: insert the first text card in the ui
@@ -417,8 +419,6 @@ $('#recordButton').on('click', async function () {
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
 
-        button.addClass('active');
-        setToolbarState();
     }
     catch (e) {
         stopRecording();
@@ -505,7 +505,7 @@ var port = false;
  * @param {Step} step the step
  */
 function setStepContent(step) {
-    $('#step').html(step.toHtml({ recording: isRecording() })); // two cards in a step
+    $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
     setToolbarState();
     updateThumb(step.curr);
 };

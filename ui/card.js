@@ -261,11 +261,11 @@ export class TestAction {
     }
 
     /** Return the html for the edit card view. */
-    toHtml(title, src) {
+    toHtml({title, src, className}) {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
 
         let html = `
-    <div class='card ${this.classes()}' data-index=${this.index}>
+    <div class='card ${this.classes()} ${className}' data-index=${this.index}>
         <div class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
@@ -328,7 +328,7 @@ export class Step {
 
         let html = `
         <div id="content">
-            ${this.curr.toHtml(title)}
+            ${this.curr.toHtml({title: title, src: null, className: 'action'})}
             `;
 
         if (this.next) {
@@ -368,7 +368,7 @@ export class Step {
             }
 
             title += '</span>';
-            html += this.next.toHtml(title, src);
+            html += this.next.toHtml({ title: title, src: src, className: 'waiting'});
         }
         html += `
         </div>

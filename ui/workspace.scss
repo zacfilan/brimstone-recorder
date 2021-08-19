@@ -134,9 +134,17 @@ body {
     }
 
     .meter {
+        height: 5px;
+        position: relative;
+        background: #f3efe6;
+        overflow: hidden;
+
+        span {
+            display: block;
+            height: 100%;
+        }
         visibility: hidden; /* not seen but takes up layout space */
     }
-
 }
 
 @keyframes progressBar {
@@ -160,7 +168,7 @@ body {
     display: flex;
     flex-direction: row;
 
-    .card:first-of-type {
+    .card.action {
         /** only the first card should see the action */
         .action {
             position: absolute;
@@ -172,14 +180,14 @@ body {
             border-radius: 6px;
             padding: 5px;
         }
-    }
+    } 
 
     /***********************/ 
     /* second card in step */
     /***********************/
-    .card:last-of-type {
+    .card.waiting {
         .screenshot {
-            .overlay.pulse { 
+            .overlay { 
                 display: none;
             }
             .action {
@@ -211,18 +219,6 @@ body {
         /** the text that says "allowed differences..*/
         #allowed-differences {
             color: orange;
-        }
-
-        .meter {
-            height: 5px;
-            position: relative;
-            background: #f3efe6;
-            overflow: hidden;
-
-            span {
-                display: block;
-                height: 100%;
-            }
         }
 
         .progress {
