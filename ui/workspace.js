@@ -103,7 +103,7 @@ function addVolatileRegions() {
     // adds to DOM temporarily
 }
 
-$('#step').on('click', '.click-to-change-view',
+$('#step').on('click', '.waiting .click-to-change-view',
     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
     async function cycleEditStates(e) {
         // flip the cards

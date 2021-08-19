@@ -269,8 +269,8 @@ export class TestAction {
         //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
         let html = `
-    <div class='card ${this.classes()} click-to-change-view ${className}' data-index=${this.index}>
-        <div title='Click to cycle through\nexpected, actual, and difference views.' class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
+    <div class='card ${this.classes()} ${className}' data-index=${this.index}>
+        <div title='Click to cycle through\nexpected, actual, and difference views.' class='click-to-change-view title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
             <span style="width:100%;"><span class="match-status"></span></span>
