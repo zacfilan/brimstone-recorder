@@ -245,6 +245,9 @@ export class TestAction {
             this._view = constants.view.EDIT;
             this._match = constants.match.FAIL;
         }
+        else {
+            this._match = constants.match.PASS;
+        }
     }
 
     toThumb() {
@@ -263,15 +266,16 @@ export class TestAction {
     /** Return the html for the edit card view. */
     toHtml({title, src, className}) {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
+        //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
         let html = `
-    <div class='card ${this.classes()} ${className}' data-index=${this.index}>
-        <div class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
+    <div class='card ${this.classes()} click-to-change-view ${className}' data-index=${this.index}>
+        <div title='Click to cycle through\nexpected, actual, and difference views.' class='title'><div style="float:left;">${title}</div><div style="float:right;">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
             <span style="width:100%;"><span class="match-status"></span></span>
         </div>
-        <div class='screenshot clickable'>
+        <div class='screenshot'>
             <img src='${src}'>`;
 
         // FIXME: calculate the best location for the callout, based on the location of the overlay
@@ -357,7 +361,7 @@ export class Step {
                         src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
                         break;
                     case constants.view.EDIT:
-                        title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different`;
+                        title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
                         src = this.next.editViewDataUrl ?? '../images/notfound.png';
                         break;
                 }

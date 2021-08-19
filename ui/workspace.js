@@ -67,25 +67,17 @@ $('#ignoreDelta').on('click',
     }
 );
 
-// stop the image drap behavior
-$('#step').on('mousedown', '.card.edit img', () => false);
+$('#undo').on('click', async function() {
+    // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
+    const {view, action} = getCard('#content .waiting');
+    action.acceptablePixelDifferences = new Screenshot();
+    await action.pixelDiff();
+    updateStepInView(TestAction.instances[action.index - 1]);
+    addVolatileRegions();
+});
 
-$('#ignoreRegion').on('click',
-    /** Add rectangles where we don't care about pixel differences. */
-    async function addVolatileRegions(e) {
-        const { view } = getCard($('#content .card:nth-of-type(2)')[0]);
-        let screenshot = view.find('.screenshot');
-        screenshot.removeClass('clickable');
-        Rectangle.setContainer(screenshot[0],
-            () => {
-                console.debug('rectangle added');
-            },
-            () => {
-                console.debug('rectangle deleted');
-            });
-        // adds these to the DOM temporarily
-    }
-);
+// stop the image drag behavior
+$('#step').on('mousedown', '.card.edit img', () => false);
 
 $('#cards').on('click', '.thumb',
     /** When the user clicks on the thumbnail put that step in the main area. */
@@ -98,8 +90,21 @@ $('#cards').on('click', '.thumb',
 
 let diffPromise = false;
 
-$('#step').on('click', '.screenshot.clickable',
-    /** When clicking on an editable action, cycle through expected, actual, and edit states. */
+function addVolatileRegions() {
+    const { view } = getCard($('#content .card.waiting')[0]);
+    let screenshot = view.find('.screenshot');
+    Rectangle.setContainer(screenshot[0],
+        () => {
+            console.debug('rectangle added');
+        },
+        () => {
+            console.debug('rectangle deleted');
+        });
+    // adds to DOM temporarily
+}
+
+$('#step').on('click', '.click-to-change-view',
+    /** When clicking on an editable action, cycle through expected, actual, and difference views. */
     async function cycleEditStates(e) {
         // flip the cards
         const { view, action } = getCard(e.currentTarget);
@@ -136,10 +141,12 @@ $('#step').on('click', '.screenshot.clickable',
                     await action.pixelDiff();
                 }
                 updateStepInView(TestAction.instances[action.index - 1]);
+                    /** Add rectangles where we don't care about pixel differences. */
+                addVolatileRegions();
                 break;
             case constants.view.EDIT:
                 action._view = constants.view.EXPECTED;
-                updateStepInView(TestAction.instances[action.index - 1]);
+                await updateStepInView(TestAction.instances[action.index - 1]);
                 break;
         }
     }
@@ -213,7 +220,7 @@ function setToolbarState() {
         const { action } = getCard(editCard);
         if (action?._view === constants.view.EDIT) {
             $('#ignoreDelta').prop('disabled', false);
-            $('#ignoreRegion').prop('disabled', false);
+            $('#undo').prop('disabled', false);
         }
     }
 }

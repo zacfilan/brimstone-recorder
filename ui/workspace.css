@@ -10,6 +10,10 @@ html {
 body {
   height: 100%;
   margin: 0;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
 }
 
 .themed {
@@ -144,7 +148,7 @@ body {
   background: grey;
 }
 
-.card .screenshot:hover {
+.card .title:hover {
   cursor: pointer;
 }
 
@@ -236,6 +240,10 @@ body {
   /** show the failed progress bar as red for failed states */
   /** hide that one */
   /** the text that says "allowed differences..*/
+}
+
+#content .card.waiting.edit .screenshot {
+  cursor: crosshair;
 }
 
 #content .card.waiting .screenshot .overlay {

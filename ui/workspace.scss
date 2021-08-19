@@ -10,6 +10,7 @@ html {
 body {
     height: 100%;
     margin: 0;
+    user-select: none;
 }
 
 .themed {
@@ -118,7 +119,7 @@ body {
         background: grey;
     }
 
-    .screenshot:hover {
+    .title:hover {
         cursor: pointer;
     }
 
@@ -186,6 +187,10 @@ body {
     /* second card in step */
     /***********************/
     .card.waiting {
+        &.edit .screenshot {
+            cursor: crosshair;
+        }
+        
         .screenshot {
             .overlay { 
                 display: none;

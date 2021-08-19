@@ -72,8 +72,14 @@ Rectangle.setContainer = function (container, addCallback, delCallback) {
             Rectangle._resizing = null;
         }
     });
-}
 
+    container.addEventListener('click', e => {
+        // don't let these bubble up - we own the mouse presently.
+        e.stopPropagation();
+        e.preventDefault();
+        return false;
+    });
+};
 
 
 
