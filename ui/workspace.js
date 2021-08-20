@@ -180,15 +180,19 @@ function setToolbarState() {
         document.documentElement.style.setProperty('--action-color', 'red');
     }
     else {
+        //not recording.
         rb.prop('title', "Click to record.");
         $('#loadButton').prop('disabled', false); // playing?
         let pb = $('#playButton');
         if ($('#playButton').hasClass('active')) {
             pb.prop('disabled', false);
+            pb.prop('title', 'Brimstone is playing.\nClick to stop.');
             iconState.Play();
             document.documentElement.style.setProperty('--action-color', 'green');
         }
         else {
+            pb.prop('title', "Click to play.");
+
             // not playing, not recoding
             $('#helpButton').prop('disabled', false); // help is always given to those at hogwarts who ask for it.
             $('#issuesButton').prop('disabled', false);
@@ -239,7 +243,7 @@ $('#previous').on('click', function (e) {
 });
 
 /** Remember the state of the last play, so I can resume correctly. */
-var playedSuccessfully = true;
+var playMatchStatus = constants.match.PASS;
 
 async function attachDebuggerToActiveTabForPlay({ width, height, url }) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
@@ -278,7 +282,13 @@ async function attachDebuggerToActiveTabForRecord() {
     return true;
 }
 
-$('#playButton').on('click', async () => {
+$('#playButton').on('click', async function() {
+    let button = $(this);
+    if (button.hasClass('active')) {
+        button.removeClass('active'); // stop playing
+        player.stopPlaying();
+        return;
+    }
     try {
         $('#playButton').addClass('active');
         setToolbarState();
@@ -294,18 +304,31 @@ $('#playButton').on('click', async () => {
         });
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
+
         // we can resume a failed step. FIXME:// I need to know the last play resulted in a failed step to set this.
-        let resume = !playedSuccessfully && playFrom > 0;
-        playedSuccessfully = await player.play(actions, playFrom, resume); // players gotta play...
+        let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
+        playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
 
         $('#playButton').removeClass('active');
         setToolbarState();
 
-        setInfoBarText(playedSuccessfully ? '✅ last run passed' : `❌ last run failed after user action ${player.currentAction.index + 1}`);
-        await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
-
-        if (playedSuccessfully) {
-            alert('✅ Test passed.');
+        switch(playMatchStatus) {
+            case constants.match.PASS:
+            case constants.match.ALLOW:
+                    setInfoBarText('✅ last run passed');
+                    await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });            
+                    alert('✅ Test passed.');
+                    break;
+            case constants.match.FAIL:
+                setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
+                break;
+            case constants.match.CANCEL:
+                updateStepInView(TestAction.instances[currentStepIndex()]);
+                setInfoBarText(`❌ last run canceled after user action ${player.currentAction.index + 1}`);
+                break;
+            default:
+                setInfoBarText(`💀 unknown status reported '${playMatchStatus}'`);
+                break;
         }
     }
     catch (e) {

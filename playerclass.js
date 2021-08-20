@@ -49,6 +49,7 @@ export class Player {
      * */
     async play(actions, startIndex = 0, resume = false) {
         this._actions = actions;
+        this._stopPlaying = false;
 
         options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
@@ -61,14 +62,14 @@ export class Player {
         // start timer
         let start;
         let stop;
-        let playedSuccessfully = true; // optimist
-        for (let i = startIndex; playedSuccessfully && (i < actions.length - 1); ++i) {
+        let next;
+        for (let i = startIndex; i < actions.length - 1; ++i) {
             let action = actions[i];
             this.currentAction = action;
             action._view = constants.view.EXPECTED;
 
-            let next = actions[i + 1];
-            next._match = constants.match.PLAY; 
+            next = actions[i + 1];
+            next._match = constants.match.PLAY;
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
             }
@@ -93,23 +94,30 @@ export class Player {
                     break;
             }
 
-            let match = await this.verifyScreenshot(next);
+            await this.verifyScreenshot(next);
             stop = performance.now();
             action._view = constants.view.EXPECTED;
-            if (match) {
-                console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
-                next._view = constants.view.EXPECTED;
+            switch (next._match) {
+                case constants.match.PASS:
+                case constants.match.ALLOW:
+                    console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
+                    next._view = constants.view.EXPECTED;
+                    break;// keep on chugging
+                case constants.match.FAIL:
+                    console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
+                    return next._match; // bail early
+                    break;
+                case constants.match.CANCEL:
+                    this._stopPlaying = false;
+                    return next._match; // bail early
             }
-            else {
-                console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
-                playedSuccessfully = false;
-            }
+
             if (this.onAfterPlay) {
                 await this.onAfterPlay(action);
             }
         }
 
-        return playedSuccessfully;
+        return next._match; // should be pass!
     }
 
     async start(action) {
@@ -300,8 +308,8 @@ export class Player {
      * Repeatedly check the expected screenshot required to start the next action
      * against the actual screenshot. 
      * 
-     * @param {TestAction} nextStep the next action
-     * @returns {boolean} true when the screenshots match false when they don't
+     * @param {TestAction} nextStep the next action. modified.
+     * @returns {string} _match property in the nextStep parameter passed in
      */
     async verifyScreenshot(nextStep) {
         let start = performance.now();
@@ -312,6 +320,11 @@ export class Player {
 
         // this loop will run even if the app is in the process of navigating to the next page.
         while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
+            if (this._stopPlaying) { // asyncronously injected
+                nextStep._view = constants.view.EXPECTED;
+                nextStep._match = constants.match.CANCEL;
+                return nextStep._match;
+            }
             ++i;
             // await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
@@ -362,7 +375,7 @@ export class Player {
                 let doneIn = ((performance.now() - start) / 1000).toFixed(1);
                 let avgIteration = (doneIn / i).toFixed(1);
                 console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
-                return true;
+                return nextStep._match;
             }
         }
 
@@ -382,7 +395,7 @@ export class Player {
             delete nextStep.editViewDataUrl;
         }
 
-        return false;
+        return nextStep._match;
     }
 
     /**
@@ -479,6 +492,11 @@ export class Player {
         console.debug(`debugger attached`);
         return this._debuggerAttachPromise;
     };
+
+    async stopPlaying() {
+        /** used to async cancel a playing test */
+        this._stopPlaying = true;
+    }
 
 }
 

@@ -19,7 +19,8 @@ export const constants = {
         PASS: 'pass',
         PLAY: 'play',
         ALLOW: 'allow',
-        FAIL: 'fail'
+        FAIL: 'fail',
+        CANCEL: 'cancel'
     }
 };
 
@@ -115,7 +116,7 @@ export class TestAction {
 
     /**
      * the result of the last time we tried to match expected against actual with the mask 
-     * one of 'fail', 'allow', 'pass', 'play',  undefined. the last meaning we don't have that info.
+     * one of 'fail', 'allow', 'pass', 'play', 'cancel', undefined. the last meaning we don't have that info.
      */
     _match;
 
