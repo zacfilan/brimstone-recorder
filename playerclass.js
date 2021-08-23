@@ -140,7 +140,9 @@ export class Player {
             code: action.event.code,
             key: action.event.key,
             windowsVirtualKeyCode: keycode,
-            nativeVirtualKeyCode: keycode
+            nativeVirtualKeyCode: keycode,
+            timestamp: 0 // this will let me id a synthetic vs user event.
+
         });
         // FIXME: Verify that [ENTER] prints correctly when in a textarea
         // https://stackoverflow.com/questions/1367700/whats-the-difference-between-keydown-and-keypress-in-net
@@ -159,7 +161,8 @@ export class Player {
                 text: keycode == 13 ? '\r' : action.event.key,
                 unmodifiedtext: action.event.key,
                 windowsVirtualKeyCode: keycode,
-                nativeVirtualKeyCode: keycode
+                nativeVirtualKeyCode: keycode,
+                timestamp: 0
             };
             await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
         }
@@ -168,7 +171,8 @@ export class Player {
             code: action.event.code,
             key: action.event.key,
             windowsVirtualKeyCode: action.event.keyCode,
-            nativeVirtualKeyCode: action.event.keyCode
+            nativeVirtualKeyCode: action.event.keyCode,
+            timestamp: 0
         });
     }
 

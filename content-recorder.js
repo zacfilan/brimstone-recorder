@@ -301,9 +301,19 @@ class Recorder {
         }
 
         if (this._state === Recorder.state.SIMULATE) {
-            // FIXME: how do I know this event came from the debugger versus from from the user?!
-            // FIXME: There is a race condition here!!                
-            //console.debug(`${e.type} ${window.location.href} ${e.timeStamp} simulated`, e.target, e);
+            // how do I know this event came from the debugger versus from from the user?! perhaps this?
+            // https://bugs.chromium.org/p/chromium/issues/detail?id=746690&q=setIgnoreInputEvents&can=2
+
+            // until then I can send a timestamp of 0 on synthetic events I want to identify
+            if ((e.type === 'keydown' || e.type === 'keyup' || e.type === 'keypress') && e.timeStamp !== 0) {
+                // this is a user event, drop it.    
+                Recorder.block(e);
+                return false;
+            }
+            //else {
+                //FIXME: timestamp the other events with 0 when I see the need.              
+                //console.debug(`${e.type} ${window.location.href} ${e.timeStamp} simulated`, e.target, e);
+            //}
         }
         else {
             let msg;
@@ -350,8 +360,8 @@ class Recorder {
                     // this keydown is unrelated to chords
                     //console.debug('chord? not chord keydown');
                     msg = this.buildMsg(e);
-                    this.postMessage(msg); // take screenshot and then simulate 
                     this._state = Recorder.state.SIMULATE;
+                    this.postMessage(msg); // take screenshot and then simulate 
                     break;
                 case 'keyup':
                     if (this.keysDown.length) {
@@ -367,8 +377,8 @@ class Recorder {
                             msg = this.buildMsg(userAction);
                             this.keysUp = [];
                             this.keysDown = [];
-                            this.postMessage(msg); // take screenshot and then simulate 
                             this._state = Recorder.state.SIMULATE;
+                            this.postMessage(msg); // take screenshot and then simulate 
                         }
                         else {
                             //console.debug('chord? not all released keyup');// else not all keys are released
