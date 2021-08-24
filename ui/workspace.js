@@ -317,6 +317,7 @@ $('#playButton').on('click', async function () {
                 alert('✅ Test passed.');
                 break;
             case constants.match.FAIL:
+                updateStepInView(TestAction.instances[currentStepIndex()]);
                 setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
                 break;
             case constants.match.CANCEL:
