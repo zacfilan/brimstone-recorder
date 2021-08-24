@@ -123,6 +123,9 @@ export class TestAction {
     /** The view view of the card, really which image src to use */
     _view;
 
+    /** recorded during playback, this is the number of MBs in use after this action is performed. */
+    memoryUsed;
+
     constructor(args) {
         Object.assign(this, args);
 
@@ -158,7 +161,9 @@ export class TestAction {
             tabHeight: this.tabHeight,
             tabWidth: this.tabWidth,
             overlay: this.overlay,
-            description: this.description
+            description: this.description,
+            memoryUsed: this.memoryUsed,
+            url: this.url // only on start actions
         };
 
         if (this.expectedScreenshot) {

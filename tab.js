@@ -11,6 +11,9 @@ export class Tab {
         this.width = 0;
         /** The actual (or desired) zoomFactor of the tab, may differ from the associated chromeTab property */
         this.zoomFactor = 1;
+
+        /** The chrome tab url, or perhaps the original that redirected to the chrome tab url. */
+        this.url = null;
     }
 
     /** The number of pixels in the width when a zoomFactor is applied. */
@@ -31,7 +34,7 @@ export class Tab {
         }
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
-
+        this.url = this.chromeTab.url;
         return this;
     }
 
@@ -47,13 +50,6 @@ export class Tab {
      */
     get windowId() {
         return this.chromeTab.windowId;
-    }
-
-        /** The chrome tab url
-     * @type {string}
-     */
-    get url() {
-        return this.chromeTab.url;
     }
 
     /** Resize the viewport of this tab to match its width, height and zoom properties.

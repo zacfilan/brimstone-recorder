@@ -102,6 +102,7 @@ export class Player {
                 case constants.match.ALLOW:
                     console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
                     next._view = constants.view.EXPECTED;
+                    next.memoryUsed = await this.getClientMemoryByChromeApi();
                     break;// keep on chugging
                 case constants.match.FAIL:
                     console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
@@ -502,6 +503,30 @@ export class Player {
         this._stopPlaying = true;
     }
 
+    /**
+     * 
+     * @returns {number} MBs used in the heap
+     */
+    async getClientMemoryByChromeApi() {
+        var getMemory = function () {
+            let m = window.performance.memory;
+            console.log(`used ${m.usedJSHeapSize} bytes`); 
+            debugger;
+            return {
+                jsHeapSizeLimit: m.jsHeapSizeLimit,
+                totalJSHeapSize: m.totalJSHeapSize,
+                usedJSHeapSize: m.usedJSHeapSize
+            };
+
+        }
+        let frames = await chrome.scripting.executeScript({
+            target: { tabId: this.tab.id },
+            function: getMemory
+        });
+
+        let memory = frames[0].result;
+        return Math.ceil(memory.usedJSHeapSize / Math.pow(2, 20));  // MB
+    }
 }
 
 /** 

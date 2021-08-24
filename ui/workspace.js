@@ -245,12 +245,19 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
 
-async function attachDebuggerToActiveTabForPlay({ width, height, url }) {
+/**
+ * 
+ * @param {object} args
+ * @param {number=} args.width the width to set the active tab to
+ * @param {number=} args.height the height to set the active tab to 
+ * @param {string=} args.url the url to go to in the tab, if it is a chrome url
+ * @param {boolean=} args.checkForChromeUrls navigate to url property if the active tab is a chrome:// url
+ */
+async function attachDebuggerToActiveTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
     let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-
-    // make sure it isn't in a //chrome tab since it won't let me attach the debugger (which is needed to screen capture often)
-    if (activeChromeTab.url.startsWith('chrome')) {
+    let navigateFirst = args.url && ( (args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
+    if (navigateFirst) {
         //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
         var resolveNavigationPromise;
         let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
@@ -258,31 +265,20 @@ async function attachDebuggerToActiveTabForPlay({ width, height, url }) {
             chrome.webNavigation.onCommitted.removeListener(navCommit);
             resolveNavigationPromise(details);
         });
-        await chrome.tabs.update(activeChromeTab.id, { url: url });
+        await chrome.tabs.update(activeChromeTab.id, { url: args.url });
         let details = await navPromise; // the above nav is really done.
     }
     await tab.fromChromeTabId(activeChromeTab.id);
-    tab.height = height; // FIXME: ugly. the attachDebugger uses this tab instance to resize the tab, to the correct dimensions
-    tab.width = width;
+
+    args.height && (tab.height = args.height);
+    args.width && (tab.width = args.width);
+    args.url && (tab.url = args.url); // don't want where we end up on redirect, want where we started
     tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
     await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached
-    return true;
 }
 
-async function attachDebuggerToActiveTabForRecord() {
-    // attach for record
-    let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-    if (activeChromeTab.url.startsWith('chrome')) {
-        alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
-        return false;
-    }
-    await tab.fromChromeTabId(activeChromeTab.id);
-    await player.attachDebugger({ tab }); // required to play anything in the tab being recorded.
-    return true;
-}
-
-$('#playButton').on('click', async function() {
+$('#playButton').on('click', async function () {
     let button = $(this);
     if (button.hasClass('active')) {
         button.removeClass('active'); // stop playing
@@ -297,10 +293,11 @@ $('#playButton').on('click', async function() {
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
 
-        await attachDebuggerToActiveTabForPlay({
-            width: actions[0].tabWidth,
-            height: actions[0].tabHeight,
-            url: actions[0].url
+        await attachDebuggerToActiveTab({
+                width: actions[0].tabWidth,
+                height: actions[0].tabHeight,
+                url: actions[0].url,
+                checkForChromeUrls: true
         });
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
@@ -312,13 +309,13 @@ $('#playButton').on('click', async function() {
         $('#playButton').removeClass('active');
         setToolbarState();
 
-        switch(playMatchStatus) {
+        switch (playMatchStatus) {
             case constants.match.PASS:
             case constants.match.ALLOW:
-                    setInfoBarText('✅ last run passed');
-                    await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });            
-                    alert('✅ Test passed.');
-                    break;
+                setInfoBarText('✅ last run passed');
+                await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
+                alert('✅ Test passed.');
+                break;
             case constants.match.FAIL:
                 setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
                 break;
@@ -456,8 +453,21 @@ $('#recordButton').on('click', async function () {
     }
 
     try {
-        if (!await attachDebuggerToActiveTabForRecord()) {
-            return;
+        let url = '';
+        if (!TestAction.instances.length) {
+            url = prompt('Where to? Type or paste URL to start recording from.');
+            if(!url) {
+                return false;
+            }
+            if (url.startsWith('chrome')) {
+                alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
+                return false;
+            }
+            await attachDebuggerToActiveTab({ url: url }); // get us there bro
+        }
+        else {
+            // we are recording over some steps, don't do an initial navigate
+            await attachDebuggerToActiveTab();
         }
 
         await startRecording(tab);
@@ -577,7 +587,7 @@ var port = false;
 function setStepContent(step) {
     $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
     setToolbarState();
-    updateThumb(step.curr);
+    updateThumb(step.curr); // this isn't the cause of the slow processing of keystokes.
 };
 
 /**
