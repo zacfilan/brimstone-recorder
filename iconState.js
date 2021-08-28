@@ -5,34 +5,36 @@ const inactive = {path: '../images/grey_b_32.png', title: 'Brimstone is not acti
 // const pass = {text: '\u2705', color: [255,255,255,255], title: 'Test passed.'};
 // const fail = {text: '\u274c', color: [255,255,255,255], title: 'Test failed'}
 
-function set({path, text, color, title}) {
+async function set({path, text, color, title}) {
+    let p = [];
     if(title) {
         //chrome.action.setBadgeText({text});
-        chrome.action.setTitle({title});
+        p.push(chrome.action.setTitle({title}));
         //chrome.action.setBadgeBackgroundColor({color});
     }
-    chrome.action.setIcon({path});
+    p.push(chrome.action.setIcon({path}))
     $('#favicon').attr('href', path);
+    return Promise.all(p);
  }
  
  /** Change the extension icon to the ready state, */
 export function Ready() {
-    set(ready);
+    return set(ready);
 }
 
 /** Change the extension icon to the playing state. */
 export function Play() {
-    set(play);
+    return set(play);
 }
 
 /** Change the extension icon to the recording state. */
 export function Record() {
-    set(record);
+    return set(record);
 }
 
 /** Change the extension icon to the inactve state. */
 export function Inactive() {
-    set(inactive);
+    return set(inactive);
 }
 
 // /** Change the extension icon to the passed state. */

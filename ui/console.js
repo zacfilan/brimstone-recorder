@@ -4,7 +4,8 @@ const _console = window.console;
 const devnull = {
     log: () => {},
     warn: () => {},
-    debug: () => {}
+    debug: () => {},
+    error: _console.error
 };
 
 export function enableConsole() {

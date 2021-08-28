@@ -34,7 +34,7 @@ function isPlaying() {
 }
 
 // grab the parent window id from the query parameter
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = new URLSearchParams(window.location.search); 
 
 /** The tab being recorded/played
  * @type {Tab}
@@ -60,6 +60,7 @@ $('#ignoreDelta').on('click',
     /** Commit any volatile rectangles or individual pixel deltas. */
     async function ignoreDelta(e) {
         // if you are editing you are going to want to save, and to save we need to detach the debugger.
+        // FIXME: is this still needed?
         await player.detachDebugger();
 
         // add a mask
@@ -256,7 +257,7 @@ var playMatchStatus = constants.match.PASS;
 async function attachDebuggerToActiveTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
     let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-    let navigateFirst = args.url && ( (args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
+    let navigateFirst = args.url && ((args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
     if (navigateFirst) {
         //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
         var resolveNavigationPromise;
@@ -294,10 +295,10 @@ $('#playButton').on('click', async function () {
         player.onAfterPlay = updateStepInView;
 
         await attachDebuggerToActiveTab({
-                width: actions[0].tabWidth,
-                height: actions[0].tabHeight,
-                url: actions[0].url,
-                checkForChromeUrls: true
+            width: actions[0].tabWidth,
+            height: actions[0].tabHeight,
+            url: actions[0].url,
+            checkForChromeUrls: true
         });
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
@@ -355,23 +356,27 @@ $('#last').on('click', function (e) {
 });
 
 
-chrome.debugger.onDetach.addListener(async (source, reason) => {
+async function debuggerOnDetach(source, reason) {
     console.debug('The debugger was detached.', source, reason);
     if (reason === 'canceled_by_user' || player._debugger_detatch_requested) {
-        await sleep(500);
+        await sleep(500); // why do I wait here?
+        
+        // sometimes this is re-entered after the workspace window has been closed.
+        if(!player?.tab) {
+            console.warn('race condition avoided');
+            return;
+        }
         await player.tab.resizeViewport();
-        if (isRecording()) {
-            stopRecording();
-        }
-        if (isPlaying()) {
-            stopPlaying(); // FIXME: refactor for less code
-        }
+        stopRecording();
+        stopPlaying(); // FIXME: refactor for less code
     }
     else {
         // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
         await player.attachDebugger({ tab }); // it's the same tab...
     }
-});
+};
+
+chrome.debugger.onDetach.addListener(debuggerOnDetach);
 
 async function startRecording(tab) {
     console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
@@ -418,6 +423,8 @@ async function startRecording(tab) {
 }
 
 function stopRecording(tab) {
+    $('#recordButton').removeClass('active');
+    setToolbarState();
     // tell all frames to stop recording. i.e. disable the event handlers if possible.
     try {
         postMessage({ type: 'stop', broadcast: true });
@@ -440,7 +447,6 @@ async function focusTab() {
 $('#recordButton').on('click', async function () {
     let button = $(this);
     if (button.hasClass('active')) {
-        button.removeClass('active'); // stop recording
         // before I take the last screenshot the window must have focus again.
         await focusTab();
         let action = await userEventToAction({
@@ -448,16 +454,16 @@ $('#recordButton').on('click', async function () {
             x: -1,
             y: -1
         });
-        updateStepInView(action);
         stopRecording();
+        updateStepInView(action);
         return;
     }
 
     try {
         let url = '';
-        if (!TestAction.instances.length) {
+        if (!TestAction.instances.length || currentStepIndex() === 0) {
             url = prompt('Where to? Type or paste URL to start recording from.');
-            if(!url) {
+            if (!url) {
                 return false;
             }
             if (url.startsWith('chrome')) {
@@ -499,7 +505,6 @@ $('#recordButton').on('click', async function () {
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
-
     }
     catch (e) {
         stopRecording();

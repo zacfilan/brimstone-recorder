@@ -15,7 +15,7 @@ async function getWorkspaceInfo() {
  * https://developer.chrome.com/docs/extensions/reference/tabs/#event-onActivated
  */
 async function tabsOnActivatedHandler(activeInfo) {
-  let tab = await chrome.tabs.get(activeInfo.tabId);
+  //let tab = await chrome.tabs.get(activeInfo.tabId); NO NO NO cN'T GET IT IF IT IS BEING CREATED
   // tab.pendingUrl would be the identifier we will use eventually
   //console.debug('active tab changed', activeInfo, tab);
 }
@@ -28,25 +28,10 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
   //console.debug('tab removed ', tabId, removeInfo);
   let workspace = await getWorkspaceInfo();
   if (tabId === workspace?.tabId) {
-    chrome.windows.remove(workspace.windowId);
-  }
-}
-
-/** 
-* Pay attention to windows being removed.
-* */
-async function windowsOnRemovedHandler(windowId) {
-  //console.log(`window ${windowId} closed`);
-
-  // was it the workspace window that was removed?
-  let workspace = await getWorkspaceInfo();
-  if (windowId === workspace?.windowId) {
-
-    // update the extension icon
-    // not sure how to import iconState module into here so
-    await chrome.storage.local.remove('workspace');
-    await chrome.action.setIcon({ path: 'images/grey_b_32.png' });
-    await chrome.action.setTitle({ title: 'Brimstone is not active.' });
+    await (Promise.all([
+      chrome.action.setIcon({ path: 'images/grey_b_32.png' }),
+      chrome.action.setTitle({ title: 'Brimstone is not active.' })
+    ]));
 
     // disconnect the handlers
     chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
@@ -56,6 +41,13 @@ async function windowsOnRemovedHandler(windowId) {
     chrome.tabs.onRemoved.removeListener(tabsOnRemovedHandler);
     chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
   }
+}
+
+/** 
+* Pay attention to windows being removed.
+* */
+async function windowsOnRemovedHandler(windowId) {
+  //console.log(`window ${windowId} closed`);
 }
 
 /** 
@@ -108,7 +100,7 @@ async function actionOnClickedHandler(tab) {
       }
     }
     catch (e) {
-      console.error(e); // at least report it in the extension details area
+      console.log('cannot find an open brimstone workspace window');
     }
   }
 
@@ -129,8 +121,8 @@ async function actionOnClickedHandler(tab) {
     left
   });
 
-  // keep track of the brimstone window id between invocations of this worker (i.e. multiple clicks of icon)
-  chrome.storage.local.set({ workspace: { windowId: window.id, tabId: tab.id } });
+  // keep track of the brimstone window id, and the tab in it between invocations of this worker (i.e. multiple clicks of icon)
+  chrome.storage.local.set({ workspace: { windowId: window.id, tabId: window.tabs[0].id } });
 
   /* register handlers */
   chrome.windows.onBoundsChanged.addListener(windowsOnBoundsChangedHandler);
