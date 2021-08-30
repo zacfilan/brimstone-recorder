@@ -79,6 +79,17 @@ $('#undo').on('click', async function () {
     addVolatileRegions();
 });
 
+$("#replace").on('click', async function () {
+    // push the actual into the expected and be done with it.
+    const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
+    action.expectedScreenshot.png = action.actualScreenshot.png;
+    action.expectedScreenshot.dataUrl = action.actualScreenshot.dataUrl;
+    action.acceptablePixelDifferences = new Screenshot();
+    await action.pixelDiff();
+    updateStepInView(TestAction.instances[action.index - 1]);
+    addVolatileRegions();
+});
+
 // stop the image drag behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
 
@@ -228,6 +239,7 @@ function setToolbarState() {
         if (action?._view === constants.view.EDIT) {
             $('#ignoreDelta').prop('disabled', false);
             $('#undo').prop('disabled', false);
+            $('#replace').prop('disabled', false);
         }
     }
 }
@@ -257,7 +269,7 @@ var playMatchStatus = constants.match.PASS;
 async function attachDebuggerToActiveTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
     let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-    let navigateFirst = args.url && ((args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
+    let navigateFirst = args?.url && ((args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
     if (navigateFirst) {
         //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
         var resolveNavigationPromise;
@@ -271,9 +283,9 @@ async function attachDebuggerToActiveTab(args) {
     }
     await tab.fromChromeTabId(activeChromeTab.id);
 
-    args.height && (tab.height = args.height);
-    args.width && (tab.width = args.width);
-    args.url && (tab.url = args.url); // don't want where we end up on redirect, want where we started
+    args?.height && (tab.height = args.height);
+    args?.width && (tab.width = args.width);
+    args?.url && (tab.url = args.url); // don't want where we end up on redirect, want where we started
     tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
     await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached
@@ -331,14 +343,11 @@ $('#playButton').on('click', async function () {
         }
     }
     catch (e) {
+        setInfoBarText('💀 aborted! ' + e?.message ?? '');
         $('#playButton').removeClass('active');
         setToolbarState();
-        setInfoBarText('💀 aborted! ' + e?.message ?? '');
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
-        }
-        else {
-            throw e;
         }
     }
 
