@@ -350,7 +350,7 @@ export class Player {
                     break;
             }
 
-            nextStep.actualScreenshot = await this.takeScreenshot(nextStep.expectedScreenshot.png.width, nextStep.expectedScreenshot.png.height);
+            nextStep.actualScreenshot = await this.takeScreenshot(this.tab.width, this.tab.height);
             if (!nextStep.actualScreenshot) {
                 console.debug('unable to obtain screenshot!');
                 continue; // couldn't get screenshot for some reason - well it didn't match then. loop.
@@ -435,10 +435,16 @@ export class Player {
         try {
             await this._debuggerDetachPromise;
             await this._debuggerAttachPromise;
-            return await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
+            let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
+            if(chrome.runtime.lastError?.message) {
+                console.warn('result:', result, 'lastError:', chrome.runtime.lastError.message);
+                throw new Error(chrome.runtime.lastError.message);
+            }
+            return result; // the debugger method may be a getter of some kind.
         }
         catch (e) {
-            if (e.message === 'detached while') {
+            console.warn('got', e);
+            if (e.message && (e.message.includes('detached while') || e.message.includes('Debugger is not attached'))) {
                 return; // we have a handler for when the debugger detaches, if there was something in flight ignore it.
             }
             throw e;

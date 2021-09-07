@@ -182,7 +182,7 @@ function setInfoBarText(infobarText) {
 }
 
 function setToolbarState() {
-    $('button').prop('disabled', true); // start with all disabled and selectively enable some
+    $('#toolbar button').prop('disabled', true); // start with all disabled and selectively enable some
 
     let rb = $('#recordButton');
     if (rb.hasClass('active')) { // recording?
@@ -288,7 +288,8 @@ async function attachDebuggerToActiveTab(args) {
     args?.url && (tab.url = args.url); // don't want where we end up on redirect, want where we started
     tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
-    await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached
+    await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached, the recorder does not need to be injected
+    return navigateFirst;
 }
 
 $('#playButton').on('click', async function () {
@@ -306,7 +307,7 @@ $('#playButton').on('click', async function () {
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
 
-        await attachDebuggerToActiveTab({
+        let navigatedFirst = await attachDebuggerToActiveTab({
             width: actions[0].tabWidth,
             height: actions[0].tabHeight,
             url: actions[0].url,
@@ -314,9 +315,13 @@ $('#playButton').on('click', async function () {
         });
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
-
-        // we can resume a failed step. FIXME:// I need to know the last play resulted in a failed step to set this.
+        // we can resume a failed step. 
         let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
+
+        if(navigatedFirst && playFrom === 0) {
+            playFrom = 1;
+        }
+
         playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
 
         $('#playButton').removeClass('active');
@@ -796,10 +801,11 @@ async function webNavigationOnCompleteHandler(details) {
 
         await startRecording(tab);
         await tab.resizeViewport();
+
     }
     catch (e) {
-        await errorDialog(e);
-        stopRecording();
+        // this can be some intermediate redirect page(s) that the user doesn't actually interact with
+        console.log('navigation completion failed.', e);
     }
 }
 

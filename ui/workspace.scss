@@ -280,7 +280,7 @@ body {
     background: black;
     position: absolute;
     left: calc(50% - 150px);
-    top: calc(50% - 150px);
+    top: 0;
 
     .header {
         border-bottom: 1px solid;
@@ -298,14 +298,19 @@ body {
     }
     .body {
         padding: 10px;
-        .stack {
-            user-select: text;
+        details {
+            height: 100px;
+        
+            .stack {
+                user-select: text;
 
-            max-width: 370px;
-            max-height: 200px;
-            overflow: auto;
-            border: 1px solid gray;
-            padding: 0.5em;
+                max-width: 370px;
+                max-height: 85px;
+                overflow: auto;
+                border: 1px solid gray;
+                padding: 0;
+                margin: 0;
+            }
         }
     }
     .footer {

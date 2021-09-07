@@ -58,7 +58,7 @@ export class Tab {
         // empirically, it needs to be visible to work
         await chrome.windows.update(this.windowId, { focused: true });
 
-        //console.debug(`resize viewport to ${this.width}x${this.height} requested`);
+        console.debug(`resize viewport to ${this.width}x${this.height} requested`);
  
         let i = 0; let distance;
         let matched = 0;
@@ -70,7 +70,7 @@ export class Tab {
                     width: distance.borderWidth + this.zoomWidth,
                     height: distance.borderHeight + this.zoomHeight
                 });
-                //console.debug(`  resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
+                console.debug(`  resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
             }
             else {
                 // measure twice cut once? It seems that I may be getting a stale measurement the first time.
@@ -81,7 +81,7 @@ export class Tab {
             }
         }
 
-        //console.debug(`  viewport now measured to be ${distance.innerWidth}x${distance.innerHeight}`);
+        console.debug(`  viewport now measured to be ${distance.innerWidth}x${distance.innerHeight}`);
         if (i == 10) {
             throw new Error("cannot set desired viewport");
         }
