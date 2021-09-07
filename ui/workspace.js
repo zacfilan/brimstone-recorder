@@ -3,7 +3,7 @@ import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
-import { sleep } from "../utilities.js";
+import { sleep, errorDialog } from "../utilities.js";
 import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
@@ -34,7 +34,7 @@ function isPlaying() {
 }
 
 // grab the parent window id from the query parameter
-const urlParams = new URLSearchParams(window.location.search); 
+const urlParams = new URLSearchParams(window.location.search);
 
 /** The tab being recorded/played
  * @type {Tab}
@@ -343,11 +343,14 @@ $('#playButton').on('click', async function () {
         }
     }
     catch (e) {
-        setInfoBarText('💀 aborted! ' + e?.message ?? '');
         $('#playButton').removeClass('active');
         setToolbarState();
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger(s) first.");
+        }
+        else {
+            setInfoBarText('💀 aborted! ' + e?.message ?? '');
+            await errorDialog(e);
         }
     }
 
@@ -369,9 +372,9 @@ async function debuggerOnDetach(source, reason) {
     console.debug('The debugger was detached.', source, reason);
     if (reason === 'canceled_by_user' || player._debugger_detatch_requested) {
         await sleep(500); // why do I wait here?
-        
+
         // sometimes this is re-entered after the workspace window has been closed.
-        if(!player?.tab) {
+        if (!player?.tab) {
             console.warn('race condition avoided');
             return;
         }
@@ -520,7 +523,7 @@ $('#recordButton').on('click', async function () {
         if (e === 'debugger_already_attached') {
             window.alert("You must close the existing debugger first.");
         }
-        else if (e === "cannot_set_desired_viewport") {
+        else if (e?.message === "cannot set desired viewport") {
             window.alert("Cannot resize the recording window. Do not start a recording maximized, space is needed for the debugger banner.");
         }
         else {
@@ -770,7 +773,7 @@ async function onMessageHandler(message, _port) {
             console.debug(`connection established from frame ${userEvent.sender.frameId}`);
             break;
         default:
-            console.error(`unexpected userEvent received <${userEvent.type}>`);
+            console.warn(`unexpected userEvent received <${userEvent.type}>`);
             break;
     }
 };
@@ -780,18 +783,24 @@ async function onMessageHandler(message, _port) {
  * https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
  */
 async function webNavigationOnCompleteHandler(details) {
-    console.debug(`tab ${details.tabId} navigation completed`, details);
-    if (details.url === 'about:blank') {
-        console.debug(`    - ignoring navigation to page url 'about:blank'`);
-        return;
-    }
-    const { height, width } = tab; // hang onto the original size
-    await tab.fromChromeTabId(details.tabId); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
-    tab.height = height;
-    tab.width = width;
+    try {
+        console.debug(`tab ${details.tabId} navigation completed`, details);
+        if (details.url === 'about:blank') {
+            console.debug(`    - ignoring navigation to page url 'about:blank'`);
+            return;
+        }
+        const { height, width } = tab; // hang onto the original size
+        await tab.fromChromeTabId(details.tabId); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
+        tab.height = height;
+        tab.width = width;
 
-    await startRecording(tab);
-    await tab.resizeViewport();
+        await startRecording(tab);
+        await tab.resizeViewport();
+    }
+    catch (e) {
+        await errorDialog(e);
+        stopRecording();
+    }
 }
 
 /** Used to wait for all frameoffsets to be reported */

@@ -4,7 +4,7 @@ import { Screenshot } from "./ui/screenshot.js";
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
-import { sleep } from "./utilities.js";
+import { sleep, errorDialog } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
 import { getHydratedForPlayPromise } from "./ui/loader.js";
@@ -398,6 +398,7 @@ export class Player {
             delete nextStep.actualScreenshot;
             delete nextStep.lastVerifyScreenshotDiffDataUrl;
             delete nextStep.editViewDataUrl;
+            await errorDialog(new Error('Unable to create screenshot'));
         }
 
         return nextStep._match;
@@ -418,7 +419,7 @@ export class Player {
             if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
                 console.debug(`require ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}`);
                 await this.tab.resizeViewport();
-                throw 'resize and try again'; // try one more time after a resize?
+                throw new Error('unable to obtain screenshot'); // try one more time after a resize?
             }
             return new Screenshot({
                 png,
@@ -426,7 +427,7 @@ export class Player {
             });
         }
         catch (e) {
-            console.warn(`unable to obtain screenshot: `, e);
+            console.warn(e);
         }
     }
 

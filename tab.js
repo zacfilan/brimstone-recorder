@@ -83,7 +83,7 @@ export class Tab {
 
         //console.debug(`  viewport now measured to be ${distance.innerWidth}x${distance.innerHeight}`);
         if (i == 10) {
-            throw "cannot_set_desired_viewport";
+            throw new Error("cannot set desired viewport");
         }
     }
 

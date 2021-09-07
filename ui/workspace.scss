@@ -11,6 +11,7 @@ body {
     height: 100%;
     margin: 0;
     user-select: none;
+    position: relative;
 }
 
 .themed {
@@ -163,7 +164,7 @@ body {
 }
 
 /***********************/
-/* second card in step */ 
+/* second card in step */
 /***********************/
 #content {
     display: flex;
@@ -181,18 +182,18 @@ body {
             border-radius: 6px;
             padding: 5px;
         }
-    } 
+    }
 
-    /***********************/ 
+    /***********************/
     /* second card in step */
     /***********************/
     .card.waiting {
         &.edit .screenshot {
             cursor: crosshair;
         }
-        
+
         .screenshot {
-            .overlay { 
+            .overlay {
                 display: none;
             }
             .action {
@@ -250,7 +251,7 @@ body {
         opacity: 0;
     }
 }
- 
+
 .pulse {
     animation: opacity2 2s infinite;
 }
@@ -266,5 +267,61 @@ body {
         height: 12px;
         padding: 5px;
         line-height: 1em;
+    }
+}
+
+.error-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    height: 300px;
+    margin: 0 auto;
+    border: 1px solid;
+    background: black;
+    position: absolute;
+    left: calc(50% - 150px);
+    top: calc(50% - 150px);
+
+    .header {
+        border-bottom: 1px solid;
+        .content {
+            font-size: 14px;
+            padding: 10px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            svg {
+                width: 32px;
+                margin-right: 0.5em;
+            }
+        }
+    }
+    .body {
+        padding: 10px;
+        .stack {
+            user-select: text;
+
+            max-width: 370px;
+            max-height: 200px;
+            overflow: auto;
+            border: 1px solid gray;
+            padding: 0.5em;
+        }
+    }
+    .footer {
+        padding: 10px;
+        align-self: flex-end;
+        margin-top: auto;
+        button {
+            .content {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                svg {
+                    width: 14px;
+                    margin-right: 0.5em;
+                }
+            }
+        }
     }
 }

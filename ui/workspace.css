@@ -14,6 +14,7 @@ body {
      -moz-user-select: none;
       -ms-user-select: none;
           user-select: none;
+  position: relative;
 }
 
 .themed {
@@ -334,5 +335,88 @@ body {
   height: 12px;
   padding: 5px;
   line-height: 1em;
+}
+
+.error-dialog {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  width: 300px;
+  height: 300px;
+  margin: 0 auto;
+  border: 1px solid;
+  background: black;
+  position: absolute;
+  left: calc(50% - 150px);
+  top: calc(50% - 150px);
+}
+
+.error-dialog .header {
+  border-bottom: 1px solid;
+}
+
+.error-dialog .header .content {
+  font-size: 14px;
+  padding: 10px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.error-dialog .header .content svg {
+  width: 32px;
+  margin-right: 0.5em;
+}
+
+.error-dialog .body {
+  padding: 10px;
+}
+
+.error-dialog .body .stack {
+  -webkit-user-select: text;
+     -moz-user-select: text;
+      -ms-user-select: text;
+          user-select: text;
+  max-width: 370px;
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid gray;
+  padding: 0.5em;
+}
+
+.error-dialog .footer {
+  padding: 10px;
+  -ms-flex-item-align: end;
+      align-self: flex-end;
+  margin-top: auto;
+}
+
+.error-dialog .footer button .content {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.error-dialog .footer button .content svg {
+  width: 14px;
+  margin-right: 0.5em;
 }
 /*# sourceMappingURL=workspace.css.map */
