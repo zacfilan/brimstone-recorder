@@ -444,7 +444,7 @@ export class Player {
         }
         catch (e) {
             console.warn('got', e);
-            if (e.message && (e.message.includes('detached while') || e.message.includes('Debugger is not attached'))) {
+            if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
                 return; // we have a handler for when the debugger detaches, if there was something in flight ignore it.
             }
             throw e;

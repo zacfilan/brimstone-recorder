@@ -163,7 +163,8 @@ export class TestAction {
             overlay: this.overlay,
             description: this.description,
             memoryUsed: this.memoryUsed,
-            url: this.url // only on start actions
+            url: this.url, // only on start actions
+            hoverTime: this.hoverTime
         };
 
         if (this.expectedScreenshot) {
