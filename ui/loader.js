@@ -90,7 +90,7 @@ export function hydrateForPlay() {
     for (let i = 0; i < TestAction.instances.length; ++i) {
         let action = TestAction.instances[i];
         if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
-            if(action.acceptablePixelDifferences) {
+            if(action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
                 screenshotPromise = action.acceptablePixelDifferences.hydrate();
                 screenshotPromises.push(screenshotPromise);
             } 

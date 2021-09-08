@@ -173,11 +173,11 @@ export class TestAction {
             clone.expectedScreenshot = { fileName: this.expectedScreenshot.fileName }; // delete the large dataUrl when serializing
         }
 
-        if (this.actualScreenshot && this.numDiffPixels && this.actualScreenshot.fileName) {
+        if (this.actualScreenshot?.fileName && this.numDiffPixels) {
             clone.actualScreenshot = { fileName: this.actualScreenshot.fileName }; // delete the large dataUrl when serializing
         }
 
-        if (this.acceptablePixelDifferences) {
+        if (this.acceptablePixelDifferences?.fileName) {
             clone.acceptablePixelDifferences = { fileName: this.acceptablePixelDifferences.fileName };
         }
 
@@ -298,8 +298,8 @@ export class TestAction {
         let footer = this.memoryUsed ? this.memoryUsed + 'MBs in use' : '';
 
         html += `
-        <div class='footer'>${footer}</div>
         </div>
+        <div class='footer'>${footer}</div>
     </div>`;
 
         return html;
