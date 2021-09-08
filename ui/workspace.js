@@ -317,9 +317,13 @@ $('#playButton').on('click', async function () {
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
         // we can resume a failed step. 
         let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
-
         if(navigatedFirst && playFrom === 0) {
-            playFrom = 1;
+            playFrom = 1; // don't navigate to the start twice
+        }
+        else if(playFrom === TestAction.instances.length - 1) {
+            // common to record then immediately hit play, so do the rewind for the user
+            playFrom = 0;
+            resume = false;
         }
 
         playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
