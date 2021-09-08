@@ -164,7 +164,9 @@ export class TestAction {
             description: this.description,
             memoryUsed: this.memoryUsed,
             url: this.url, // only on start actions
-            hoverTime: this.hoverTime
+            hoverTime: this.hoverTime,
+            deltaX: this.deltaX,
+            deltaY: this.deltaY
         };
 
         if (this.expectedScreenshot) {
@@ -293,7 +295,10 @@ export class TestAction {
             <div class='action callout user-event' data-index='${this.index}' style='top:${o.top + o.height}%;left:${o.left}%;'>${this.description}</div>
             `;
         }
+        let footer = this.memoryUsed ? this.memoryUsed + 'MBs in use' : '';
+
         html += `
+        <div class='footer'>${footer}</div>
         </div>
     </div>`;
 
