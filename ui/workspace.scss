@@ -120,13 +120,30 @@ body {
         background: grey;
     }
 
-    .title:hover {
-        cursor: pointer;
-    }
-
     .title {
         color: white;
-        padding: 1em 0em;
+        padding: 1em;
+        display: flex;
+        align-items: center;
+        height: 20px;
+
+        svg {
+            height: 20px;
+            width: 20px;
+            path {
+                fill: red;
+            }
+            margin-right: .3em;
+        }
+
+        &:hover {
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .stepNumber {
+            margin-left: auto; // right align him
+        }
     }
 
     .user-events {

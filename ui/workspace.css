@@ -149,13 +149,35 @@ body {
   background: grey;
 }
 
-.card .title:hover {
-  cursor: pointer;
-}
-
 .card .title {
   color: white;
-  padding: 1em 0em;
+  padding: 1em;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  height: 20px;
+}
+
+.card .title svg {
+  height: 20px;
+  width: 20px;
+  margin-right: .3em;
+}
+
+.card .title svg path {
+  fill: red;
+}
+
+.card .title:hover {
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.card .title .stepNumber {
+  margin-left: auto;
 }
 
 .card .user-events {
