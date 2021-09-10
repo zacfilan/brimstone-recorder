@@ -307,6 +307,22 @@ export class Player {
         }
     }
 
+    /** Chords must start with Alt, Ctrl, Meta/Command, or Shift */
+    async sendKeys(action) {
+        for (let i = 0; i < action.events.length; ++i) {
+            let keyEvent = action.events[i];
+            let args = {
+                type: keyEvent.type,
+                //                modifiers: Ctrl,
+                code: keyEvent.code,
+                key: keyEvent.key,
+                windowsVirtualKeyCode: keyEvent.keyCode,
+                nativeVirtualKeyCode: keyEvent.keyCode
+            };
+            await this.debuggerSendCommand('Input.dispatchKeyEvent', args);
+        }
+    }
+
     /**
      * Called after we play the current action.
      * 
@@ -320,7 +336,7 @@ export class Player {
         let start = performance.now();
 
         /** Used to display the results of applying the acceptableDifferences to the actual image. */
-        let differencesPng;
+        let differencesPng = false;
         let i = 0;
 
         // this loop will run even if the app is in the process of navigating to the next page.
@@ -350,13 +366,31 @@ export class Player {
                     break;
             }
 
-            nextStep.actualScreenshot = await this.takeScreenshot(this.tab.width, this.tab.height);
-            if (!nextStep.actualScreenshot) {
-                console.debug('unable to obtain screenshot!');
-                continue; // couldn't get screenshot for some reason - well it didn't match then. loop.
-            }
-            nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
+            differencesPng = false; // if the last time through we were able to take a screenshot or not
 
+            // FIXME: why can this.tab.height != nextStep.expectedScreenshot.png.height ??
+            // 1. The debugger attach banner is in flux during a navigation. expected to be handled this way.
+            // 2. The original resize to accomodate the debug banner didn't work. I think this is occurring on my laptop
+            //    because the window snap-to function is re-snapping and making the window smaller again after I do increase its size.
+            // warn on this case better? Eventually this is detectable.
+
+            // If I move it out of the snap region the resize does happen, but then the screenshot taken is too big! Because I am 
+            // using REAL tab height which already includes the debug banner.
+
+            // these parameters are here to resize the friggin screen in the first place - so png height is right? why did I ever switch the
+            // tab sizes in the first place??
+            try {
+                // this is a little weird, I can check the size before hand, but it's more efficient to 
+                // assume that it will work, than to check every time. make the common case fast.
+                nextStep.actualScreenshot = await this._takeScreenshot(this.tab.width, this.tab.height);
+            }
+            catch (e) {
+                console.debug(e.message + '. resize and try again.');
+                await this.tab.resizeViewport(); // I am assuming it was because of the size
+                continue;
+            }
+
+            nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
             let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(nextStep.expectedScreenshot.png, nextStep.actualScreenshot.png, nextStep.acceptablePixelDifferences?.png);
 
             // FIXME: this should be factored into the card I think
@@ -398,77 +432,112 @@ export class Player {
             delete nextStep.actualScreenshot;
             delete nextStep.lastVerifyScreenshotDiffDataUrl;
             delete nextStep.editViewDataUrl;
-            await errorDialog(new Error('Unable to create screenshot'));
+            throw new Error('Unable to create screenshot');
         }
 
         return nextStep._match;
     }
 
+    /** 
+     * Uses the debugger API to capture a screenshot.
+     * Returns the dataurl on success.
+     * 
+     * @throws {Exception} on failure.
+     */
+    async captureScreenshotAsDataUrl() {
+        let result = await this.debuggerSendCommand('Page.captureScreenshot', {
+            format: 'png'
+        });
+
+        // result can come back undefined/null. (e.g. debugger not attached, or can detach wihle the command is in flight)
+        let dataUrl = 'data:image/png;base64,' + result.data;
+        return dataUrl;
+    }
+
     /**
-    * Take a screenshot of an expected size.
+    * Take a screenshot of an expected size. May attempt to resize the viewport as well.
+    * This is a proivate method that is only expected to be called by verifyScreenshot.
+    * Swallows exceptions, returns truthy value.
+    * @param {number} expectedWidth expected width of screenshot
+    * @param {number} expectedHeight expected height of screenshot
+    * @returns Screenshot on success
+    * @throws on failure
     */
-    async takeScreenshot(expectedWidth, expectedHeight) {
-        try {
-            // unthrottled. 
-            let result = await this.debuggerSendCommand('Page.captureScreenshot', {
-                format: 'png'
-            });
-            // result can come back undefined/null. (debugger not attached?)
-            let dataUrl = 'data:image/png;base64,' + result.data;
-            let png = await Player.dataUrlToPNG(dataUrl);
-            if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
-                console.debug(`require ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}`);
-                await this.tab.resizeViewport();
-                throw new Error('unable to obtain screenshot'); // try one more time after a resize?
-            }
-            return new Screenshot({
-                png,
-                dataUrl
-            });
+    async _takeScreenshot(expectedWidth, expectedHeight) {
+        // unthrottled. 
+        let dataUrl = await this.captureScreenshotAsDataUrl();
+        let png = await Player.dataUrlToPNG(dataUrl);
+        if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
+            throw new Error(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}.`);
         }
-        catch (e) {
-            console.warn(e);
-        }
+        return new Screenshot({
+            png,
+            dataUrl
+        });
     }
 
+    /** 
+     * Send the command to the debugger on the current tab.
+     * Returns command result on success.
+     * @throws {Exception} on failure.
+     */
+    async _debuggerSendCommandRaw(method, commandParams) {
+        let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
+        if (chrome.runtime.lastError?.message) {
+            console.warn('result:', result, 'lastError:', chrome.runtime.lastError.message);
+            throw new Error(chrome.runtime.lastError.message);
+        }
+        return result; // the debugger method may be a getter of some kind.
+    }
+
+    /** 
+     * Force (re)attach the debugger (if necessary) and send the command.
+     * Returns command result on success.
+     * @throws {Exception} on failure.
+     */
     async debuggerSendCommand(method, commandParams) {
-        try {
-            await this._debuggerDetachPromise;
-            await this._debuggerAttachPromise;
-            let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
-            if(chrome.runtime.lastError?.message) {
-                console.warn('result:', result, 'lastError:', chrome.runtime.lastError.message);
-                throw new Error(chrome.runtime.lastError.message);
+        let i = 0;
+        var lastException;
+        for (i = 0; i < 2; ++i) { // at most twice 
+            try {
+                return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
             }
-            return result; // the debugger method may be a getter of some kind.
+            catch (e) {
+                console.warn('got', e);
+                lastException = e;
+                if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
+                    await this.attachDebugger({ tab: this.tab });
+                }
+                else {
+                    throw lastException;
+                }
+            }
         }
-        catch (e) {
-            console.warn('got', e);
-            if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
-                return; // we have a handler for when the debugger detaches, if there was something in flight ignore it.
-            }
-            throw e;
+        if (i == 2) {
+            throw lastException;
         }
     }
 
-    /** Schedule detaching the debugger from the current tab.*/
-    async detachDebugger() {
-        console.debug("schedule detaching debugger");
-        //await this._attachDebuggerPromise; // if there is one in flight wait for it.
-
-        this._debugger_detatch_requested = true;
+    /** 
+     * Schedule detaching the debugger from the current tab.
+     * Unused? 
+     * */
+    async detachDebugger(debugee) {
         if (!this.tab) {
-            this._debuggerDetachPromise = Promise.resolve();
+            return;
         }
-        else {
-            this._debuggerDetachPromise = new Promise(resolve => {
-                chrome.debugger.detach({ tabId: this.tab.id }, () => {
-                    resolve(chrome.runtime.lastError);
-                });
-            });
+
+        if (!debugee) {
+            debugee = {
+                tabId: this.tab.id
+            }
         }
-        await this._debuggerDetachPromise;
-        console.debug("debugger detached");
+
+        this._debugger_detach_requested = true; // in the onDetach handler don't try to reattach
+        await (new Promise(_resolve => chrome.debugger.detach(debugee, _resolve))); // should trigger the attach automagically
+        if (chrome.runtime.lastError?.message) {
+            throw new Error(chrome.runtime.lastError.message);
+        }
     }
 
     /** Schedule attaching the debugger to the given tab.
@@ -476,24 +545,25 @@ export class Player {
     */
     async attachDebugger({ tab }) {
         console.debug(`schedule attach debugger`);
+
         await this._debuggerDetachPromise; // if there is one in flight wait for it.
-        this._debugger_detatch_requested = false;
+        this._debugger_detach_requested = false;
         this.tab = tab;
 
-        await (new Promise(async (resolve, reject) => {
-            let p = new Promise(resolve => chrome.debugger.getTargets(resolve));
-            let targets = await p;
-            if (!targets.find(target => target.tabId === tab.id && target.attached)) {
-                chrome.debugger.attach({ tabId: tab.id }, "1.3", resolve);
+        let debuggerAttached = false;
+        try {
+            await this._debuggerSendCommandRaw('Page.bringToFront'); // if this throws we know we aren't driving
+            console.debug(`a drivable debugger is already attached to tab ${tab.id}`); // we can drive 
+            debuggerAttached = true;
+        }
+        catch (e) { }
+
+        if (!debuggerAttached) {
+            await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", _resolve)));
+            if (chrome.runtime.lastError?.message) {
+                throw new Error(chrome.runtime.lastError.message);
             }
-            else {
-                // As long as the user didn't manually attach a debugger to this tab, then we are ok to reuse it, which is a better experience for the user
-                // However if, the user (or me as a dev) attach the devtools manually to page being recorded that will confuse this logic, 
-                // and we might not be able control the browser. FIXME: I can't yet tell the difference programatically.
-                console.debug(`a debugger is already attached to tab ${tab.id}`);
-                resolve('the debugger is already attached');
-            }
-        }));
+        }
 
         // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
         // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
@@ -517,7 +587,7 @@ export class Player {
     async getClientMemoryByChromeApi() {
         var getMemory = function () {
             let m = window.performance.memory;
-            console.log(`used ${m.usedJSHeapSize} bytes`); 
+            console.log(`used ${m.usedJSHeapSize} bytes`);
             debugger;
             return {
                 jsHeapSizeLimit: m.jsHeapSizeLimit,

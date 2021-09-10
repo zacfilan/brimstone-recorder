@@ -14,6 +14,16 @@ setToolbarState();
 
 window.document.title = 'Brimstone - untitled';
 
+// catch all unhandled rejections and report them
+window.addEventListener('unhandledrejection', function (e) {
+    errorDialog(e.reason);
+});
+
+window.addEventListener("error", function (e) {
+    errorDialog(e.error);
+    return false;
+});
+
 /** The index of the first card showing in big step area */
 function currentStepIndex() {
     let index = $('#content .card:first-of-type').attr('data-index');
@@ -22,7 +32,6 @@ function currentStepIndex() {
     }
     return -1; // not found
 }
-
 /** Are we in the recording state? */
 function isRecording() {
     return $('#recordButton').hasClass('active');
@@ -59,9 +68,6 @@ var _lastScreenshot;
 $('#ignoreDelta').on('click',
     /** Commit any volatile rectangles or individual pixel deltas. */
     async function ignoreDelta(e) {
-        // if you are editing you are going to want to save, and to save we need to detach the debugger.
-        // FIXME: is this still needed?
-        await player.detachDebugger();
 
         // add a mask
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
@@ -270,6 +276,13 @@ async function attachDebuggerToActiveTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
     let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
     let navigateFirst = args?.url && ((args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
+    
+    let w = await chrome.windows.get(activeChromeTab.windowId);
+    if(w.state !== 'normal') {
+        window.alert(`The window state of the tab you want to record or playback is '${w.state}'. It will be set to 'normal' to continue.`);
+        await chrome.windows.update(activeChromeTab.windowId, {state: 'normal'});
+    }
+    
     if (navigateFirst) {
         //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
         var resolveNavigationPromise;
@@ -281,6 +294,7 @@ async function attachDebuggerToActiveTab(args) {
         await chrome.tabs.update(activeChromeTab.id, { url: args.url });
         let details = await navPromise; // the above nav is really done.
     }
+    
     await tab.fromChromeTabId(activeChromeTab.id);
 
     args?.height && (tab.height = args.height);
@@ -317,10 +331,10 @@ $('#playButton').on('click', async function () {
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
         // we can resume a failed step. 
         let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
-        if(navigatedFirst && playFrom === 0) {
+        if (navigatedFirst && playFrom === 0) {
             playFrom = 1; // don't navigate to the start twice
         }
-        else if(playFrom === TestAction.instances.length - 1) {
+        else if (playFrom === TestAction.instances.length - 1) {
             // common to record then immediately hit play, so do the rewind for the user
             playFrom = 0;
             resume = false;
@@ -359,7 +373,7 @@ $('#playButton').on('click', async function () {
         }
         else {
             setInfoBarText('💀 aborted! ' + e?.message ?? '');
-            await errorDialog(e);
+            throw e;
         }
     }
 
@@ -376,11 +390,20 @@ $('#last').on('click', function (e) {
     updateStepInView(TestAction.instances[TestAction.instances.length - 1]);
 });
 
+// we have a handler for when the debugger detaches, if there was a command in flight when the debugger deattached
+// it may be ok to ignore it, the only one I can think of is during *playback* while we are waiting to verify by reading screenshots
+// and the debugger is detached because playback is in the middle of a navigation. that closes the debugger, which should reattach,
+// the verify loop should pick up where it was just fine.
 
+
+// if the user manually closes the debugger and then tries to record or play we need the debugger to reattach inorder for that to happen
+// which means we need to wait and re-issue this command
+
+// if we are recording and taking a screenshot with the debugger and it's detached we are sort of hosed.
 async function debuggerOnDetach(source, reason) {
     console.debug('The debugger was detached.', source, reason);
-    if (reason === 'canceled_by_user' || player._debugger_detatch_requested) {
-        await sleep(500); // why do I wait here?
+    if (reason === 'canceled_by_user' || player._debugger_detach_requested) {
+        //await sleep(500); // why do I wait here you ask. It's to give the banner a chance to disappear, so that the resize below works. 
 
         // sometimes this is re-entered after the workspace window has been closed.
         if (!player?.tab) {
@@ -466,21 +489,21 @@ async function focusTab() {
 }
 
 $('#recordButton').on('click', async function () {
-    let button = $(this);
-    if (button.hasClass('active')) {
-        // before I take the last screenshot the window must have focus again.
-        await focusTab();
-        let action = await userEventToAction({
-            type: 'stop',
-            x: -1,
-            y: -1
-        });
-        stopRecording();
-        updateStepInView(action);
-        return;
-    }
-
     try {
+        let button = $(this);
+        if (button.hasClass('active')) {
+            // before I take the last screenshot the window must have focus again.
+            await focusTab();
+            let action = await userEventToAction({
+                type: 'stop',
+                x: -1,
+                y: -1
+            });
+            stopRecording();
+            updateStepInView(action);
+            return;
+        }
+
         let url = '';
         if (!TestAction.instances.length || currentStepIndex() === 0) {
             url = prompt('Where to? Type or paste URL to start recording from.');
@@ -529,15 +552,7 @@ $('#recordButton').on('click', async function () {
     }
     catch (e) {
         stopRecording();
-        if (e === 'debugger_already_attached') {
-            window.alert("You must close the existing debugger first.");
-        }
-        else if (e?.message === "cannot set desired viewport") {
-            window.alert("Cannot resize the recording window. Do not start a recording maximized, space is needed for the debugger banner.");
-        }
-        else {
-            throw e;
-        }
+        throw e;
     }
 });
 
@@ -668,7 +683,7 @@ async function userEventToAction(userEvent, frameId) {
     switch (userEvent.type) {
         case 'mousemove':
             cardModel.description = 'move mouse here';
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'wheel':
@@ -687,32 +702,37 @@ async function userEventToAction(userEvent, frameId) {
             break;
         case 'keypress':
             cardModel.description = `type ${userEvent.event.key}`;
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'chord':
             cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(dataUrl);
+            break;
+        case 'sendKeys':
+            cardModel.description = 'type ' + userEvent.events.map(k => k.key).join();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'click':
             cardModel.description = 'click';
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'contextmenu':
             cardModel.description = 'right click';
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'dblclick':
             cardModel.description = 'double click';
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'stop':
             cardModel.description = 'stop recording';
-            dataUrl = await captureScreenshotAsDataUrl();
+            dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
         case 'start': {
@@ -733,14 +753,6 @@ async function userEventToAction(userEvent, frameId) {
     return cardModel;
 }
 
-async function captureScreenshotAsDataUrl() {
-    let result = await player.debuggerSendCommand('Page.captureScreenshot', {
-        format: 'png'
-    });
-    let dataUrl = 'data:image/png;base64,' + result.data;
-    return dataUrl;
-}
-
 /** 
  * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
 */
@@ -756,7 +768,7 @@ async function onMessageHandler(message, _port) {
             }
             break;
         case 'screenshot':
-            _lastScreenshot = await captureScreenshotAsDataUrl();
+            _lastScreenshot = await player.captureScreenshotAsDataUrl();
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId });
             break;
         case 'mousemove': // this does not ack, because it will always be followed by another operation.
@@ -765,6 +777,14 @@ async function onMessageHandler(message, _port) {
             action = await userEventToAction(userEvent, userEvent.sender.frameId);
             updateStepInView(action);
             // no simulation required
+            break;
+        // FIXME: the user action could pass in if it wants an ack or not
+        case 'sendKeys':
+            // update the UI with a screenshot
+            action = await userEventToAction(userEvent, userEvent.sender.frameId);
+            updateStepInView(action);
+            // no simulation required
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // don't need to send the whole thing back
             break;
         case 'click':
         case 'keypress':

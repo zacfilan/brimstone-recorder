@@ -85,6 +85,9 @@ class Recorder {
         /** The keys that have been released up in the current chord. */
         this.keysUp = [];
 
+        /** All key events that are targetting the same DOM element. Used to bundle keypress recording. */
+        this.keyEventQ = [];
+
         /** Two way communication with the workspace */
         this._port;
 
@@ -93,6 +96,11 @@ class Recorder {
 
         /** Used to wait and see if a sibgle click becomes a double click. */
         this.pendingClick = false;
+
+        /** 
+         * Hold the current/last event observed.
+         * @type {Event}*/
+        this.event;
 
         chrome.runtime.onMessage.addListener(runtimeFrameIdSpecificOnMessageHandler.bind(this)); // extension sends message to one or all frames
         chrome.runtime.onConnect.addListener(runtimeOnConnectHandler.bind(this));
@@ -152,6 +160,7 @@ class Recorder {
 
         // JSON.stringify bails as soon as it hits a circular reference, so we must project out a subset of the properties
         // rather than just augment the e object.
+
         let msg = {
             // properties of the message
             type: e.type,
@@ -242,7 +251,12 @@ class Recorder {
 
     /** Central callback for all bound event handlers */
     handleEvent(e) {
-        //console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle user input event:`, e);
+        console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle user input event:`, e);
+
+        /** Is the current event happening on a different DOM element than last time? */
+        let newEventTarget = this.event?.target !== e.target;
+        this.event = e;
+
 
         /** 
          * A child (possibly x-origin) frame needs to know its
@@ -305,14 +319,14 @@ class Recorder {
             // https://bugs.chromium.org/p/chromium/issues/detail?id=746690&q=setIgnoreInputEvents&can=2
 
             // until then I can send a timestamp of 0 on synthetic events I want to identify
-            if ((e.type === 'keydown' || e.type === 'keyup' || e.type === 'keypress') && e.timeStamp !== 0) {
-                // this is a user event, drop it.    
-                Recorder.block(e);
-                return false;
-            }
+            // if ((e.type === 'keydown' || e.type === 'keyup' || e.type === 'keypress') && e.timeStamp !== 0) {
+            //     // this is a user event, drop it.    
+            //     Recorder.block(e);
+            //     return false;
+            // }
             //else {
-                //FIXME: timestamp the other events with 0 when I see the need.              
-                //console.debug(`${e.type} ${window.location.href} ${e.timeStamp} simulated`, e.target, e);
+            //FIXME: timestamp the other events with 0 when I see the need.              
+            //console.debug(`${e.type} ${window.location.href} ${e.timeStamp} simulated`, e.target, e);
             //}
         }
         else {
@@ -341,54 +355,74 @@ class Recorder {
                     this._wheel.deltaY += e.deltaY;
                     return; // bubble
                 case 'keydown':
-                    if (e.repeat) {
-                        break;
-                    }
-                    if (this._wheel) {
-                        // any (other) user input signals the end of a scroll input
-                        msg = this.buildMsg(this._wheel);
-                        this.postMessage(msg); // record a wheel action 
-                        this._wheel = false;
-                    }
+                    // we are in loose mode. 
+                    // if (newEventTarget) {
+                    //     if (this.keyEventQ.length) {
+                    //         let rect = this.keyEventQ[0].target.getBoundingClientRect();
+                    //         this.postMessage({
+                    //             type: 'sendKeys',
+                    //             boundingClientRect: rect,
+                    //             x: rect.x + rect.width / 2,
+                    //             y: rect = rect.y + rect.height / 2,
+                    //             events: this.keyEventQ
+                    //         });
+                    //         this.keyEventQ = [];
+                    //     }
+                    // }
+                    this.keyEventQ.push(e);  // regardless we queue up the key events
+                    return; // bubble bro
+                    // }
+                    // else {
+                    //     // strict mode
+                    //     if (e.repeat) {
+                    //         break; // ignore repeating keys
+                    //     }
+                    //     if (this._wheel) {
+                    //         // any (other) user input signals the end of a scroll input, like a keydown event
+                    //         msg = this.buildMsg(this._wheel);
+                    //         this.postMessage(msg); // record a wheel action 
+                    //         this._wheel = false;
+                    //     }
 
-                    if (this.keysDown.length || e.ctrlKey) {
-                        this.keysDown.push(e);
-                        //console.debug('chord? chord start or continue keydown');
-                        break;
-                    }
+                    //     if (this.keysDown.length || e.ctrlKey) {
+                    //         this.keysDown.push(e);
+                    //         //console.debug('chord? chord start or continue keydown');
+                    //         break;
+                    //     }
 
-                    // this keydown is unrelated to chords
-                    //console.debug('chord? not chord keydown');
-                    msg = this.buildMsg(e);
-                    this._state = Recorder.state.SIMULATE;
-                    this.postMessage(msg); // take screenshot and then simulate 
-                    break;
+                    //     // this keydown is unrelated to chords
+                    //     //console.debug('chord? not chord keydown');
+                    //     msg = this.buildMsg(e);
+                    //     this._state = Recorder.state.SIMULATE;
+                    //     this.postMessage(msg); // take screenshot and then simulate 
+                    // }
                 case 'keyup':
-                    if (this.keysDown.length) {
-                        // we started a chord
-                        this.keysUp.push(e); // and just released a key in the chord
-                        if (this.keysUp.length === this.keysDown.length) {
-                            //console.debug('chord? all released keyup');// else not all keys are released
-                            // released all keys n the chord
-                            let userAction = {
-                                type: 'chord',
-                                target: e.target
-                            };
-                            msg = this.buildMsg(userAction);
-                            this.keysUp = [];
-                            this.keysDown = [];
-                            this._state = Recorder.state.SIMULATE;
-                            this.postMessage(msg); // take screenshot and then simulate 
-                        }
-                        else {
-                            //console.debug('chord? not all released keyup');// else not all keys are released
-                        }
-                    }
-                    else {
-                        //console.debug('chord? not chord keyup');
-                    }
+                    this.keyEventQ.push(e);  // regardless we queue up the key events
+                    return;
+                    // if (this.keysDown.length) {
+                    //     // we started a chord
+                    //     this.keysUp.push(e); // and just released a key in the chord
+                    //     if (this.keysUp.length === this.keysDown.length) {
+                    //         //console.debug('chord? all released keyup');// else not all keys are released
+                    //         // released all keys n the chord
+                    //         let userAction = {
+                    //             type: 'chord',
+                    //             target: e.target
+                    //         };
+                    //         msg = this.buildMsg(userAction);
+                    //         this.keysUp = [];
+                    //         this.keysDown = [];
+                    //         this._state = Recorder.state.SIMULATE;
+                    //         this.postMessage(msg); // take screenshot and then simulate 
+                    //     }
+                    //     else {
+                    //         //console.debug('chord? not all released keyup');// else not all keys are released
+                    //     }
+                    // }
+                    // else {
+                    //     //console.debug('chord? not chord keyup');
+                    // }
 
-                    break;
                 case 'contextmenu':
                 case 'dblclick':
                     if (this._wheel) {
@@ -402,6 +436,17 @@ class Recorder {
                     this._state = Recorder.state.SIMULATE;
                     break;
                 case 'click':
+                    if (this.keyEventQ.length) {
+                        let rect = this.keyEventQ[0].target.getBoundingClientRect();
+                        this.postMessage({
+                            type: 'sendKeys',
+                            boundingClientRect: rect,
+                            x: rect.x + rect.width / 2,
+                            y: rect = rect.y + rect.height / 2,
+                            events: this.keyEventQ
+                        });
+                        this.keyEventQ = [];
+                    }
                     // don't know yet if it is a single click or the first of a double click
                     if (!this.pendingClick) {
                         this.pendingClick = e;
@@ -432,6 +477,7 @@ class Recorder {
                     /** The time that the users mouse entered the current element, used to record hover effects. */
                     this._mouseEnterTime = performance.now();
                 case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
+                case 'keypress':
                     return; // let it bubble
             }
             Recorder.block(e);
@@ -478,8 +524,8 @@ Recorder.events = [
     'invalid',      // blocked. ''
     'change',       // blocked. it changes styles. e.g. (x) on a combobox.
 
-    'mouseout',
-    'mouseover',
+    //'mouseout',
+    //'mouseover',
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event
     'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action. 

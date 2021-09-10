@@ -26,6 +26,9 @@ export class Tab {
         return Math.round(this.height * this.zoomFactor);
     }
 
+    /** 
+     * Re-populates this instance from the chrome tab id.
+     */
     async fromChromeTabId(id) {
         this.chromeTab = await chrome.tabs.get(id);
         this.zoomFactor = await chrome.tabs.getZoom(id);
@@ -63,6 +66,9 @@ export class Tab {
         let i = 0; let distance;
         let matched = 0;
         for (i = 0; i < 10; i++) {
+            if(i) {
+                await sleep(137); // we get once chance to be fast
+            }
             distance = await this.getViewport();
             if(distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
                 // it's wrong
@@ -77,7 +83,6 @@ export class Tab {
                 if(++matched>1) {
                     break;
                 }
-                await sleep(137); // snooze ad do it again for good measure
             }
         }
 
