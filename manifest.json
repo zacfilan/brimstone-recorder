@@ -32,7 +32,7 @@
     {
       "matches": ["<all_urls>"],
       "all_frames": true,
-      "js": ["content-recorder.js"],
+      "js": ["recorder.js"],
       "run_at": "document_start"
     }
   ]

@@ -114,7 +114,7 @@ async function actionOnClickedHandler(tab) {
   let window = await chrome.windows.create({
     url: chrome.runtime.getURL(`ui/workspace.html?parent=${currentWindow.id}&tab=${tab.id}`),
     type: "popup",
-    focused: false,
+    focused: true,
     width,
     height,
     top,

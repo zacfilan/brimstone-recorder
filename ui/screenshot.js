@@ -1,4 +1,4 @@
-import { Player } from "../playerclass.js";
+import { Player } from "../player.js";
 import { getScreenshots } from "./loader.js";
 
 /** A container for properties of a screenshot */

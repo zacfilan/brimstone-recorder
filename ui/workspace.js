@@ -1,4 +1,4 @@
-import { Player } from "../playerclass.js"
+import { Player } from "../player.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
@@ -276,13 +276,13 @@ async function attachDebuggerToActiveTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
     let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
     let navigateFirst = args?.url && ((args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
-    
+
     let w = await chrome.windows.get(activeChromeTab.windowId);
-    if(w.state !== 'normal') {
+    if (w.state !== 'normal') {
         window.alert(`The window state of the tab you want to record or playback is '${w.state}'. It will be set to 'normal' to continue.`);
-        await chrome.windows.update(activeChromeTab.windowId, {state: 'normal'});
+        await chrome.windows.update(activeChromeTab.windowId, { state: 'normal' });
     }
-    
+
     if (navigateFirst) {
         //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
         var resolveNavigationPromise;
@@ -294,7 +294,7 @@ async function attachDebuggerToActiveTab(args) {
         await chrome.tabs.update(activeChromeTab.id, { url: args.url });
         let details = await navPromise; // the above nav is really done.
     }
-    
+
     await tab.fromChromeTabId(activeChromeTab.id);
 
     args?.height && (tab.height = args.height);
@@ -700,21 +700,15 @@ async function userEventToAction(userEvent, frameId) {
             cardModel.description = `mouse here, scroll wheel ${magnitude}px ${direction}`;
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
-        case 'keypress':
-            cardModel.description = `type ${userEvent.event.key}`;
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+        case 'keys':
+            cardModel.description = 'type ' + userEvent.event.filter(e => e.type === 'keydown').map(k => k.key).join('');
             break;
         case 'chord':
             cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
             dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
-        case 'sendKeys':
-            cardModel.description = 'type ' + userEvent.events.map(k => k.key).join();
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
-            break;
+
         case 'click':
             cardModel.description = 'click';
             dataUrl = await player.captureScreenshotAsDataUrl();
@@ -773,36 +767,48 @@ async function onMessageHandler(message, _port) {
             break;
         case 'mousemove': // this does not ack, because it will always be followed by another operation.
         case 'wheel': // this does not ack, because it will always be followed by another operation.
-            // update the UI with a screenshot
+            // record
             action = await userEventToAction(userEvent, userEvent.sender.frameId);
-            updateStepInView(action);
+            updateStepInView(action); // record the user action to disk
+            //
+
             // no simulation required
             break;
-        // FIXME: the user action could pass in if it wants an ack or not
-        case 'sendKeys':
-            // update the UI with a screenshot
-            action = await userEventToAction(userEvent, userEvent.sender.frameId);
-            updateStepInView(action);
-            // no simulation required
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // don't need to send the whole thing back
+        case 'keys':
+        case 'keypress':
+            if (userEvent.handler?.takeScreenshot) {
+                _lastScreenshot = await player.captureScreenshotAsDataUrl();
+            }
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent);
+            }
+            if (userEvent.handler?.record) {
+                action = await userEventToAction(userEvent, userEvent.sender.frameId);
+                action.addExpectedScreenshot(_lastScreenshot);
+                updateStepInView(action); // record the user action to disk
+            }
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'click':
-        case 'keypress':
         case 'contextmenu':
         case 'dblclick':
         case 'chord':
-            // update the UI with a screenshot
+            // record
             action = await userEventToAction(userEvent, userEvent.sender.frameId);
             updateStepInView(action);
-            // Now simulate that event back in the recording, via the CDP
-            await player[action.type](action);
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // don't need to send the whole thing back
+            //
+
+            await player[action.type](action); // simulate
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'connect':
             console.debug(`connection established from frame ${userEvent.sender.frameId}`);
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+
             break;
         default:
             console.warn(`unexpected userEvent received <${userEvent.type}>`);
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
     }
 };

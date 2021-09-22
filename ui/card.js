@@ -1,4 +1,4 @@
-import { Player } from "../playerclass.js"
+import { Player } from "../player.js"
 import { Screenshot } from "./screenshot.js";
 const PNG = png.PNG;
 
@@ -153,7 +153,7 @@ export class TestAction {
         let clone = {
             type: this.type,
             boundingClientRect: this.boundingClientRect,
-            event: this.event,
+            event: this.event, // curated properties from an Event
             x: this.x,
             y: this.y,
             sender: this.sender,
@@ -165,8 +165,8 @@ export class TestAction {
             memoryUsed: this.memoryUsed,
             url: this.url, // only on start actions
             hoverTime: this.hoverTime,
-            deltaX: this.deltaX,
-            deltaY: this.deltaY
+            deltaX: this.deltaX, // only on wheel actions 
+            deltaY: this.deltaY // only on wheel actions
         };
 
         if (this.expectedScreenshot) {
