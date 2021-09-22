@@ -8,7 +8,7 @@ import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
 
-disableConsole(); // can be reenabled in the debugger later
+//disableConsole(); // can be reenabled in the debugger later
 
 setToolbarState();
 
@@ -703,6 +703,9 @@ async function userEventToAction(userEvent, frameId) {
         case 'keys':
             cardModel.description = 'type ' + userEvent.event.filter(e => e.type === 'keydown').map(k => k.key).join('');
             break;
+        case 'keypress':
+            cardModel.description = 'type ' + userEvent.event.key;
+            break;
         case 'chord':
             cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
             dataUrl = await player.captureScreenshotAsDataUrl();
@@ -779,13 +782,13 @@ async function onMessageHandler(message, _port) {
             if (userEvent.handler?.takeScreenshot) {
                 _lastScreenshot = await player.captureScreenshotAsDataUrl();
             }
-            if (userEvent.handler?.simulate) {
-                await player[userEvent.type](userEvent);
-            }
             if (userEvent.handler?.record) {
                 action = await userEventToAction(userEvent, userEvent.sender.frameId);
                 action.addExpectedScreenshot(_lastScreenshot);
                 updateStepInView(action); // record the user action to disk
+            }
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
             }
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;

@@ -535,7 +535,7 @@ class Recorder {
     handleKeyDown(e) {
         return this._processKeySequence(e, {
             takeScreenshot: this.keyEventQueue.length === 0,
-            record: false,
+            record: false || e.keyCode === 13, // enter can navigate to another page, so we need to force the recording of this key
             simulate: true,
         });
     }

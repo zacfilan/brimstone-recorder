@@ -541,20 +541,15 @@ export class Player {
         this._debugger_detach_requested = false;
         this.tab = tab;
 
-        let debuggerAttached = false;
-        try {
-            await this._debuggerSendCommandRaw('Page.bringToFront'); // if this throws we know we aren't driving
-            console.debug(`a drivable debugger is already attached to tab ${tab.id}`); // we can drive 
-            debuggerAttached = true;
-        }
-        catch (e) { }
 
-        if (!debuggerAttached) {
-            await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", _resolve)));
-            if (chrome.runtime.lastError?.message) {
-                throw new Error(chrome.runtime.lastError.message);
+        await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", _resolve)));
+        if (chrome.runtime.lastError?.message) {
+            if(!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
+                throw new Error(chrome.runtime.lastError.message); // not sure how to handle that.
             }
+            // else we can ignore that, that's what we want
         }
+        // else no error 
 
         // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
         // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
