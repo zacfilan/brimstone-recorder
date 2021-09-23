@@ -97,9 +97,8 @@ class Recorder {
         window.removeEventListener("message", this, { capture: true, passive: false });
         window.addEventListener("message", this, { capture: true, passive: false });
 
-        this.postMessage({ type: 'connect' });
+        this.pushMessage({ type: 'connect' });
     }
-
 
     /**
      * Use window.postMessage to post a message into
@@ -138,13 +137,22 @@ class Recorder {
      * If there is nothing pending it will be immediated transmitted.
      *  
      * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
-     * Note this automatically sends the Sender info.
+     * Note this automatically sends the Sender (frameId) info.
      */
-    postMessage(msg) {
+    pushMessage(msg) {
         this.messageQueue.push(msg);
         if (this.messageQueue.length === 1) { // was an empty queue...
             this.tx(); //... so tx it right away
         }
+    }
+
+    /**
+     * Direct raw postMessage to the extension, frameId is added to message.
+     */
+    _postMessage(msg) {
+        msg.sender = { frameId: this._frameId };
+        console.debug(`TX: `, msg);
+        this._port.postMessage(msg);
     }
 
     /**
@@ -158,10 +166,8 @@ class Recorder {
     tx() {
         if (this.messageQueue.length) {
             let msg = this.messageQueue[0];
-            msg.sender = { frameId: this._frameId };
-            console.debug(`TX: `, msg);
             this._state = Recorder.state.SIMULATE; // FIXME: redundant to this.messageQueue.length
-            this._port.postMessage(msg);
+            this._postMessage(msg);
             return true;
         }
         return false;
@@ -309,7 +315,7 @@ class Recorder {
             }
             switch (brimstoneRecorder.func) {
                 case 'relayFrameOffsetToExtension': // *all* children frames get this message
-                    this.postMessage({ type: 'frameOffset', func: 'frameOffset', args: brimstoneRecorder.args });
+                    this._postMessage({ type: 'frameOffset', func: 'frameOffset', args: brimstoneRecorder.args });
                     break;
             }
 
@@ -385,7 +391,7 @@ class Recorder {
                             clientY: e.clientY
                         };
                         this._state === Recorder.state.BLOCK;
-                        this.postMessage({ type: 'screenshot' });
+                        this.pushMessage({ type: 'screenshot' });
                         break; // the first is (intended) to be blocked from the app, and used just to indicate start, we block other events til the screenshot is taken.
                     }
                     // subsequent wheel events in the chain are aggregated and allowed to bubble, and really scroll the app
@@ -402,9 +408,8 @@ class Recorder {
                 case 'dblclick':
                     this.recordKeySequence();
                     this.recordWheel();
-
                     msg = this.buildMsg(e);
-                    this.postMessage(msg); // take screenshot and then simulate 
+                    this.pushMessage(msg); // take screenshot and then simulate 
                     break;
                 case 'click':
                     // don't know yet if it is a single click or the first of a double click
@@ -413,9 +418,8 @@ class Recorder {
                         setTimeout(() => {
                             this.recordKeySequence();
                             this.recordWheel();
-
                             let msg = this.buildMsg(this.pendingClick);
-                            this.postMessage(msg); // take screenshot, and then simulate 
+                            this.pushMessage(msg); // take screenshot, and then simulate 
                             this.pendingClick = false;
                         }, 500);
                     }
@@ -463,7 +467,7 @@ class Recorder {
         
         clearTimeout(this.pendingKeyTimeout);
         let rect = this.keyEventQueue[0].target.getBoundingClientRect();
-        this.postMessage({
+        this.pushMessage({
             type: 'keys',
             boundingClientRect: rect,
             x: rect.x + rect.width / 2,
@@ -519,7 +523,7 @@ class Recorder {
         }
 
         let rect = e.target.getBoundingClientRect();
-        this.postMessage({
+        this.pushMessage({
             type: 'keypress', // convert the keydown into a keypress, to simulate down, up and chat events
             boundingClientRect: rect,
             x: rect.x + rect.width / 2,
@@ -550,7 +554,7 @@ class Recorder {
         if (this._wheel) {
             // any (other) user input signals the end of a scroll input
             let msg = this.buildMsg(this._wheel);
-            this.postMessage(msg); // record a wheel action, fire and forget 
+            this.pushMessage(msg); // record a wheel action, fire and forget 
             this._wheel = false;
         }
     }
