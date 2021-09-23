@@ -7,6 +7,7 @@ import { sleep, errorDialog } from "../utilities.js";
 import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
+const version = 'v'+chrome.runtime.getManifest().version;
 
 disableConsole(); // can be reenabled in the debugger later
 
@@ -184,7 +185,7 @@ function setInfoBarText(infobarText) {
             infobarText = 'ready';
         }
     }
-    $('#infobar').html(infobarText);
+    $('#infobar').html(version + ' ' + infobarText);
 }
 
 function setToolbarState() {
