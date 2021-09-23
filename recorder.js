@@ -160,8 +160,8 @@ class Recorder {
             let msg = this.messageQueue[0];
             msg.sender = { frameId: this._frameId };
             console.debug(`TX: `, msg);
-            this._port.postMessage(msg);
             this._state = Recorder.state.SIMULATE; // FIXME: redundant to this.messageQueue.length
+            this._port.postMessage(msg);
             return true;
         }
         return false;
@@ -400,7 +400,7 @@ class Recorder {
                     break; // do not execute - these should not even be seen here, they should be synthetic events.                    
                 case 'contextmenu':
                 case 'dblclick':
-                    this.completeKeySequence();
+                    this.recordKeySequence();
                     this.recordWheel();
 
                     msg = this.buildMsg(e);
@@ -411,7 +411,7 @@ class Recorder {
                     if (!this.pendingClick) {
                         this.pendingClick = e;
                         setTimeout(() => {
-                            this.completeKeySequence();
+                            this.recordKeySequence();
                             this.recordWheel();
 
                             let msg = this.buildMsg(this.pendingClick);
@@ -441,15 +441,13 @@ class Recorder {
     }
 
     /**
-      * Completes an observed sequence of user key events to some element.
-      * 
-      * Send a properly formatted keys message to the extension to implement
-      * that. record only.
+      * Schedule a recordKeySequence operation
+      * to occur in the future.
       */
-    _scheduleCompleteKeySequence() {
+    _scheduleRecordKeySequence() {
         clearTimeout(this.pendingKeyTimeout);
         this.pendingKeyTimeout = setTimeout (
-            this.completeKeySequence.bind(this),
+            this.recordKeySequence.bind(this),
             500 // FIXME: make configurable
         );
     }
@@ -458,7 +456,7 @@ class Recorder {
      * If there was a key sequence in process that hasn't been recorded,
      * record it now.
      */
-    completeKeySequence() {
+    recordKeySequence() {
         if(!this.keyEventQueue.length) {
             return;
         }
@@ -488,20 +486,26 @@ class Recorder {
         this.keyEventQueue = []; // FIXME: is this correct?!
     }
 
+
     /**
-     * If there are buffered keyevents for some input, send a keys message to the extension.
-     * This will show the bundled keys typed in the UI, simulate keyevents [2,n], record this 
-     * user action that can play back keyevents [1, n].
+     * Start/Continue an observed sequence of user key events to some element.
      * 
-     * @param {object} handler how the extension should handle these keyevents
-     * @param {boolean} handler.takeScreenshot should extension take a screenshot first?
-     * @param {boolean} handler.record should extension update the test recording with a completely specified user action (updates UI too)?
-     * @param {boolean} handler.simulate should extension generate events via the debugger to simulate these events back to the app?
+     * Send a properly formatted keys message to the extension to implement
+     * that. On the first keydown we take a screenshot, before we simulate.
+     * We also schedule a callback in the future to send the record message
+     * for the aggregate keystrokes.
      * 
+     * Some special handling for [ENTER] key
      */
-    _processKeySequence(e, handler) {
+    handleKeyDown(e) {
+        let takeScreenshot = this.keyEventQueue.length === 0;
         this.keyEventQueue.push(e); // hang onto it in the queue
-        this._scheduleCompleteKeySequence();
+        if(e.keyCode === 13) {
+            this.recordKeySequence();
+        }
+        else {        
+            this._scheduleRecordKeySequence();
+        }
 
         let rect = e.target.getBoundingClientRect();
         this.postMessage({
@@ -520,23 +524,11 @@ class Recorder {
                 metaKey: e.metaKey,
                 shiftKey: e.shiftKey
             },
-            handler: handler
-        });
-    }
-
-    /**
-     * Start/Continue an observed sequence of user key events to some element.
-     * 
-     * Send a properly formatted keys message to the extension to implement
-     * that. On the first keydown we take a screenshot, before we simulate.
-     * We also schedule a callback in the future to send the record message
-     * for the aggregate keystrokes.
-     */
-    handleKeyDown(e) {
-        return this._processKeySequence(e, {
-            takeScreenshot: this.keyEventQueue.length === 0,
-            record: false || e.keyCode === 13, // enter can navigate to another page, so we need to force the recording of this key
-            simulate: true,
+            handler: {
+                takeScreenshot: takeScreenshot,
+                record: false, // enter can navigate to another page, where we lose this recorders context, so we need to force the recording of this key
+                simulate: true
+            }
         });
     }
 
@@ -591,8 +583,8 @@ Recorder.events = [
     'invalid',      // blocked. ''
     'change',       // blocked. it changes styles. e.g. (x) on a combobox.
 
-    //'mouseout',
-    //'mouseover',
+    //'mouseout', // not used
+    'mouseover', // bubble and is used to observe and calculate hoverTime
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event
     'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action. 

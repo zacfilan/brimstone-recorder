@@ -381,7 +381,7 @@ export class Step {
             }
 
             if (this.next._match === constants.match.ALLOW) {
-                title += ` <span id='allowed-differences'>Has allowed differences.</span>`;
+                title += ` <span id='allowed-differences'> Has allowed differences.</span>`;
             }
 
             html += this.next.toHtml({ title: title, src: src, className: 'waiting'});
