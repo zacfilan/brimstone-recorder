@@ -8,7 +8,7 @@ import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
 
-//disableConsole(); // can be reenabled in the debugger later
+disableConsole(); // can be reenabled in the debugger later
 
 setToolbarState();
 
