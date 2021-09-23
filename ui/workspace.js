@@ -711,7 +711,6 @@ async function userEventToAction(userEvent, frameId) {
             dataUrl = await player.captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(dataUrl);
             break;
-
         case 'click':
             cardModel.description = 'click';
             dataUrl = await player.captureScreenshotAsDataUrl();

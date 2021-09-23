@@ -456,7 +456,7 @@ class Recorder {
      * If there was a key sequence in process that hasn't been recorded,
      * record it now.
      */
-    recordKeySequence() {
+     recordKeySequence() {
         if(!this.keyEventQueue.length) {
             return;
         }
@@ -486,7 +486,6 @@ class Recorder {
         this.keyEventQueue = []; // FIXME: is this correct?!
     }
 
-
     /**
      * Start/Continue an observed sequence of user key events to some element.
      * 
@@ -499,11 +498,23 @@ class Recorder {
      */
     handleKeyDown(e) {
         let takeScreenshot = this.keyEventQueue.length === 0;
-        this.keyEventQueue.push(e); // hang onto it in the queue
+        let record = false;
         if(e.keyCode === 13) {
-            this.recordKeySequence();
+            if(this.keyEventQueue.length === 0) {
+                // no pending key presses
+                record = true; // so this enter key will be an indiviudal recorded action, ss taken before, simulated last
+                // fall thro to take ss, record, then simulate the [ENTER] key by its lonesome
+            }
+            else {
+                // there are pending keypresses
+                this.keyEventQueue.push(e); // through the [ENTER} on the end
+                this.recordKeySequence(); // the whole sequence is recorded (anything before the [ENTER] has already been simulated)
+                // fallthru to just simulate the [ENTER]
+            }
         }
-        else {        
+        else {
+            this.keyEventQueue.push(e); // through the [ENTER} on the end
+       
             this._scheduleRecordKeySequence();
         }
 
@@ -526,7 +537,7 @@ class Recorder {
             },
             handler: {
                 takeScreenshot: takeScreenshot,
-                record: false, // enter can navigate to another page, where we lose this recorders context, so we need to force the recording of this key
+                record: record, // enter can navigate to another page, where we lose this recorders context, so we need to force the recording of this key
                 simulate: true
             }
         });
