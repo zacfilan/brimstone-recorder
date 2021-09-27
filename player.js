@@ -74,7 +74,6 @@ export class Player {
                 await this.onBeforePlay(action);
             }
             console.log(`[${action.index}] : ${action.description}`);
-            start = performance.now();
 
             // if we are resume(ing) we are picking up from an error state, meaning we already
             // performed the action, we just need to do the verification again for the first action.
@@ -93,9 +92,11 @@ export class Player {
                     this.mouseLocation = { x: action.x, y: action.y };
                     break;
             }
-
+            start = performance.now();
             await this.verifyScreenshot(next);
             stop = performance.now();
+            next.latency = ((stop - start)/1000).toFixed(1);
+
             action._view = constants.view.EXPECTED;
             switch (next._match) {
                 case constants.match.PASS:

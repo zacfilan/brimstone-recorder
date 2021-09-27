@@ -163,6 +163,7 @@ export class TestAction {
             overlay: this.overlay,
             description: this.description,
             memoryUsed: this.memoryUsed,
+            latency: this.latency,
             url: this.url, // only on start actions
             hoverTime: this.hoverTime,
             deltaX: this.deltaX, // only on wheel actions 
@@ -273,7 +274,7 @@ export class TestAction {
     }
 
     /** Return the html for the edit card view. */
-    toHtml({title, src, className}) {
+    toHtml({title, src, className, stats}) {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
         //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
@@ -295,8 +296,19 @@ export class TestAction {
             <div class='action callout user-event' data-index='${this.index}' style='top:${o.top + o.height}%;left:${o.left}%;'>${this.description}</div>
             `;
         }
-        let footer = this.memoryUsed ? this.memoryUsed + 'MBs in use' : '';
-
+        let footer = '';
+        if(this.latency) {
+            footer += `Visible in ${this.latency}s.`;
+        }
+        if(this.memoryUsed) {
+            if(this.latency) {
+                footer += ' ';
+            }
+            footer += `${this.memoryUsed}MBs in use.`;
+        }
+        if(!stats) {
+            footer = '';
+        }
         html += `
         </div>
         <div class='footer'>${footer}</div>
@@ -344,7 +356,7 @@ export class Step {
 
         let html = `
         <div id="content">
-            ${this.curr.toHtml({title: title, src: null, className: 'action'})}
+            ${this.curr.toHtml({title: title, src: null, className: 'action', stats: false})}
             `;
 
         if (this.next) {
@@ -384,7 +396,7 @@ export class Step {
                 title += ` <span id='allowed-differences'> Has allowed differences.</span>`;
             }
 
-            html += this.next.toHtml({ title: title, src: src, className: 'waiting'});
+            html += this.next.toHtml({ title: title, src: src, className: 'waiting', stats: true});
         }
         html += `
         </div>
