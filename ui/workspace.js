@@ -321,13 +321,16 @@ $('#playButton').on('click', async function () {
         let actions = TestAction.instances;
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
-
+        
+        
         let navigatedFirst = await attachDebuggerToActiveTab({
             width: actions[0].tabWidth,
             height: actions[0].tabHeight,
             url: actions[0].url,
             checkForChromeUrls: true
         });
+
+        await startPlaying(tab);
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
         // we can resume a failed step. 
@@ -423,6 +426,31 @@ async function debuggerOnDetach(source, reason) {
 
 chrome.debugger.onDetach.addListener(debuggerOnDetach);
 
+async function startPlaying(tab) {
+        // only listen for navigations, when we are actively playing, and remove the listener when we are not.
+    //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
+    chrome.webNavigation.onCompleted.removeListener(playingWebNavigationOnCompleteHandler);
+    chrome.webNavigation.onCompleted.addListener(playingWebNavigationOnCompleteHandler);
+    
+    await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
+}
+
+async function playingWebNavigationOnCompleteHandler(details) {
+    try {
+        console.debug(`tab ${details.tabId} navigation completed`, details);
+        if (details.url === 'about:blank') {
+            console.debug(`    - ignoring navigation to page url 'about:blank'`);
+            return;
+        }
+        await startPlaying(tab);
+
+    }
+    catch (e) {
+        // this can be some intermediate redirect page(s) that the user doesn't actually interact with
+        console.log('navigation completion failed.', e);
+    }
+}
+
 async function startRecording(tab) {
     console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
     console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
@@ -441,6 +469,9 @@ async function startRecording(tab) {
         let frame = frames[i];
         await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
     }
+
+    // hide the cursor in all frames
+    await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
 
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
 
@@ -885,11 +916,11 @@ async function getFrameOffset(frameId) {
             _rejectPostMessageResponsePromise = reject;
         });
 
-        // tell my parent to broadcast down into his kids (including me) their offsets
+        // tell this frames parent to broadcast down into his kids (including this frame) their offsets
         await chrome.tabs.sendMessage(tab.id, { func: 'postMessageOffsetIntoIframes' }, { frameId: frame.parentFrameId });
         // it's posted, but that doesn't mean much
 
-        let response = await p; // eventually some 'frameOffset' messages come in, and when I see mine this promise is resolved with my offset.
+        let response = await p; // eventually some 'frameOffset' messages come in, and when I see mie (this frame) this promise is resolved with my offset.
 
         frameOffset.left += response.left;
         frameOffset.top += response.top;

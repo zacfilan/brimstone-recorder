@@ -41,8 +41,20 @@ class Recorder {
         chrome.runtime.onConnect.addListener(this._runtimeOnConnectHandler.bind(this));
     }
 
+    hideCursor() {
+        if(document.getElementById('brimstone-recorder-css')) {
+            return;
+        }
+        
+        var styleSheet = document.createElement("style");
+        styleSheet.type="text/css";
+        styleSheet.innerText = 'body {caret-color: transparent;}';
+        styleSheet.id = 'brimstone-recorder-css';
+        document.head.appendChild(styleSheet);
+    }
+
     /** 
-     * Chrome-extension API: For single one time messages . This can respond if neeed be.
+     * Chrome-extension API: For single one time messages . This can respond if need be.
      * These can be targeted by frameId from the extension, or broadcast to all frames.
      * https://developer.chrome.com/docs/extensions/reference/runtime/#event-onMessage  
      * */
@@ -57,6 +69,10 @@ class Recorder {
                 return;
             case 'setFrameId':
                 this._frameId = message.args.to;
+                sendResponse();
+                break;
+            case 'hideCursor':
+                this.hideCursor();
                 sendResponse();
                 break;
             default:
