@@ -274,7 +274,7 @@ export class TestAction {
     }
 
     /** Return the html for the edit card view. */
-    toHtml({title, src, className, stats}) {
+    toHtml({ title, src, className, stats }) {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
         //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
@@ -297,16 +297,16 @@ export class TestAction {
             `;
         }
         let footer = '';
-        if(this.latency) {
+        if (this.latency) {
             footer += `Visible in ${this.latency}s.`;
         }
-        if(this.memoryUsed) {
-            if(this.latency) {
+        if (this.memoryUsed) {
+            if (this.latency) {
                 footer += ' ';
             }
             footer += `${this.memoryUsed}MBs in use.`;
         }
-        if(!stats) {
+        if (!stats) {
             footer = '';
         }
         html += `
@@ -323,6 +323,20 @@ export class TestAction {
  * @type {TestAction[]}
  */
 TestAction.instances = [];
+
+/**
+ * Metadata about the current set of test actions.
+ */
+TestAction.meta = {
+    /** The version of brimstone-recorder used to record this test. */
+    version: 'v' + chrome.runtime.getManifest().version,
+
+    /** Should we hide the cursor for this test for performance? */
+    hideCursor: true,
+
+    /** Was this test recorded (and should be played back) incognito? */
+    incognito: false
+};
 
 /**
  * An action followed by the next expected screen: action, expected screen
@@ -356,19 +370,19 @@ export class Step {
 
         let html = `
         <div id="content">
-            ${this.curr.toHtml({title: title, src: null, className: 'action', stats: false})}
+            ${this.curr.toHtml({ title: title, src: null, className: 'action', stats: false })}
             `;
 
         if (this.next) {
             let src;
             let title = '';
 
-            if(this.next._match === constants.match.PLAY) {
+            if (this.next._match === constants.match.PLAY) {
                 title += 'Wait for actual to match.';
             }
             else {
 
-                if(this.next._match === constants.match.FAIL) {
+                if (this.next._match === constants.match.FAIL) {
                     title += '<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="exchange" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-exchange fa-w-16 fa-5x"><path fill="currentColor" d="M0 168v-16c0-13.255 10.745-24 24-24h381.97l-30.467-27.728c-9.815-9.289-10.03-24.846-.474-34.402l10.84-10.84c9.373-9.373 24.568-9.373 33.941 0l82.817 82.343c12.497 12.497 12.497 32.758 0 45.255l-82.817 82.343c-9.373 9.373-24.569 9.373-33.941 0l-10.84-10.84c-9.556-9.556-9.341-25.114.474-34.402L405.97 192H24c-13.255 0-24-10.745-24-24zm488 152H106.03l30.467-27.728c9.815-9.289 10.03-24.846.474-34.402l-10.84-10.84c-9.373-9.373-24.568-9.373-33.941 0L9.373 329.373c-12.497 12.497-12.497 32.758 0 45.255l82.817 82.343c9.373 9.373 24.569 9.373 33.941 0l10.84-10.84c9.556-9.556 9.341-25.113-.474-34.402L106.03 384H488c13.255 0 24-10.745 24-24v-16c0-13.255-10.745-24-24-24z" class=""></path></svg>'
                     title += ' failed match. ';
                 }
@@ -396,7 +410,7 @@ export class Step {
                 title += ` <span id='allowed-differences'> Has allowed differences.</span>`;
             }
 
-            html += this.next.toHtml({ title: title, src: src, className: 'waiting', stats: true});
+            html += this.next.toHtml({ title: title, src: src, className: 'waiting', stats: true });
         }
         html += `
         </div>

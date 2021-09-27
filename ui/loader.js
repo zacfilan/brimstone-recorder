@@ -1,3 +1,4 @@
+import { loadOptions, saveOptions } from "../options.js";
 import { constants, TestAction } from "./card.js";
 import { Screenshot } from "./screenshot.js";
 
@@ -37,6 +38,12 @@ export async function loadFile() {
     let test = JSON.parse(await zip.file("test.json").async("string"));
 
     let actions = test.steps;
+
+    // if the test has meta data, then update the currently running set of options with this data
+    let options = await loadOptions();
+    options.hideCursor = test.meta?.hideCursor ?? false;
+    await saveOptions(options);
+
     let screenshotPromises = [];
     for (let i = 0; i < actions.length; ++i) {
         let action = new TestAction(actions[i]);
@@ -112,7 +119,11 @@ export function hydrateForPlay() {
 export async function saveFile() {
     console.debug('create zip');
     zip = new JSZip();
-    zip.file('test.json', JSON.stringify({ steps: TestAction.instances }, null, 2)); // add the test.json file to archive
+    zip.file('test.json', JSON.stringify(
+        { 
+            meta: TestAction.meta,
+            steps: TestAction.instances 
+        }, null, 2)); // add the test.json file to archive
     screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
     // add all the expected screenshots to the screenshots directory in the archive
     for (let i = 0; i < TestAction.instances.length; ++i) {

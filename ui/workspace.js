@@ -7,7 +7,10 @@ import { sleep, errorDialog } from "../utilities.js";
 import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
-const version = 'v'+chrome.runtime.getManifest().version;
+import { loadOptions } from "../options.js";
+
+/** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
+const version = 'v' + chrome.runtime.getManifest().version;
 
 disableConsole(); // can be reenabled in the debugger later
 
@@ -321,8 +324,8 @@ $('#playButton').on('click', async function () {
         let actions = TestAction.instances;
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
-        
-        
+
+
         let navigatedFirst = await attachDebuggerToActiveTab({
             width: actions[0].tabWidth,
             height: actions[0].tabHeight,
@@ -426,13 +429,26 @@ async function debuggerOnDetach(source, reason) {
 
 chrome.debugger.onDetach.addListener(debuggerOnDetach);
 
+/**
+ * Hide the cursor in all frames.
+ * Read value from Options, write into TestAction.meta.
+ */
+async function hideCursor() {
+    let options = await loadOptions();
+    TestAction.meta.hideCursor = options.hideCursor;
+    if (TestAction.meta.hideCursor) {
+        await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
+    }
+}
+
 async function startPlaying(tab) {
-        // only listen for navigations, when we are actively playing, and remove the listener when we are not.
+    // only listen for navigations, when we are actively playing, and remove the listener when we are not.
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
     chrome.webNavigation.onCompleted.removeListener(playingWebNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(playingWebNavigationOnCompleteHandler);
-    
-    await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
+
+    await hideCursor();
+
 }
 
 async function playingWebNavigationOnCompleteHandler(details) {
@@ -470,8 +486,7 @@ async function startRecording(tab) {
         await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
     }
 
-    // hide the cursor in all frames
-    await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
+    await hideCursor();
 
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
 

@@ -53,7 +53,6 @@ export class Player {
 
         options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
-
         let v = await getHydratedForPlayPromise();
 
         this._actions = actions;
