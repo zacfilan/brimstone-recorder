@@ -46,6 +46,8 @@ export class Player {
      * Returns a deferred boolean that reflects the success of playing all the steps:
      * true if they all played successfully, false if one failed.
      * @param {TestAction[]} actions the actions to play
+     * @param {number} startIndex the index we start playing from
+     * @param {boolean} resume if true we do not drive this step, just check it
      * */
     async play(actions, startIndex = 0, resume = false) {
         this._actions = actions;

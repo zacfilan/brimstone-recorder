@@ -274,12 +274,14 @@ var playMatchStatus = constants.match.PASS;
  * @param {number=} args.width the width to set the active tab to
  * @param {number=} args.height the height to set the active tab to 
  * @param {string=} args.url the url to go to in the tab, if it is a chrome url
- * @param {boolean=} args.checkForChromeUrls navigate to url property if the active tab is a chrome:// url
+ * @param {Tab=} args.tab the tab to attach to, if not specifed the active tab is used.
  */
-async function attachDebuggerToActiveTab(args) {
+async function attachDebuggerToTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
-    let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-    let navigateFirst = args?.url && ((args.checkForChromeUrls && activeChromeTab.url.startsWith('chrome')) || !args.checkForChromeUrls);
+    let activeChromeTab = args.tab;
+    if(!activeChromeTab) {
+        [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+    }
 
     let w = await chrome.windows.get(activeChromeTab.windowId);
     if (w.state !== 'normal') {
@@ -287,8 +289,8 @@ async function attachDebuggerToActiveTab(args) {
         await chrome.windows.update(activeChromeTab.windowId, { state: 'normal' });
     }
 
-    if (navigateFirst) {
-        //mmmkay, we can't connect the debugger to that (without more permissions, and I am not really into recording inside those.)
+    if (args?.url) {
+        // this better be a URL that I can attach a debugger to
         var resolveNavigationPromise;
         let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
         chrome.webNavigation.onCommitted.addListener(function navCommit(details) {
@@ -307,7 +309,6 @@ async function attachDebuggerToActiveTab(args) {
     tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
     await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached, the recorder does not need to be injected
-    return navigateFirst;
 }
 
 $('#playButton').on('click', async function () {
@@ -325,29 +326,38 @@ $('#playButton').on('click', async function () {
         player.onBeforePlay = updateStepInView;
         player.onAfterPlay = updateStepInView;
 
-
-        let navigatedFirst = await attachDebuggerToActiveTab({
-            width: actions[0].tabWidth,
-            height: actions[0].tabHeight,
-            url: actions[0].url,
-            checkForChromeUrls: true
-        });
-
-        await startPlaying(tab);
-
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
-        // we can resume a failed step. 
+        let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+        let url = false;
+        
+        // we can resume a failed step, which means we don't drive the action just check the screenshot results of it.
+        // this is used when the user fixes a failed step and wants to play from there.
         let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
-        if (navigatedFirst && playFrom === 0) {
-            playFrom = 1; // don't navigate to the start twice
-        }
-        else if (playFrom === TestAction.instances.length - 1) {
-            // common to record then immediately hit play, so do the rewind for the user
+
+        // common to record then immediately hit play, so do the rewind for the user
+        if(playFrom === TestAction.instances.length - 1) {
             playFrom = 0;
             resume = false;
         }
 
-        playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
+        if(playFrom === 0) {
+            // if we are playing from the beginning we navigate to about:blank, then to the starting url, then attach the debugger.
+            // https://github.com/zacfilan/brimstone-recorder/issues/87
+            await chrome.tabs.update(activeChromeTab.id, { url: 'about:blank' });
+            url = actions[0].url;
+            playFrom = 1; // don't navigate to the start twice
+        }
+
+        await attachDebuggerToTab({
+            tab: activeChromeTab,
+            width: actions[0].tabWidth,
+            height: actions[0].tabHeight,
+            url: url 
+        });
+
+        await startPlaying(tab);
+
+         playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
 
         $('#playButton').removeClass('active');
         setToolbarState();
@@ -561,11 +571,11 @@ $('#recordButton').on('click', async function () {
                 alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
                 return false;
             }
-            await attachDebuggerToActiveTab({ url: url }); // get us there bro
+            await attachDebuggerToTab({ url: url }); // get us there bro
         }
         else {
             // we are recording over some steps, don't do an initial navigate
-            await attachDebuggerToActiveTab();
+            await attachDebuggerToTab();
         }
 
         await startRecording(tab);
