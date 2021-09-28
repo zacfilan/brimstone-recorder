@@ -7,7 +7,7 @@ import { sleep, errorDialog } from "../utilities.js";
 import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
-import { loadOptions } from "../options.js";
+import { loadOptions, saveOptions } from "../options.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
 const version = 'v' + chrome.runtime.getManifest().version;
@@ -278,7 +278,7 @@ var playMatchStatus = constants.match.PASS;
  */
 async function attachDebuggerToTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
-    let activeChromeTab = args.tab;
+    let activeChromeTab = args?.tab;
     if(!activeChromeTab) {
         [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
     }
@@ -563,7 +563,9 @@ $('#recordButton').on('click', async function () {
 
         let url = '';
         if (!TestAction.instances.length || currentStepIndex() === 0) {
-            url = prompt('Where to? Type or paste URL to start recording from.');
+            let options = await loadOptions();
+            let defaultUrl = options?.url ?? '';
+            url = prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
             if (!url) {
                 return false;
             }
@@ -571,6 +573,8 @@ $('#recordButton').on('click', async function () {
                 alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
                 return false;
             }
+            options.url = url;
+            saveOptions(); // no need to wait
             await attachDebuggerToTab({ url: url }); // get us there bro
         }
         else {
