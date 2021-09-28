@@ -379,8 +379,8 @@ class Recorder {
             // https://bugs.chromium.org/p/chromium/issues/detail?id=746690&q=setIgnoreInputEvents&can=2
 
             // I send a timestamp of 0 on synthetic events to distingush them from user events
-            if (e.type === 'keydown' && e.timeStamp !== 0) {
-                this.handleKeyDown(e); // queue the users typing
+            if ((e.type === 'keydown' || e.type === 'keyup') && e.timeStamp !== 0) {
+                this.handleKey(e); // queue the users typing
                 Recorder.block(e);
                 return false;
             }
@@ -415,11 +415,11 @@ class Recorder {
                     this._wheel.deltaY += e.deltaY;
                     return; // bubble
                 case 'keydown':
-                    this.handleKeyDown(e);
-                    break; // do not execute
                 case 'keyup':
+                    this.handleKey(e);
+                    break; // do not execute
                 case 'keypress':
-                    break; // do not execute - these should not even be seen here, they should be synthetic events.                    
+                    break; // do not execute - these should not even be seen here, they should be synthetic events only.                    
                 case 'contextmenu':
                 case 'dblclick':
                     this.recordKeySequence();
@@ -516,7 +516,10 @@ class Recorder {
      * 
      * Some special handling for [ENTER] key
      */
-    handleKeyDown(e) {
+    handleKey(e) {
+        if(e.repeat) {
+            return;
+        }
         let takeScreenshot = this.keyEventQueue.length === 0;
         let record = false;
         if(e.keyCode === 13) {
@@ -527,7 +530,7 @@ class Recorder {
             }
             else {
                 // there are pending keypresses
-                this.keyEventQueue.push(e); // through the [ENTER} on the end
+                this.keyEventQueue.push(e); // throw the [ENTER} on the end
                 this.recordKeySequence(); // the whole sequence is recorded (anything before the [ENTER] has already been simulated)
                 // fallthru to just simulate the [ENTER]
             }
@@ -540,7 +543,7 @@ class Recorder {
 
         let rect = e.target.getBoundingClientRect();
         this.pushMessage({
-            type: 'keypress', // convert the keydown into a keypress, to simulate down, up and chat events
+            type: e.type, // simulate the down or the up in the order they are queued
             boundingClientRect: rect,
             x: rect.x + rect.width / 2,
             y: rect = rect.y + rect.height / 2,

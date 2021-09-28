@@ -838,7 +838,8 @@ async function onMessageHandler(message, _port) {
             // no simulation required
             break;
         case 'keys':
-        case 'keypress':
+        case 'keydown':
+        case 'keyup':
             if (userEvent.handler?.takeScreenshot) {
                 _lastScreenshot = await player.captureScreenshotAsDataUrl();
             }

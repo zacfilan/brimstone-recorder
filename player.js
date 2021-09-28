@@ -96,7 +96,7 @@ export class Player {
             start = performance.now();
             await this.verifyScreenshot(next);
             stop = performance.now();
-            next.latency = ((stop - start)/1000).toFixed(1);
+            next.latency = ((stop - start) / 1000).toFixed(1);
 
             action._view = constants.view.EXPECTED;
             switch (next._match) {
@@ -270,49 +270,77 @@ export class Player {
         });
     }
 
-    /** Chords must start with Alt, Ctrl, Meta/Command, or Shift */
-    async chord(action) {
-        let Alt = 1;
-        let Ctrl = 2;
-        let Meta = 4;
-        let Shift = 8;
-        for (let i = 0; i < action.keysDown.length; ++i) {
-            let key = action.keysDown[i];
-            let args = {
-                type: 'keyDown',
-                modifiers: Ctrl,
-                code: key.code,
-                key: key.key,
-                windowsVirtualKeyCode: key.keyCode,
-                nativeVirtualKeyCode: key.keyCode
-            };
-            if (i > 0) {
-                args.modifiers = Ctrl; // FIXME:!
-            }
-            await this.debuggerSendCommand('Input.dispatchKeyEvent', args);
-        }
+    async keyup(action) {
+        let modifiers = 0;
+        let event = action.event;
 
-        for (let i = 0; i < action.keysUp.length; ++i) {
-            let key = action.keysUp[i];
-            let args = {
-                type: 'keyUp',
-                modifiers: Ctrl,
-                code: key.code,
-                key: key.key,
-                windowsVirtualKeyCode: key.keyCode,
-                nativeVirtualKeyCode: key.keyCode
-            };
-            if (i > 0) {
-                args.modifiers = Ctrl; // FIXME:!
+        modifiers |= event.altKey ? 1 : 0;
+        modifiers |= event.ctrlKey ? 2 : 0;
+        modifiers |= event.metaKey ? 4 : 0;
+        modifiers |= event.shiftKey ? 8 : 0;
+
+        await this.debuggerSendCommand('Input.dispatchKeyEvent', {
+            type: 'keyUp',
+            modifiers: modifiers,
+            code: event.code,
+            key: event.key,
+            windowsVirtualKeyCode: event.keyCode,
+            nativeVirtualKeyCode: event.keyCode,
+            timestamp: 0
+        });
+    }
+
+    async keydown(action) {
+        let modifiers = 0;
+        let event = action.event;
+        let keycode = event.keyCode;
+
+        modifiers |= event.altKey ? 1 : 0;
+        modifiers |= event.ctrlKey ? 2 : 0;
+        modifiers |= event.metaKey ? 4 : 0;
+        modifiers |= event.shiftKey ? 8 : 0;
+
+        await this.debuggerSendCommand('Input.dispatchKeyEvent', {
+            type: 'keyDown',
+            modifiers: modifiers,
+            code: event.code,
+            key: event.key,
+            windowsVirtualKeyCode: keycode,
+            nativeVirtualKeyCode: keycode,
+            timestamp: 0
+        });
+
+        if (modifiers === 0 || modifiers === 8) {
+
+            // FIXME: Verify that [ENTER] prints correctly when in a textarea
+            // https://stackoverflow.com/questions/1367700/whats-the-difference-between-keydown-and-keypress-in-net
+            var printable =
+                (keycode > 47 && keycode < 58) || // number keys
+                (keycode == 32 || keycode == 13) || // spacebar & return key(s) (if you want to allow carriage returns)
+                (keycode > 64 && keycode < 91) || // letter keys
+                (keycode > 95 && keycode < 112) || // numpad keys
+                (keycode > 185 && keycode < 193) || // ;=,-./` (in order)
+                (keycode > 218 && keycode < 223);   // [\]' (in order)
+            if (printable) {
+                let msg = {
+                    type: 'char',
+                    code: event.code,
+                    key: event.key,
+                    text: keycode == 13 ? '\r' : event.key,
+                    unmodifiedtext: event.key,
+                    windowsVirtualKeyCode: keycode,
+                    nativeVirtualKeyCode: keycode,
+                    timestamp: 0
+                };
+                await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
             }
-            await this.debuggerSendCommand('Input.dispatchKeyEvent', args);
         }
     }
 
     async keys(action) {
         for (let i = 0; i < action.event.length; ++i) {
             let event = action.event[i];
-            await this.keypress({ event: event });
+            await this[event.type]({ event }); // pretend it is a distinct action
         }
     }
 
@@ -546,7 +574,7 @@ export class Player {
 
         await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", _resolve)));
         if (chrome.runtime.lastError?.message) {
-            if(!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
+            if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
                 throw new Error(chrome.runtime.lastError.message); // not sure how to handle that.
             }
             // else we can ignore that, that's what we want
