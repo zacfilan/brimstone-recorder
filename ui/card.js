@@ -125,6 +125,11 @@ export class TestAction {
 
     /** recorded during playback, this is the number of MBs in use after this action is performed. */
     memoryUsed;
+    
+    /** 
+     * Optional the user can name this action. e.g. 'Open Dialog'
+     * @type {string}*/
+    name;
 
     constructor(args) {
         Object.assign(this, args);
@@ -167,7 +172,8 @@ export class TestAction {
             url: this.url, // only on start actions
             hoverTime: this.hoverTime,
             deltaX: this.deltaX, // only on wheel actions 
-            deltaY: this.deltaY // only on wheel actions
+            deltaY: this.deltaY, // only on wheel actions
+            name: this.name // optional
         };
 
         if (this.expectedScreenshot) {
@@ -280,7 +286,7 @@ export class TestAction {
 
         let html = `
     <div class='card ${this.classes()} ${className}' data-index=${this.index}>
-        <div title='Click to cycle through\nexpected, actual, and difference views.' class='click-to-change-view title'>${title}<div class="stepNumber">${this.index + 1}</div></div>
+        <div title='${title.tooltip}' class='click-to-change-view title'>${title.text}<div class="stepNumber">${this.index + 1}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
             <span style="width:100%;"><span class="match-status"></span></span>
@@ -360,12 +366,15 @@ export class Step {
     }
 
     toHtml({ isRecording }) {
-        let title = '';
+        let title = {
+            text: '',
+            tooltip: 'Click to edit.'
+        };
         if (isRecording) {
-            title = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
+            title.text = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
         }
         else {
-            title = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action';
+            title.text = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : this.curr.name || 'User action';
         }
 
         let html = `
@@ -375,39 +384,42 @@ export class Step {
 
         if (this.next) {
             let src;
-            let title = '';
+            let title = {
+                text: '',
+                tooltip: 'Click to cycle through\nexpected, actual, and difference views.'
+            };
 
             if (this.next._match === constants.match.PLAY) {
-                title += 'Wait for actual to match.';
+                title.text += 'Wait for actual to match.';
             }
             else {
 
                 if (this.next._match === constants.match.FAIL) {
-                    title += '<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="exchange" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-exchange fa-w-16 fa-5x"><path fill="currentColor" d="M0 168v-16c0-13.255 10.745-24 24-24h381.97l-30.467-27.728c-9.815-9.289-10.03-24.846-.474-34.402l10.84-10.84c9.373-9.373 24.568-9.373 33.941 0l82.817 82.343c12.497 12.497 12.497 32.758 0 45.255l-82.817 82.343c-9.373 9.373-24.569 9.373-33.941 0l-10.84-10.84c-9.556-9.556-9.341-25.114.474-34.402L405.97 192H24c-13.255 0-24-10.745-24-24zm488 152H106.03l30.467-27.728c9.815-9.289 10.03-24.846.474-34.402l-10.84-10.84c-9.373-9.373-24.568-9.373-33.941 0L9.373 329.373c-12.497 12.497-12.497 32.758 0 45.255l82.817 82.343c9.373 9.373 24.569 9.373 33.941 0l10.84-10.84c9.556-9.556 9.341-25.113-.474-34.402L106.03 384H488c13.255 0 24-10.745 24-24v-16c0-13.255-10.745-24-24-24z" class=""></path></svg>'
-                    title += ' failed match. ';
+                    title.text += '<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="exchange" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-exchange fa-w-16 fa-5x"><path fill="currentColor" d="M0 168v-16c0-13.255 10.745-24 24-24h381.97l-30.467-27.728c-9.815-9.289-10.03-24.846-.474-34.402l10.84-10.84c9.373-9.373 24.568-9.373 33.941 0l82.817 82.343c12.497 12.497 12.497 32.758 0 45.255l-82.817 82.343c-9.373 9.373-24.569 9.373-33.941 0l-10.84-10.84c-9.556-9.556-9.341-25.114.474-34.402L405.97 192H24c-13.255 0-24-10.745-24-24zm488 152H106.03l30.467-27.728c9.815-9.289 10.03-24.846.474-34.402l-10.84-10.84c-9.373-9.373-24.568-9.373-33.941 0L9.373 329.373c-12.497 12.497-12.497 32.758 0 45.255l82.817 82.343c9.373 9.373 24.569 9.373 33.941 0l10.84-10.84c9.556-9.556 9.341-25.113-.474-34.402L106.03 384H488c13.255 0 24-10.745 24-24v-16c0-13.255-10.745-24-24-24z" class=""></path></svg>'
+                    title.text += ' failed match. ';
                 }
 
                 switch (this.next._view) {
                     case constants.view.EXPECTED:
-                        title += 'Expected result';
+                        title.text += 'Expected result';
                         if (this.next.index === TestAction.instances.length - 1) {
-                            title += ' - final screenshot';
+                            title.text += ' - final screenshot';
                         }
-                        title += '.';
+                        title.text += '.';
                         break;
                     case constants.view.ACTUAL:
-                        title += 'Actual result.';
+                        title.text += 'Actual result.';
                         src = this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
                         break;
                     case constants.view.EDIT:
-                        title += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
+                        title.text += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
                         src = this.next.editViewDataUrl ?? '../images/notfound.png';
                         break;
                 }
             }
 
             if (this.next._match === constants.match.ALLOW) {
-                title += ` <span id='allowed-differences'> Has allowed differences.</span>`;
+                title.text += ` <span id='allowed-differences'> Has allowed differences.</span>`;
             }
 
             html += this.next.toHtml({ title: title, src: src, className: 'waiting', stats: true });

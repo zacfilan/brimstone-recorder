@@ -187,6 +187,9 @@ body {
     display: flex;
     flex-direction: row;
 
+    /***********************/
+    /* First card in step */
+    /***********************/
     .card.action {
         /** only the first card should see the action */
         .action {

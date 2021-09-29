@@ -139,6 +139,17 @@ function addVolatileRegions() {
     // adds to DOM temporarily
 }
 
+$('#step').on('click', '.action .title',
+    function(e) {
+        const { view, action } = getCard(e.currentTarget);
+        let name = prompt('What would you like to name this step?', action.name || 'User action');
+        if(name && name !== 'User action') {
+            action.name = name;
+            updateStepInView(TestAction.instances[action.index]);
+        }
+    }
+);
+
 $('#step').on('click', '.waiting .click-to-change-view',
     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
     async function cycleEditStates(e) {
