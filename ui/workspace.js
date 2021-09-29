@@ -13,10 +13,16 @@ import { loadOptions, saveOptions } from "../options.js";
 const version = 'v' + chrome.runtime.getManifest().version;
 
 // some meta keycodes
-const ALT = 18;
-const META = 91;
-const CTRL = 17;
-const SHIFT = 16;
+const ALT_KEYCODE = 18;
+const META_KEYCODE = 91;
+const CTRL_KEYCODE = 17;
+const SHIFT_KEYCODE = 16;
+
+const keycode2modifier = {};
+keycode2modifier[ALT_KEYCODE] = 1;
+keycode2modifier[CTRL_KEYCODE] = 2;
+keycode2modifier[META_KEYCODE] = 4;
+keycode2modifier[SHIFT_KEYCODE] = 8;
 
 disableConsole(); // can be reenabled in the debugger later
 
@@ -368,11 +374,11 @@ $('#playButton').on('click', async function () {
         $('#playButton').removeClass('active');
         setToolbarState();
 
+        await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
         switch (playMatchStatus) {
             case constants.match.PASS:
             case constants.match.ALLOW:
                 setInfoBarText('✅ last run passed');
-                await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
                 alert('✅ Test passed.');
                 break;
             case constants.match.FAIL:
@@ -771,30 +777,30 @@ async function userEventToAction(userEvent, frameId) {
             break;
         case 'keys':
             cardModel.description = 'type ';
+
             for (let i = 0; i < userEvent.event.length; ++i) {
                 let event = userEvent.event[i];
+
+
                 // this could be extended to arbitrary chords, but I don't really care if e.g. 'a' and 'b' are both down at the same time
                 // I only care if a modifier key is down and followed by another downkey.
                 if (event.type === 'keydown') {
-                    if (event.keyCode === ALT || event.keyCode === META || event.keyCode === CTRL || event.keyCode === SHIFT) {
-                        // look ahead
-                        let next = userEvent?.event[i + 1];
-                        if (!next) {
-                            // last event, print it
-                            cardModel.description += `<span class='modifier'>${event.key}</span>`;
-                        }
-                        else if (next.type === 'keydown') { // i prevent repeats so the keycode must be different if it is also down
-                            cardModel.description += `<span class='modifier'>${event.key}+</span>`;
-                        }
-                        // else keyup, nothing to report
+                    let isModifierKey = keycode2modifier[event.keyCode] || 0;
+                    let modifiers = 0;
+                    modifiers |= event.altKey ? 1 : 0;
+                    modifiers |= event.ctrlKey ? 2 : 0;
+                    modifiers |= event.metaKey ? 4 : 0;
+                    modifiers |= event.shiftKey ? 8 : 0;
+                    
+                    let chord = modifiers & ~isModifierKey;
+                    if (chord) {
+                        cardModel.description += `<span class='modifier'>+</span>`;
+                    }
+                    if (chord || event.key.length > 1) {
+                        cardModel.description += `<span class='modifier'>${event.key}</span>`;
                     }
                     else {
-                        if (event.key.length > 1) {
-                            cardModel.description += `<span class='modifier'>${event.key}</span>`;
-                        }
-                        else {
-                            cardModel.description += event.key;
-                        }
+                        cardModel.description += event.key;
                     }
                 }
                 // else keyup, nothing to report

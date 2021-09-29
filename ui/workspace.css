@@ -260,7 +260,13 @@ body {
 }
 
 #content .card.action .action .modifier {
-  background: black;
+  background: lightgray;
+  border-radius: 5px;
+  color: black;
+  border: 1px solid black;
+  font-size: 14px;
+  padding: 0px 3px;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 #content .card.waiting {
