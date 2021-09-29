@@ -259,6 +259,10 @@ body {
   padding: 5px;
 }
 
+#content .card.action .action .modifier {
+  background: black;
+}
+
 #content .card.waiting {
   /** show the failed progress bar as red for failed states */
   /** hide that one */

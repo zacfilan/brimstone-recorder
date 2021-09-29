@@ -42,12 +42,12 @@ class Recorder {
     }
 
     hideCursor() {
-        if(document.getElementById('brimstone-recorder-css')) {
+        if (document.getElementById('brimstone-recorder-css')) {
             return;
         }
-        
+
         var styleSheet = document.createElement("style");
-        styleSheet.type="text/css";
+        styleSheet.type = "text/css";
         styleSheet.innerText = 'body {caret-color: transparent;}';
         styleSheet.id = 'brimstone-recorder-css';
         document.head.appendChild(styleSheet);
@@ -466,7 +466,7 @@ class Recorder {
       */
     _scheduleRecordKeySequence() {
         clearTimeout(this.pendingKeyTimeout);
-        this.pendingKeyTimeout = setTimeout (
+        this.pendingKeyTimeout = setTimeout(
             this.recordKeySequence.bind(this),
             500 // FIXME: make configurable
         );
@@ -476,11 +476,11 @@ class Recorder {
      * If there was a key sequence in process that hasn't been recorded,
      * record it now.
      */
-     recordKeySequence() {
-        if(!this.keyEventQueue.length) {
+    recordKeySequence() {
+        if (!this.keyEventQueue.length) {
             return;
         }
-        
+
         clearTimeout(this.pendingKeyTimeout);
         let rect = this.keyEventQueue[0].target.getBoundingClientRect();
         this.pushMessage({
@@ -517,27 +517,34 @@ class Recorder {
      * Some special handling for [ENTER] key
      */
     handleKey(e) {
-        if(e.repeat) {
+        if (e.repeat) {
             return;
         }
+
         let takeScreenshot = this.keyEventQueue.length === 0;
         let record = false;
-        if(e.keyCode === 13) {
-            if(this.keyEventQueue.length === 0) {
-                // no pending key presses
-                record = true; // so this enter key will be an indiviudal recorded action, ss taken before, simulated last
-                // fall thro to take ss, record, then simulate the [ENTER] key by its lonesome
+
+        if (e.keyCode === 13) {
+            if (e.type === 'keydown') {
+                if (this.keyEventQueue.length === 0) {
+                    // no pending key presses
+                    record = true; // so this enter key down event will be an indiviudal recorded action, ss taken before, simulated last
+                    // fall thro to take ss, record, then simulate the [ENTER] key by its lonesome
+                }
+                else {
+                    // there are pending key events
+                    this.keyEventQueue.push(e); // throw the [ENTER] keydown event on the end
+                    this.recordKeySequence(); // the whole sequence is recorded immediately (anything before this event has already been simulated)
+                    // fallthru to just simulate the [ENTER] key event
+                }
             }
             else {
-                // there are pending keypresses
-                this.keyEventQueue.push(e); // throw the [ENTER} on the end
-                this.recordKeySequence(); // the whole sequence is recorded (anything before the [ENTER] has already been simulated)
-                // fallthru to just simulate the [ENTER]
+                // keyup enter
+                takeScreenshot = false; // just fall thru to simulate it, no ss, no record
             }
         }
         else {
-            this.keyEventQueue.push(e); // through the [ENTER} on the end
-       
+            this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
             this._scheduleRecordKeySequence();
         }
 

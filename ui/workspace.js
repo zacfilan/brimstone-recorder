@@ -12,6 +12,12 @@ import { loadOptions, saveOptions } from "../options.js";
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
 const version = 'v' + chrome.runtime.getManifest().version;
 
+// some meta keycodes
+const ALT = 18;
+const META = 91;
+const CTRL = 17;
+const SHIFT = 16;
+
 disableConsole(); // can be reenabled in the debugger later
 
 setToolbarState();
@@ -279,7 +285,7 @@ var playMatchStatus = constants.match.PASS;
 async function attachDebuggerToTab(args) {
     // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
     let activeChromeTab = args?.tab;
-    if(!activeChromeTab) {
+    if (!activeChromeTab) {
         [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
     }
 
@@ -329,18 +335,18 @@ $('#playButton').on('click', async function () {
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
         let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
         let url = false;
-        
+
         // we can resume a failed step, which means we don't drive the action just check the screenshot results of it.
         // this is used when the user fixes a failed step and wants to play from there.
         let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
 
         // common to record then immediately hit play, so do the rewind for the user
-        if(playFrom === TestAction.instances.length - 1) {
+        if (playFrom === TestAction.instances.length - 1) {
             playFrom = 0;
             resume = false;
         }
 
-        if(playFrom === 0) {
+        if (playFrom === 0) {
             // if we are playing from the beginning we navigate to about:blank, then to the starting url, then attach the debugger.
             // https://github.com/zacfilan/brimstone-recorder/issues/87
             await chrome.tabs.update(activeChromeTab.id, { url: 'about:blank' });
@@ -352,12 +358,12 @@ $('#playButton').on('click', async function () {
             tab: activeChromeTab,
             width: actions[0].tabWidth,
             height: actions[0].tabHeight,
-            url: url 
+            url: url
         });
 
         await startPlaying(tab);
 
-         playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
+        playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
 
         $('#playButton').removeClass('active');
         setToolbarState();
@@ -574,7 +580,7 @@ $('#recordButton').on('click', async function () {
                 return false;
             }
             options.url = url;
-            saveOptions(); // no need to wait
+            saveOptions(options); // no need to wait
             await attachDebuggerToTab({ url: url }); // get us there bro
         }
         else {
@@ -644,7 +650,9 @@ function postMessage(msg) {
 
 $('#saveButton').on('click', async () => {
     let file = await saveFile();
-    window.document.title = `Brimstone - ${file.name}`;
+    if (file) {
+        window.document.title = `Brimstone - ${file.name}`;
+    }
 });
 
 $('#helpButton').on('click', () => {
@@ -762,10 +770,45 @@ async function userEventToAction(userEvent, frameId) {
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'keys':
-            cardModel.description = 'type ' + userEvent.event.filter(e => e.type === 'keydown').map(k => k.key).join('');
+            cardModel.description = 'type ';
+            for (let i = 0; i < userEvent.event.length; ++i) {
+                let event = userEvent.event[i];
+                // this could be extended to arbitrary chords, but I don't really care if e.g. 'a' and 'b' are both down at the same time
+                // I only care if a modifier key is down and followed by another downkey.
+                if (event.type === 'keydown') {
+                    if (event.keyCode === ALT || event.keyCode === META || event.keyCode === CTRL || event.keyCode === SHIFT) {
+                        // look ahead
+                        let next = userEvent?.event[i + 1];
+                        if (!next) {
+                            // last event, print it
+                            cardModel.description += `<span class='modifier'>${event.key}</span>`;
+                        }
+                        else if (next.type === 'keydown') { // i prevent repeats so the keycode must be different if it is also down
+                            cardModel.description += `<span class='modifier'>${event.key}+</span>`;
+                        }
+                        // else keyup, nothing to report
+                    }
+                    else {
+                        if (event.key.length > 1) {
+                            cardModel.description += `<span class='modifier'>${event.key}</span>`;
+                        }
+                        else {
+                            cardModel.description += event.key;
+                        }
+                    }
+                }
+                // else keyup, nothing to report
+            }
             break;
+        case 'keydown':
         case 'keypress':
-            cardModel.description = 'type ' + userEvent.event.key;
+            cardModel.description = 'type ';
+            if (userEvent.event.key.length > 1) {
+                cardModel.description += `<span class='modifier'>${userEvent.event.key}</span>`;
+            }
+            else {
+                cardModel.description += userEvent.event.key;
+            }
             break;
         case 'chord':
             cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a

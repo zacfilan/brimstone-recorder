@@ -48,7 +48,7 @@ export async function loadFile() {
     for (let i = 0; i < actions.length; ++i) {
         let action = new TestAction(actions[i]);
         let screenshotPromise;
-        
+
         if (action.expectedScreenshot?.fileName) {
             action.expectedScreenshot = new Screenshot(action.expectedScreenshot);
             action._view = constants.view.EXPECTED;
@@ -59,11 +59,11 @@ export async function loadFile() {
         // create the container for the other screenshots to be hydrated, 
         // thus, if these props exist on the action, they def have a fileName
         // but may not be hydrated. if they don't exist, they weren't in the file, nor has this action been played
-        if(action.acceptablePixelDifferences?.fileName) {
+        if (action.acceptablePixelDifferences?.fileName) {
             action._match = constants.match.ALLOW;
             action.acceptablePixelDifferences = new Screenshot(action.acceptablePixelDifferences);
         }
-        if(action.actualScreenshot?.fileName) { 
+        if (action.actualScreenshot?.fileName) {
             action._match = constants.match.FAIL; // if it failed, do I really care to know there are allowed differences too?
             // if you have an actual one to load it means that the last time this was run it failed.
             action.actualScreenshot = new Screenshot(action.actualScreenshot);
@@ -97,10 +97,10 @@ export function hydrateForPlay() {
     for (let i = 0; i < TestAction.instances.length; ++i) {
         let action = TestAction.instances[i];
         if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
-            if(action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
+            if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
                 screenshotPromise = action.acceptablePixelDifferences.hydrate();
                 screenshotPromises.push(screenshotPromise);
-            } 
+            }
         }
         if (action.expectedScreenshot && !action.expectedScreenshot.png) {
             screenshotPromise = action.expectedScreenshot.createPngFromDataUrl();
@@ -120,9 +120,9 @@ export async function saveFile() {
     console.debug('create zip');
     zip = new JSZip();
     zip.file('test.json', JSON.stringify(
-        { 
+        {
             meta: TestAction.meta,
-            steps: TestAction.instances 
+            steps: TestAction.instances
         }, null, 2)); // add the test.json file to archive
     screenshots = zip.folder("screenshots"); // add a screenshots folder to the archive
     // add all the expected screenshots to the screenshots directory in the archive
@@ -152,18 +152,23 @@ export async function saveFile() {
 
     console.debug('save zip to disk');
     let blobpromise = zip.generateAsync({ type: "blob" });
-    const handle = await window.showSaveFilePicker({
-        suggestedName: `test.zip`,
-        types: [
-            {
-                description: 'A ZIP archive that can be run by Brimstone',
-                accept: { 'application/zip': ['.zip'] }
-            }
-        ]
-    });
-    const writable = await handle.createWritable();
-    let blob = await blobpromise;
-    await writable.write(blob);  // Write the contents of the file to the stream.    
-    await writable.close(); // Close the file and write the contents to disk.
-    return handle;
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: `test.zip`,
+            types: [
+                {
+                    description: 'A ZIP archive that can be run by Brimstone',
+                    accept: { 'application/zip': ['.zip'] }
+                }
+            ]
+        });
+        const writable = await handle.createWritable();
+        let blob = await blobpromise;
+        await writable.write(blob);  // Write the contents of the file to the stream.    
+        await writable.close(); // Close the file and write the contents to disk.
+        return handle;
+    }
+    catch (e) {
+        console.error(e);
+    }
 }
