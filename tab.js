@@ -33,7 +33,7 @@ export class Tab {
         this.chromeTab = await chrome.tabs.get(id);
         this.zoomFactor = await chrome.tabs.getZoom(id);
         if (this.zoomFactor !== 1) {
-            throw "BOOM!";
+            throw new Error(`The zoom factor must equal 1. It is currently ${this.zoomFactor}`);
         }
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
