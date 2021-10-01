@@ -17,6 +17,11 @@ body {
   position: relative;
 }
 
+.error-text {
+  color: red;
+  font-weight: bold;
+}
+
 .themed {
   background: rgba(0, 0, 0, 0.75);
   color: white;
@@ -205,7 +210,10 @@ body {
     width: 0;
     background-color: green;
   }
-  75% {
+  80% {
+    background-color: green;
+  }
+  99% {
     background-color: orange;
   }
   100% {
@@ -219,7 +227,10 @@ body {
     width: 0;
     background-color: green;
   }
-  75% {
+  80% {
+    background-color: green;
+  }
+  99% {
     background-color: orange;
   }
   100% {

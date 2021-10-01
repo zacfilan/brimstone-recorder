@@ -303,9 +303,8 @@ export class TestAction {
             `;
         }
         let footer = '';
-        if (this.latency) {
-            footer += `Visible in ${this.latency}s.`;
-        }
+        let red = this.latency > 3 ? "class='error-text'" : '';
+        footer += `Visible in <span ${red}>${this.latency}s</span>.`;
         if (this.memoryUsed) {
             if (this.latency) {
                 footer += ' ';
@@ -371,10 +370,10 @@ export class Step {
             tooltip: 'Click to edit.'
         };
         if (isRecording) {
-            title.text = this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action';
+            title.text = this.curr.name || (this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action');
         }
         else {
-            title.text = this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : this.curr.name || 'User action';
+            title.text = this.curr.name || (this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action');
         }
 
         let html = `
