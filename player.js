@@ -290,6 +290,50 @@ export class Player {
         });
     }
 
+    /**
+     * Simulate the a change of a select dropdown.
+     */
+    async change(action) {
+        /**
+         * This function is injected and run in the app
+         * @param {number} x the x coordinate of the select element
+         * @param {*} y  the y coordinate of the select element
+         * @param {*} value the vaue to set the select element to
+         * @returns {string} an error message on error
+         */
+        function changeSelectValue(x, y, value) {
+            debugger;
+            try {
+                var select = document.elementFromPoint(x, y);
+                if (select.tagName !== 'SELECT') {
+                    return 'not a select element';
+                }
+                if (select.value === value) {
+                    return;
+                }
+                select.value = value;
+                select.dispatchEvent(new Event('change'));
+            }
+            catch (e) {
+                return e.message;
+            }
+        }
+
+        // FIXME: I need to run this in the correct frame!
+        let frames = await chrome.scripting.executeScript({
+            target: { tabId: this.tab.id/*, frameIds: frameIds*/ },
+            function: changeSelectValue,
+            args: [action.x, action.y, action.event.value]
+        });
+        let errorMessage = frames[0].result;
+
+        if (errorMessage) {
+            throw new Error(errorMessage); // I'd want to know that.
+        }
+
+        await this.click(action); // to close the open shadow dom options
+    }
+
     async keydown(action) {
         let modifiers = 0;
         let event = action.event;
@@ -359,6 +403,7 @@ export class Player {
         /** Used to display the results of applying the acceptableDifferences to the actual image. */
         let differencesPng = false;
         let i = 0;
+        let resize = false;
 
         // this loop will run even if the app is in the process of navigating to the next page.
         while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
@@ -403,11 +448,15 @@ export class Player {
             try {
                 // this is a little weird, I can check the size before hand, but it's more efficient to 
                 // assume that it will work, than to check every time. make the common case fast.
+                if (resize) {
+                    resize = false;
+                    await this.tab.resizeViewport(); // I am assuming it was because of the size
+                }
                 nextStep.actualScreenshot = await this._takeScreenshot(this.tab.width, this.tab.height);
             }
             catch (e) {
                 console.debug(e.message + '. resize and try again.');
-                await this.tab.resizeViewport(); // I am assuming it was because of the size
+                resize = true;
                 continue;
             }
 

@@ -863,6 +863,9 @@ async function userEventToAction(userEvent, frameId) {
             cardModel._view = constants.view.EXPECTED;
             break;
         }
+        case 'change':
+            cardModel.description = `change value to ${cardModel.event.value}`;
+            break;
         default:
             cardModel.description = 'Unknown!';
             break;
@@ -900,6 +903,7 @@ async function onMessageHandler(message, _port) {
         case 'keys':
         case 'keydown':
         case 'keyup':
+        case 'change':
             if (userEvent.handler?.takeScreenshot) {
                 _lastScreenshot = await player.captureScreenshotAsDataUrl();
             }
@@ -920,9 +924,19 @@ async function onMessageHandler(message, _port) {
             // record
             action = await userEventToAction(userEvent, userEvent.sender.frameId);
             updateStepInView(action);
-            //
 
             await player[action.type](action); // simulate
+            
+            /* 
+                we can't record the shadow dom open options screen on a select dropdown
+                like we 'normally' would before an option is clicked in it, 
+                because we can't see events in the shadow dom (much less preempt or block them).
+                so take a snapshot of the screen 'likely' to be what they see after the simulate
+            */
+            if(userEvent.event?.target?.tagName === 'SELECT') {
+                _lastScreenshot = await player.captureScreenshotAsDataUrl();
+            }
+
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'connect':

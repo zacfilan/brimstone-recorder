@@ -239,7 +239,10 @@ class Recorder {
 
             // properties of the event
             event: {
-                type: e.type
+                type: e.type,
+                target: {
+                    tagName: e.target.tagName
+                }
             }
         };
 
@@ -271,7 +274,6 @@ class Recorder {
                 ['clientX', 'clientY'].forEach(p =>
                     msg.event[p] = e[p]);
                 break;
-
             case 'chord':
                 msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
                 msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
@@ -289,6 +291,16 @@ class Recorder {
                     msg.keysDown.push(down);
                     msg.keysUp.push(up);
                 }
+                break;
+            case 'change':
+                msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
+                msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
+                msg.handler = {
+                    takeScreenshot: false, // use the last taken, as the correct state
+                    record: true, 
+                    simulate: false
+                };
+                msg.event.value = e.target.value; // specific to the change event
                 break;
         }
 
@@ -361,6 +373,7 @@ class Recorder {
                 case 'mousedown':
                 case 'contextmenu':
                 case 'keydown':
+                case 'change':
                     this._state = Recorder.state.RECORD;
                     //console.debug(`${e.type} ${window.location.href}} switches us to RECORD state`);
                     break;
@@ -392,6 +405,14 @@ class Recorder {
         else {
             let msg;
             switch (e.type) {
+                case 'change':
+                    // handle select elements that update their value by user interacting, e.g. clicking, in the shadow DOM options, where we cannot see these events.
+                    // at this point in time the shadow DOM is closed and the value has already changed.
+                    if (e.target.tagName === 'SELECT') {
+                        let msg = this.buildMsg(e);
+                        this.pushMessage(msg);  
+                    }
+                    return; // bubble it
                 case 'wheel':
                     if (!this._wheel) {
                         this._wheel = {
