@@ -1,14 +1,14 @@
 {
   "name": "Brimstone",
   "description": "Record and play Brimstone pixel-perfect webpage automation tests",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js"
   },
   "permissions": [
     "tabs",
-    "storage", 
+    "storage",
     "activeTab",
     "scripting",
     "webNavigation",
@@ -18,9 +18,9 @@
     "*://*/",
     "<all_urls>"
   ],
-  "action" : {
-    "default_icon": {             
-      "32": "images/grey_b_32.png"    
+  "action": {
+    "default_icon": {
+      "32": "images/grey_b_32.png"
     },
     "default_title": "Brimstone is inactive.\nClick to open window."
   },
@@ -30,9 +30,13 @@
   "options_page": "options_ui.html",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "<all_urls>"
+      ],
       "all_frames": true,
-      "js": ["recorder.js"],
+      "js": [
+        "recorder.js"
+      ],
       "run_at": "document_start"
     }
   ]

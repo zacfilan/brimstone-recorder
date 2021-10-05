@@ -24,42 +24,47 @@ body {
     color: white;
 }
 
-#toolbar {
-    padding: 0px;
+.row {
     display: flex;
+    align-items: center;
     flex-direction: row;
-    height: 40px;
-    justify-content: space-between;
+}
 
-    button {
-        background: unset;
-        color: unset;
-        border-radius: 3px;
-        border: 0;
-        margin: 4px;
-        font-size: larger;
-        height: 31px;
+button {
+    background: unset;
+    color: unset;
+    border-radius: 3px;
+    border: 0;
+    margin: 4px;
+    font-size: larger;
+    height: 31px;
 
-        &[disabled],
-        &[disabled] i {
-            opacity: 0.3;
-            &:hover {
-                background: unset;
-                cursor: unset;
-            }
-        }
-
+    &[disabled],
+    &[disabled] i {
+        opacity: 0.3;
         &:hover {
-            background: rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-        }
-
-        svg {
-            height: 20px;
-            width: 20px;
-            fill: white;
+            background: unset;
+            cursor: unset;
         }
     }
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+    }
+
+    svg {
+        height: 20px;
+        width: 20px;
+        fill: white;
+    }
+}
+
+#toolbar {
+    @extend .row;
+    padding: 0px;
+    height: 40px;
+    justify-content: space-between;
 
     #recordButton,
     #playButton {
@@ -168,6 +173,10 @@ body {
             height: 100%;
         }
         visibility: hidden; /* not seen but takes up layout space */
+    }
+
+    .footer {
+        @extend .row;
     }
 }
 

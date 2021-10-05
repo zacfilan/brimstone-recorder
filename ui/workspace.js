@@ -140,10 +140,10 @@ function addVolatileRegions() {
 }
 
 $('#step').on('click', '.action .title',
-    function(e) {
+    function (e) {
         const { view, action } = getCard(e.currentTarget);
         let name = prompt('What would you like to name this step?', action.name || 'User action');
-        if(name && name !== 'User action') {
+        if (name && name !== 'User action') {
             action.name = name;
             updateStepInView(TestAction.instances[action.index]);
         }
@@ -333,6 +333,66 @@ async function attachDebuggerToTab(args) {
 
     await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached, the recorder does not need to be injected
 }
+
+$('#step').on('click', '#chartButton', async function () {
+    let latencyValues = TestAction.instances.map(a => a.latency);
+    let memoryUsedValues = TestAction.instances.map(a => a.memoryUsed);
+    let indicies = TestAction.instances.map(a => a.index);
+    let chartDescriptor = JSON.stringify({
+        type: 'line',
+        data: {
+            labels: indicies, // x-axis labels
+            datasets: [
+                {
+                    label: 'Latency (secs.)',
+                    borderColor: 'red',
+                    backgroundColor: 'white',
+                    fill: false,
+                    data: latencyValues,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Memory (MBs)',
+                    borderColor: 'blue',
+                    backgroundColor: 'white',
+                    fill: false,
+                    data: memoryUsedValues,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            stacked: false,
+            title: {
+                display: true,
+                text: 'Some stats'
+            },
+            scales: {
+                yAxes: [
+                    {
+                        id: "y",
+                        type: "linear",
+                        display: true,
+                        position: "left"
+                    },
+                    {
+                        id: "y1",
+                        type: "linear",
+                        display: true,
+                        position: "right",
+                        gridLines: {
+                            drawOnChartArea: false
+                        }
+                    }
+                ]
+            }
+        }
+    });
+    let window = await chrome.windows.create({
+        url: chrome.runtime.getURL(`ui/chart.html?c=${chartDescriptor}`),
+        type: "popup",
+      });
+});
 
 $('#playButton').on('click', async function () {
     let button = $(this);
@@ -802,7 +862,7 @@ async function userEventToAction(userEvent, frameId) {
                     modifiers |= event.ctrlKey ? 2 : 0;
                     modifiers |= event.metaKey ? 4 : 0;
                     modifiers |= event.shiftKey ? 8 : 0;
-                    
+
                     let chord = modifiers & ~isModifierKey;
                     if (chord) {
                         cardModel.description += `<span class='modifier'>+</span>`;
@@ -926,14 +986,14 @@ async function onMessageHandler(message, _port) {
             updateStepInView(action);
 
             await player[action.type](action); // simulate
-            
+
             /* 
                 we can't record the shadow dom open options screen on a select dropdown
                 like we 'normally' would before an option is clicked in it, 
                 because we can't see events in the shadow dom (much less preempt or block them).
                 so take a snapshot of the screen 'likely' to be what they see after the simulate
             */
-            if(userEvent.event?.target?.tagName === 'SELECT') {
+            if (userEvent.event?.target?.tagName === 'SELECT') {
                 _lastScreenshot = await player.captureScreenshotAsDataUrl();
             }
 
