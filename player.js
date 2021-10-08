@@ -11,6 +11,45 @@ import { getHydratedForPlayPromise } from "./ui/loader.js";
 
 var options;
 
+/**
+ * This function is injected and run in the app
+ * 
+ * Scroll the element that matches the css to the given value
+ */
+function _scroll(css, top, left) {
+    let elem = document.querySelector(css);
+    if(top !== null) {
+        elem.scrollTop = top;
+    }
+    if(left !== null) {
+        elem.scrollLeft = left;
+    }
+}
+
+/**
+* This function is injected and run in the app
+* @param {number} x the x coordinate of the select element
+* @param {*} y  the y coordinate of the select element
+* @param {*} value the vaue to set the select element to
+* @returns {string} an error message on error
+*/
+function _changeSelectValue(x, y, value) {
+    try {
+        var select = document.elementFromPoint(x, y);
+        if (select.tagName !== 'SELECT') {
+            return 'not a select element';
+        }
+        if (select.value === value) {
+            return;
+        }
+        select.value = value;
+        select.dispatchEvent(new Event('change'));
+    }
+    catch (e) {
+        return e.message;
+    }
+}
+
 export class Player {
     /** The currently executing step. */
     actionStep;
@@ -294,35 +333,10 @@ export class Player {
      * Simulate the a change of a select dropdown.
      */
     async change(action) {
-        /**
-         * This function is injected and run in the app
-         * @param {number} x the x coordinate of the select element
-         * @param {*} y  the y coordinate of the select element
-         * @param {*} value the vaue to set the select element to
-         * @returns {string} an error message on error
-         */
-        function changeSelectValue(x, y, value) {
-            debugger;
-            try {
-                var select = document.elementFromPoint(x, y);
-                if (select.tagName !== 'SELECT') {
-                    return 'not a select element';
-                }
-                if (select.value === value) {
-                    return;
-                }
-                select.value = value;
-                select.dispatchEvent(new Event('change'));
-            }
-            catch (e) {
-                return e.message;
-            }
-        }
-
         // FIXME: I need to run this in the correct frame!
         let frames = await chrome.scripting.executeScript({
             target: { tabId: this.tab.id/*, frameIds: frameIds*/ },
-            function: changeSelectValue,
+            function: _changeSelectValue,
             args: [action.x, action.y, action.event.value]
         });
         let errorMessage = frames[0].result;
@@ -332,6 +346,20 @@ export class Player {
         }
 
         await this.click(action); // to close the open shadow dom options
+    }
+
+    async scroll(action) {
+        // FIXME: I need to run this in the correct frame!
+        let frames = await chrome.scripting.executeScript({
+            target: { tabId: this.tab.id/*, frameIds: frameIds*/ },
+            function: _scroll,
+            args: [action.event.css, action.event.scrollTop, action.event.scrollLeft]
+        });
+        let errorMessage = frames[0].result;
+
+        if (errorMessage) {
+            throw new Error(errorMessage); // I'd want to know that.
+        }
     }
 
     async keydown(action) {

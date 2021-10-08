@@ -55,7 +55,7 @@ export class TestAction {
     sender;
 
     /**
-     * object that descobes the boundingClientRect in percentages
+     * object that describes the boundingClientRect in percentages
      * so that it can render when the UI is resized.
      */
     overlay;

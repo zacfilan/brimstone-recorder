@@ -1,5 +1,173 @@
 
+// thanks dave. https://blog.davidvassallo.me/2019/09/20/a-javascript-reverse-css-selector/
+var TopLevelObject = {};
+TopLevelObject.DOMNodePathStep = function (value, optimized) {
+    this.value = value;
+    this.optimized = optimized || false;
+}
+TopLevelObject.DOMNodePathStep.prototype = {
+    /**
+     * @override
+     * @return {string}
+     */
+    toString: function () {
+        return this.value;
+    }
+}
+TopLevelObject.DOMPresentationUtils = {}
 
+TopLevelObject.DOMPresentationUtils.cssPath = function (node, optimized) {
+    if (node.nodeType !== Node.ELEMENT_NODE)
+        return "";
+    var steps = [];
+    var contextNode = node;
+    while (contextNode) {
+        var step = TopLevelObject.DOMPresentationUtils._cssPathStep(contextNode, !!optimized, contextNode === node);
+        if (!step)
+            break; // Error - bail out early.
+        steps.push(step);
+        if (step.optimized)
+            break;
+        contextNode = contextNode.parentNode;
+    }
+    steps.reverse();
+    return steps.join(" > ");
+}
+
+TopLevelObject.DOMPresentationUtils._cssPathStep = function (node, optimized, isTargetNode) {
+    if (node.nodeType !== Node.ELEMENT_NODE)
+        return null;
+    var id = node.getAttribute("id");
+    if (optimized) {
+        if (id)
+            return new TopLevelObject.DOMNodePathStep(idSelector(id), true);
+        var nodeNameLower = node.nodeName.toLowerCase();
+        if (nodeNameLower === "body" || nodeNameLower === "head" || nodeNameLower === "html")
+            return new TopLevelObject.DOMNodePathStep(node.tagName.toLowerCase(), true);
+    }
+    var nodeName = node.tagName.toLowerCase();
+    if (id)
+        return new TopLevelObject.DOMNodePathStep(nodeName + idSelector(id), true);
+    var parent = node.parentNode;
+    if (!parent || parent.nodeType === Node.DOCUMENT_NODE)
+        return new TopLevelObject.DOMNodePathStep(nodeName, true);
+    /**
+     * @param {!TopLevelObject.DOMNode} node
+     * @return {!Array.<string>}
+     */
+    function prefixedElementClassNames(node) {
+        var classAttribute = node.getAttribute("class");
+        if (!classAttribute)
+            return [];
+        return classAttribute.split(/\s+/g).filter(Boolean).map(function (name) {
+            // The prefix is required to store "__proto__" in a object-based map.
+            return "$" + name;
+        });
+    }
+    /**
+     * @param {string} id
+     * @return {string}
+     */
+    function idSelector(id) {
+        return "#" + escapeIdentifierIfNeeded(id);
+    }
+    /**
+     * @param {string} ident
+     * @return {string}
+     */
+    function escapeIdentifierIfNeeded(ident) {
+        if (isCSSIdentifier(ident))
+            return ident;
+        var shouldEscapeFirst = /^(?:[0-9]|-[0-9-]?)/.test(ident);
+        var lastIndex = ident.length - 1;
+        return ident.replace(/./g, function (c, i) {
+            return ((shouldEscapeFirst && i === 0) || !isCSSIdentChar(c)) ? escapeAsciiChar(c, i === lastIndex) : c;
+        });
+    }
+    /**
+     * @param {string} c
+     * @param {boolean} isLast
+     * @return {string}
+     */
+    function escapeAsciiChar(c, isLast) {
+        return "\\" + toHexByte(c) + (isLast ? "" : " ");
+    }
+    /**
+     * @param {string} c
+     */
+    function toHexByte(c) {
+        var hexByte = c.charCodeAt(0).toString(16);
+        if (hexByte.length === 1)
+            hexByte = "0" + hexByte;
+        return hexByte;
+    }
+    /**
+     * @param {string} c
+     * @return {boolean}
+     */
+    function isCSSIdentChar(c) {
+        if (/[a-zA-Z0-9_-]/.test(c))
+            return true;
+        return c.charCodeAt(0) >= 0xA0;
+    }
+    /**
+     * @param {string} value
+     * @return {boolean}
+     */
+    function isCSSIdentifier(value) {
+        return /^-?[a-zA-Z_][a-zA-Z0-9_-]*$/.test(value);
+    }
+    var prefixedOwnClassNamesArray = prefixedElementClassNames(node);
+    var needsClassNames = false;
+    var needsNthChild = false;
+    var ownIndex = -1;
+    var elementIndex = -1;
+    var siblings = parent.children;
+    for (var i = 0; (ownIndex === -1 || !needsNthChild) && i < siblings.length; ++i) {
+        var sibling = siblings[i];
+        if (sibling.nodeType !== Node.ELEMENT_NODE)
+            continue;
+        elementIndex += 1;
+        if (sibling === node) {
+            ownIndex = elementIndex;
+            continue;
+        }
+        if (needsNthChild)
+            continue;
+        if (sibling.tagName.toLowerCase() !== nodeName)
+            continue;
+        needsClassNames = true;
+        var ownClassNames = prefixedOwnClassNamesArray.values();
+        var ownClassNameCount = 0;
+        for (var name in ownClassNames)
+            ++ownClassNameCount;
+        if (ownClassNameCount === 0) {
+            needsNthChild = true;
+            continue;
+        }
+        var siblingClassNamesArray = prefixedElementClassNames(sibling);
+        for (var j = 0; j < siblingClassNamesArray.length; ++j) {
+            var siblingClass = siblingClassNamesArray[j];
+            if (!ownClassNames.hasOwnProperty(siblingClass))
+                continue;
+            delete ownClassNames[siblingClass];
+            if (!--ownClassNameCount) {
+                needsNthChild = true;
+                break;
+            }
+        }
+    }
+    var result = nodeName;
+    if (isTargetNode && nodeName.toLowerCase() === "input" && node.getAttribute("type") && !node.getAttribute("id") && !node.getAttribute("class"))
+        result += "[type=\"" + node.getAttribute("type") + "\"]";
+    if (needsNthChild) {
+        result += ":nth-child(" + (ownIndex + 1) + ")";
+    } else if (needsClassNames) {
+        for (var prefixedName in prefixedOwnClassNamesArray.values())
+            result += "." + escapeIdentifierIfNeeded(prefixedName.substr(1));
+    }
+    return new TopLevelObject.DOMNodePathStep(result, false);
+}
 
 
 /**
@@ -28,8 +196,28 @@ class Recorder {
     /** are we currently expecting events to only come in from the debugger */
     _state = Recorder.state.READY;
 
-    /** Used to wait and see if a sibgle click becomes a double click. */
+    /** Used to wait and see if a single click becomes a double click. */
     pendingClick = false;
+
+    /** The last scroll events seen.
+     * 
+     */
+    lastScrollEvents = [];
+
+    /**
+     * True if the mouse is currently down, value contains the event itself.
+     */
+    mouseDown = false;
+
+    /** An identifer for the timeout that will record a scroll action */
+    pendingScrollTimeout;
+
+    boundRecordScrollAction;
+
+    /** An identifier for the timeout that will record a mouse move action */
+    boundMouseMoveTimeoutAction;
+    /** the last mouse move event seen */
+    lastMouseMoveEvent;
 
     /** 
      * Hold the current/last event observed.
@@ -39,6 +227,8 @@ class Recorder {
     constructor() {
         chrome.runtime.onMessage.addListener(this._runtimeFrameIdSpecificOnMessageHandler.bind(this)); // extension sends message to one or all frames
         chrome.runtime.onConnect.addListener(this._runtimeOnConnectHandler.bind(this));
+        this.boundRecordScrollAction = this._recordScrollAction.bind(this);
+        this.boundMouseMoveTimeoutAction = this._recordMouseMoveAction.bind(this);
     }
 
     hideCursor() {
@@ -297,7 +487,7 @@ class Recorder {
                 msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
                 msg.handler = {
                     takeScreenshot: false, // use the last taken, as the correct state
-                    record: true, 
+                    record: true,
                     simulate: false
                 };
                 msg.event.value = e.target.value; // specific to the change event
@@ -327,7 +517,6 @@ class Recorder {
     /** Central callback for all bound event handlers */
     handleEvent(e) {
         console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle ${e.timeStamp === 0 ? 'SYNTHETIC' : 'user'} event:`, e);
-
         this.event = e;
 
         /** 
@@ -374,6 +563,7 @@ class Recorder {
                 case 'contextmenu':
                 case 'keydown':
                 case 'change':
+                case 'scroll':
                     this._state = Recorder.state.RECORD;
                     //console.debug(`${e.type} ${window.location.href}} switches us to RECORD state`);
                     break;
@@ -405,36 +595,64 @@ class Recorder {
         else {
             let msg;
             switch (e.type) {
+                case 'mousemove':
+                    if(this.mouseDown) {
+                        return; //bubble
+                    }
+                    this.lastMouseMoveEvent = e;
+                    if(!this.pendingMouseMoveTimeout) {
+                        // first. take a screenshot now.
+                        this.pushMessage({
+                            type: 'mousemove',
+                            x: e.x,
+                            y: e.y,
+                            event: {
+                                type: e.type
+                            },
+                            handler: {
+                                screenshot: true,
+                                //simulate: true, // just drop it i guess
+                                record: false
+                            }
+                        });
+                    }
+                    clearTimeout(this.pendingMouseMoveTimeout);
+                    this.pendingMouseMoveTimeout = setTimeout(
+                        this.boundMouseMoveTimeoutAction,
+                        500 // FIXME: make configurable
+                    );
+                    return; // bubble
                 case 'change':
                     // handle select elements that update their value by user interacting, e.g. clicking, in the shadow DOM options, where we cannot see these events.
                     // at this point in time the shadow DOM is closed and the value has already changed.
                     if (e.target.tagName === 'SELECT') {
                         let msg = this.buildMsg(e);
-                        this.pushMessage(msg);  
+                        this.pushMessage(msg);
                     }
                     return; // bubble it
-                case 'wheel':
-                    if (!this._wheel) {
-                        this._wheel = {
-                            type: 'wheel',
-                            deltaX: 0,
-                            deltaY: 0,
-
-                            // This is the element that first sees the event (e.g. some div)
-                            // the actual one being scrolled (e.g. window) currentTargetbeing scrolled? Or the element the scrollwheel is over, cause we scroll the big one.
-                            boundingClientRect: e.target.getBoundingClientRect(), // capture that now before we scroll it away
-
-                            clientX: e.clientX,
-                            clientY: e.clientY
-                        };
-                        this._state === Recorder.state.BLOCK;
-                        this.pushMessage({ type: 'screenshot' });
-                        break; // the first is (intended) to be blocked from the app, and used just to indicate start, we block other events til the screenshot is taken.
+                case 'mousedown':
+                    this.mouseDown = e;
+                    if(this.pendingMouseMoveTimeout) {
+                        clearTimeout(this.pendingMouseMoveTimeout);
+                        this.pendingMouseMoveTimeout = null;
                     }
-                    // subsequent wheel events in the chain are aggregated and allowed to bubble, and really scroll the app
-                    this._wheel.deltaX += e.deltaX;
-                    this._wheel.deltaY += e.deltaY;
-                    return; // bubble
+                    break; // block?
+                case 'mouseup':
+                    this.mouseDown = false;
+                    break;
+                case 'scroll':
+                    console.log(e.target.scrollLeft);
+                    if (this.mouseDown) { // only record scroll event when the user is moving the slider with the mouse
+                        let element = e.target === document ? document.documentElement : e.target;
+                        // FIXME: could make sure the elements for mouse down scrolltarget are the same too
+                        this.lastScrollEvents.push({element: element, scrollLeft: element.scrollLeft, scrollTop: element.scrollTop}); // just the last one
+                        clearTimeout(this.pendingScrollTimeout);
+                        this.pendingScrollTimeout = setTimeout(
+                            this.boundRecordScrollAction,
+                            500 // FIXME: make configurable
+                        );
+                    }
+                    return; // cannot be cancelled anyway
                 case 'keydown':
                 case 'keyup':
                     this.handleKey(e);
@@ -525,6 +743,89 @@ class Recorder {
             }
         });
         this.keyEventQueue = []; // FIXME: is this correct?!
+    }
+
+    /**
+     * Enough time has passed without the user doing anything to record the last observed scroll event.
+     * The start screen for the scroll event must already have been taken. How? Options:
+     * 1. take a screenshot periodically every 500ms to refresh the last screenshot 
+     * 2. take a screenshot on 'other' events, that preceed the scroll event. This is hard, I cannot block the scroll action so the
+     *    user must know not to scroll until after the screenshot is taken.
+     *      
+     *      If I use some form of mousemove between recorded events to indicate the last event is done I can take a screenshot
+     *      based on that. I also want a visual indicator to the user that brimstone is ready to record your next action. (i.e.) it
+     *      has recorded the screen
+     */
+    _recordScrollAction() {
+        if (!this.lastScrollEvents.length) {
+            return;
+        }
+
+        let item = this.lastScrollEvents[this.lastScrollEvents.length-1];
+        let element = item.element;
+        let scrollLeft = null, scrollTop = null; // be undefined
+
+        if(this.lastScrollEvents.length>1) {
+            let prevItem = this.lastScrollEvents[this.lastScrollEvents.length-2];
+            if(prevItem.scrollTop !== item.scrollTop) {
+                scrollTop = item.scrollTop;
+            }
+            if(prevItem.scrollLeft !== item.scrollLeft) {
+                scrollLeft = item.scrollLeft;
+            }
+        }
+        else {
+            scrollTop = item.scrollTop;
+            scrollLeft = item.scrollLeft;
+        }
+
+        clearTimeout(this.pendingScrollTimeout);
+        let rect = element.getBoundingClientRect();
+        this.pushMessage({
+            type: 'scroll',
+            boundingClientRect: rect,
+            x: rect.x + rect.width / 2,
+            y: rect = rect.y + rect.height / 2,
+            event: {
+                type: 'scroll',
+                // x,y is not going to suffice in general for this I believe
+                css: TopLevelObject.DOMPresentationUtils.cssPath(element),
+                scrollTop: scrollTop,
+                scrollLeft: scrollLeft
+            },
+            handler: {
+                record: true, // no simulate, no screenshots.
+            }
+        });
+        this.lastScrollEvents = [];
+    }
+
+    /**
+     * The user has paused long enough to have the mousemove operation recorded.
+     */
+    _recordMouseMoveAction() {
+        if(!this.pendingMouseMoveTimeout) {
+            return;
+        }
+        clearTimeout(this.pendingScrollTimeout);
+        this.pendingMouseMoveTimeout = null;
+        this.pushMessage({
+            type: 'mousemove',
+            boundingClientRect: {
+                height: 10,
+                width: 10,
+                top: this.lastMouseMoveEvent.y - 5,
+                left: this.lastMouseMoveEvent.x - 5
+            },
+            x: this.lastMouseMoveEvent.x,
+            y: this.lastMouseMoveEvent.y,
+            event: {
+                type: 'mousemove'
+            },
+            handler: {
+                record: true, // no simulate, no screenshots.
+            }
+        });
     }
 
     /**
@@ -625,7 +926,7 @@ Recorder.events = [
     // comments describe what is done when recording, not handling 'simulated' events.
     // simulated events all bubble directly to the app.
 
-    //'mousemove',    // blocked. maintains last known mouse position
+    'mousemove',    // blocked. maintains last known mouse position
     'mousedown',    // blocked. just observed, required for click to occur?.
     'mouseup',      // blocked. just observed, required for click to occur?.
 
@@ -649,14 +950,14 @@ Recorder.events = [
     'mouseover', // bubble and is used to observe and calculate hoverTime
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event
-    'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action. 
+    //'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action. 
     // the first wheel event must take a screenshot and block all subsequent events until that's done.
     // subsequent wheel events are aggregated.
     // we decide the the user is no longer scrolling when a non-wheel user action type event occurs.
     // this records the completed scroll action.
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll_event
-    //'scroll' // not cancelable :( 
+    'scroll' // not cancelable 
 
     // FIXME: I do not ever see these...WHY? 
     //'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
