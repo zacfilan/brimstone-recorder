@@ -24,7 +24,7 @@ keycode2modifier[CTRL_KEYCODE] = 2;
 keycode2modifier[META_KEYCODE] = 4;
 keycode2modifier[SHIFT_KEYCODE] = 8;
 
-disableConsole(); // can be reenabled in the debugger later
+//disableConsole(); // can be reenabled in the debugger later
 
 setToolbarState();
 
@@ -72,7 +72,9 @@ const player = new Player();
 
 var uiCardsElement = document.getElementById('cards');
 
-/* Some globals */
+/**
+ * cache the last screenshot taken
+ * */
 var _lastScreenshot;
 
 /** The parsed test.json object, this will change in memory during use.
@@ -662,10 +664,15 @@ $('#recordButton').on('click', async function () {
         }
         else {
             // we are recording over some steps, don't do an initial navigate
+            //FIXME: need to reset the lastScreenshot to whatever
             await attachDebuggerToTab();
         }
 
         await startRecording(tab);
+        if(url) { // cache the starting page
+            await captureScreenshotAsDataUrl();
+        }
+
         button.addClass('active');
         setToolbarState();
 
@@ -795,6 +802,19 @@ function updateThumb(action) {
 }
 
 /** 
+ * Uses the debugger API to capture a screenshot.
+ * Returns the dataurl on success.
+ * 
+ * Cache the dataURl in the _lastScreenshot variable
+ * 
+ * @throws {Exception} on failure.
+ */
+async function captureScreenshotAsDataUrl() {
+    _lastScreenshot = await player.captureScreenshotAsDataUrl();
+    return _lastScreenshot;
+}
+
+/** 
  * This is only used during recording. It update the zip file.
  * 
  * Process a user event received from the content script (during recording)
@@ -829,8 +849,8 @@ async function userEventToAction(userEvent, frameId) {
     switch (userEvent.type) {
         case 'mousemove':
             cardModel.description = 'move mouse here';
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+            await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'wheel':
             let direction = '';
@@ -845,6 +865,18 @@ async function userEventToAction(userEvent, frameId) {
             }
             cardModel.description = `mouse here, scroll wheel ${magnitude}px ${direction}`;
             cardModel.addExpectedScreenshot(_lastScreenshot);
+            break;
+        case 'scroll':
+            cardModel.description = 'scroll';
+            if(cardModel.event.scrollTop !== null) {
+                cardModel.description += ` top to ${cardModel.event.scrollTop}px`; 
+            }
+            if(cardModel.event.scrollLeft !== null) {
+                if(cardModel.event.scrollTop !== null) {
+                    cardModel.description += ',';
+                }
+                cardModel.description += ` left to ${cardModel.event.scrollLeft}px`; 
+            }
             break;
         case 'keys':
             cardModel.description = 'type ';
@@ -889,28 +921,28 @@ async function userEventToAction(userEvent, frameId) {
             break;
         case 'chord':
             cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+            await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'click':
             cardModel.description = 'click';
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+            await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'contextmenu':
             cardModel.description = 'right click';
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+            await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'dblclick':
             cardModel.description = 'double click';
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+            await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'stop':
             cardModel.description = 'stop recording';
-            dataUrl = await player.captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(dataUrl);
+            await captureScreenshotAsDataUrl();
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'start': {
             cardModel.description = `goto ${cardModel.url}`;
@@ -948,10 +980,9 @@ async function onMessageHandler(message, _port) {
             }
             break;
         case 'screenshot':
-            _lastScreenshot = await player.captureScreenshotAsDataUrl();
+            await captureScreenshotAsDataUrl();
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId });
             break;
-        case 'mousemove': // this does not ack, because it will always be followed by another operation.
         case 'wheel': // this does not ack, because it will always be followed by another operation.
             // record
             action = await userEventToAction(userEvent, userEvent.sender.frameId);
@@ -960,12 +991,14 @@ async function onMessageHandler(message, _port) {
 
             // no simulation required
             break;
+        case 'mousemove': // this does not ack, because it will always be followed by another operation.
         case 'keys':
         case 'keydown':
         case 'keyup':
         case 'change':
+        case 'scroll':
             if (userEvent.handler?.takeScreenshot) {
-                _lastScreenshot = await player.captureScreenshotAsDataUrl();
+                await captureScreenshotAsDataUrl();
             }
             if (userEvent.handler?.record) {
                 action = await userEventToAction(userEvent, userEvent.sender.frameId);
@@ -991,10 +1024,10 @@ async function onMessageHandler(message, _port) {
                 we can't record the shadow dom open options screen on a select dropdown
                 like we 'normally' would before an option is clicked in it, 
                 because we can't see events in the shadow dom (much less preempt or block them).
-                so take a snapshot of the screen 'likely' to be what they see after the simulate
+                so take a snapshot of the screen 'likely' to be what they see after the simulate step
             */
             if (userEvent.event?.target?.tagName === 'SELECT') {
-                _lastScreenshot = await player.captureScreenshotAsDataUrl();
+                await captureScreenshotAsDataUrl();
             }
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
