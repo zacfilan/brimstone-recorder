@@ -73,9 +73,15 @@ const player = new Player();
 var uiCardsElement = document.getElementById('cards');
 
 /**
- * cache the last screenshot taken
+ * cache the last mouse related screenshot taken
  * */
-var _lastScreenshot;
+ var _lastScreenshot;
+
+/**
+ * cache the last keys related screenshot taken
+ * */
+ var _lastKeyScreenshot;
+
 
 /** The parsed test.json object, this will change in memory during use.
  * It represents the recorded user actions, and optionally the result
@@ -393,7 +399,7 @@ $('#step').on('click', '#chartButton', async function () {
     let window = await chrome.windows.create({
         url: chrome.runtime.getURL(`ui/chart.html?c=${chartDescriptor}`),
         type: "popup",
-      });
+    });
 });
 
 $('#playButton').on('click', async function () {
@@ -669,7 +675,7 @@ $('#recordButton').on('click', async function () {
         }
 
         await startRecording(tab);
-        if(url) { // cache the starting page
+        if (url) { // cache the starting page
             await captureScreenshotAsDataUrl();
         }
 
@@ -729,7 +735,14 @@ $('#clearButton').on('click', async () => {
  */
 function postMessage(msg) {
     console.debug('TX', msg);
-    port.postMessage(msg);
+    try {
+        port.postMessage(msg);
+    }
+    catch (e) {
+        // it is possible that we are in the process of navigating, either by synthetic or real user event (e.g. passive recording)
+        // the port can be down.
+        console.log('post message failed.', e);
+    }
 }
 
 $('#saveButton').on('click', async () => {
@@ -849,8 +862,7 @@ async function userEventToAction(userEvent, frameId) {
     switch (userEvent.type) {
         case 'mousemove':
             cardModel.description = 'move mouse here';
-            await captureScreenshotAsDataUrl();
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            cardModel.addExpectedScreenshot(_lastScreenshot); // previously taken
             break;
         case 'wheel':
             let direction = '';
@@ -868,14 +880,14 @@ async function userEventToAction(userEvent, frameId) {
             break;
         case 'scroll':
             cardModel.description = 'scroll';
-            if(cardModel.event.scrollTop !== null) {
-                cardModel.description += ` top to ${cardModel.event.scrollTop}px`; 
+            if (cardModel.event.scrollTop !== null) {
+                cardModel.description += ` top to ${cardModel.event.scrollTop}px`;
             }
-            if(cardModel.event.scrollLeft !== null) {
-                if(cardModel.event.scrollTop !== null) {
+            if (cardModel.event.scrollLeft !== null) {
+                if (cardModel.event.scrollTop !== null) {
                     cardModel.description += ',';
                 }
-                cardModel.description += ` left to ${cardModel.event.scrollLeft}px`; 
+                cardModel.description += ` left to ${cardModel.event.scrollLeft}px`;
             }
             break;
         case 'keys':
@@ -991,10 +1003,25 @@ async function onMessageHandler(message, _port) {
 
             // no simulation required
             break;
-        case 'mousemove': // this does not ack, because it will always be followed by another operation.
         case 'keys':
         case 'keydown':
-        case 'keyup':
+        case 'keyup': // better not take a screenshot here!
+            // same as the mouseset below except we use a dedicated key related cached screenshot
+            // to allow a mousemove screenshot to not overwrite a pending keys record event.
+            if (userEvent.handler?.takeScreenshot) {
+                _lastKeyScreenshot = await captureScreenshotAsDataUrl();
+            }
+            if (userEvent.handler?.record) {
+                action = await userEventToAction(userEvent, userEvent.sender.frameId);
+                action.addExpectedScreenshot(_lastKeyScreenshot);
+                updateStepInView(action); // record the user action to disk
+            }
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+            }
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
+        case 'mousemove':
         case 'change':
         case 'scroll':
             if (userEvent.handler?.takeScreenshot) {
