@@ -596,7 +596,7 @@ class Recorder {
             let msg;
             switch (e.type) {
                 case 'mousemove':
-                    if(this.mouseDown) {
+                    if(this.mouseDown || this.pendingClick) {
                         return; //bubble
                     }
                     this.lastMouseMoveEvent = e;
@@ -610,7 +610,7 @@ class Recorder {
                                 type: e.type
                             },
                             handler: {
-                                screenshot: true,
+                                takeScreenshot: true,
                                 //simulate: true, // just drop it i guess
                                 record: false
                             }
@@ -692,7 +692,7 @@ class Recorder {
                     /** The time that the users mouse entered the current element, used to record hover effects. */
                     this._mouseEnterTime = performance.now();
                 case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
-                    return; // let it bubble
+                    return; // bubble
             }
             Recorder.block(e);
             return false; // should be redundant and not needed, I am blocking all these I hope
@@ -839,11 +839,12 @@ class Recorder {
      * Some special handling for [ENTER] key
      */
     handleKey(e) {
+        this.mouseDown = false; // cancel mousemove recording in process
         if (e.repeat) {
             return;
         }
 
-        let takeScreenshot = this.keyEventQueue.length === 0;
+        let takeScreenshot = this.keyEventQueue.length === 0 && e.type === 'keydown';
         let record = false;
 
         if (e.keyCode === 13) {
@@ -866,8 +867,13 @@ class Recorder {
             }
         }
         else {
-            this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
-            this._scheduleRecordKeySequence();
+            // not when the only thing that would be in the queue is a single keyup
+            // related to enter key handling. 1 down, enter down is meant to clear the queue, but if I let go of 1 late, it gets in the queue, which 
+            // is unintentional. i.e. don't add a keyup to a flushed (empty) queue
+            if(this.keyEventQueue.length !== 0 || e.type === 'keydown') {
+                this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
+                this._scheduleRecordKeySequence();
+            }
         }
 
         let rect = e.target.getBoundingClientRect();
@@ -957,11 +963,11 @@ Recorder.events = [
     // this records the completed scroll action.
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll_event
-    'scroll' // not cancelable 
+    'scroll', // not cancelable 
 
     // FIXME: I do not ever see these...WHY? 
-    //'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
-    //'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
+    'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
+    'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
 ];
 
 Recorder.block = function block(e) {
