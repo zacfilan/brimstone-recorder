@@ -75,12 +75,12 @@ var uiCardsElement = document.getElementById('cards');
 /**
  * cache the last mouse related screenshot taken
  * */
- var _lastScreenshot;
+var _lastScreenshot;
 
 /**
  * cache the last keys related screenshot taken
  * */
- var _lastKeyScreenshot;
+var _lastMouseMoveScreenshot;
 
 
 /** The parsed test.json object, this will change in memory during use.
@@ -851,10 +851,21 @@ async function userEventToAction(userEvent, frameId) {
          * of the overlay in percentages of the aspect-ratio preserved image.
          */
         cardModel.overlay = {
-            height: element.height * 100 / tab.height,
-            width: element.width * 100 / tab.width,
+            height: element.height * 100 / tab.height, // height of target element as a percent of screenshot height
+            width: element.width * 100 / tab.width, // width of target element as a percent screenshot width
+
+            /** absolute y coordinate of the TARGET ELEMENT as a percent of screenshot */
             top: (element.top + frameOffset.top) * 100 / tab.height,
-            left: (element.left + frameOffset.left) * 100 / tab.width
+            /** absolute x coordinate of the TARGET ELEMENT as a percent of screenshot */
+            left: (element.left + frameOffset.left) * 100 / tab.width,
+
+            tabHeight: tab.height,
+            tabWidth: tab.width,
+
+            /** absolute x coordinate of the mouse position as a percent of screenshot */
+            x: (cardModel.x + frameOffset.left) * 100 / tab.width,
+            /** absolute y coordinate of the mouse position as a percent of screenshot */
+            y: (cardModel.y + frameOffset.top) * 100 / tab.height
         };
     }
 
@@ -1003,17 +1014,15 @@ async function onMessageHandler(message, _port) {
 
             // no simulation required
             break;
-        case 'keys':
-        case 'keydown':
-        case 'keyup': // better not take a screenshot here!
-            // same as the mouseset below except we use a dedicated key related cached screenshot
-            // to allow a mousemove screenshot to not overwrite a pending keys record event.
+        case 'mousemove':
+            // same as the below except we use a dedicated cached screenshot
+            // to allow a mousemove screenshot to not overwrite a pending keys or pending click record event.
             if (userEvent.handler?.takeScreenshot) {
-                _lastKeyScreenshot = await captureScreenshotAsDataUrl();
+                _lastScreenshot = _lastMouseMoveScreenshot = await captureScreenshotAsDataUrl();
             }
             if (userEvent.handler?.record) {
                 action = await userEventToAction(userEvent, userEvent.sender.frameId);
-                action.addExpectedScreenshot(_lastKeyScreenshot);
+                action.addExpectedScreenshot(_lastMouseMoveScreenshot);
                 updateStepInView(action); // record the user action to disk
             }
             if (userEvent.handler?.simulate) {
@@ -1021,7 +1030,9 @@ async function onMessageHandler(message, _port) {
             }
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
-        case 'mousemove':
+        case 'keys':
+        case 'keydown':
+        case 'keyup': // better not take a screenshot here!
         case 'change':
         case 'scroll':
             if (userEvent.handler?.takeScreenshot) {

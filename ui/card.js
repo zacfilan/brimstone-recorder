@@ -48,6 +48,15 @@ const chart = `
 </svg>
 `;
 
+
+const pointer = `
+<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="arrow-pointer"
+  class="svg-inline--fa fa-arrow-pointer" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+  <path fill="currentColor"
+    d="M318.4 304.5c-3.531 9.344-12.47 15.52-22.45 15.52h-105l45.15 94.82c9.496 19.94 1.031 43.8-18.91 53.31c-19.95 9.504-43.82 1.035-53.32-18.91L117.3 351.3l-75 88.25c-4.641 5.469-11.37 8.453-18.28 8.453c-2.781 0-5.578-.4844-8.281-1.469C6.281 443.1 0 434.1 0 423.1V56.02c0-9.438 5.531-18.03 14.12-21.91C22.75 30.26 32.83 31.77 39.87 37.99l271.1 240C319.4 284.6 321.1 295.1 318.4 304.5z">
+  </path>
+</svg>`;
+
 export class TestAction {
     /** 
      * @type {object}
@@ -87,17 +96,14 @@ export class TestAction {
      */
     boundingClientRect;
 
-    /** the x coordinate of this action*/
+    /** x coordinate of the action. for mouse events, this is the pixel location of the mouse. for type events it is the middle of the element that gets the key */
     x;
 
-    /** the y corrdinate of this action */
+    /** y coordinate of the action. for mouse events, this is the pixel location of the mouse. for type events it is the middle of the element that gets the key */
     y;
 
-    /** raw copy of the event that generated this action */
+    /** filtered copy of the event that generated this action */
     event;
-
-    /** string id of the type of the action (e.g. event.type) */
-    type;
 
     /** 
      * What the screen should look like before the input action can be performed.
@@ -321,11 +327,19 @@ export class TestAction {
         // FIXME: calculate the best location for the callout, based on the location of the overlay
         if (this.overlay) {
             let o = this.overlay;
+            let calloutY = o.top + o.height;
+            let calloutX = o.left;
+            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contenxtmenu') {
+                calloutY = o.y + (100 * ((18 + 25) / o.tabHeight)); // 25px lower than the 18px pointer is
+                calloutX = o.x;
+                html += `<div class='overlay pointer' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>${pointer}</div>`;
+            }
             html += `
             <div class='overlay pulse' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
-            <div class='action callout user-event' data-index='${this.index}' style='top:${o.top + o.height}%;left:${o.left}%;'>${this.description}</div>
+            <div class='action callout user-event' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${this.description}</div>
             `;
         }
+
         let footer = '';
         if (this.latency) {
             let red = this.latency > 3 ? "class='error-text'" : '';
@@ -337,7 +351,7 @@ export class TestAction {
             }
             footer += `${this.memoryUsed}MBs in use.`;
         }
-        if(this.latency || this.memoryUsed) {
+        if (this.latency || this.memoryUsed) {
             footer += `<button id='chartButton' title='Chart these metrics.'>${chart}</button>`;
         }
         if (!stats) {

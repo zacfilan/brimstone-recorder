@@ -155,6 +155,17 @@ button svg {
   background: var(--action-color);
 }
 
+.card .screenshot .overlay.pointer {
+  background: unset;
+  width: 12px;
+  height: 18px;
+  color: var(--action-color);
+}
+
+.card .screenshot .overlay.pointer svg {
+  height: 18px;
+}
+
 .card.empty {
   height: 200px;
   background: grey;
