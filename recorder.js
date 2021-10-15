@@ -459,10 +459,13 @@ class Recorder {
                     msg.event[p] = e[p]);
                 break;
             case 'mousemove':
-                msg.x = e.clientX;
-                msg.y = e.clientY;
+                msg.x = e.x;
+                msg.y = e.y;
                 ['clientX', 'clientY'].forEach(p =>
                     msg.event[p] = e[p]);
+                msg.handler = {
+                    record: true // no simulate, no screenshots.
+                };
                 break;
             case 'chord':
                 msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
@@ -596,16 +599,16 @@ class Recorder {
             let msg;
             switch (e.type) {
                 case 'mousemove':
-                    if(this.mouseDown || this.pendingClick) {
+                    if (this.mouseDown || this.pendingClick) {
                         return; //bubble
                     }
                     this.lastMouseMoveEvent = e;
-                    if(!this.pendingMouseMoveTimeout) {
+                    if (!this.pendingMouseMoveTimeout) {
                         // first. take a screenshot now.
                         this.pushMessage({
                             type: 'mousemove',
-                            x: e.x,
-                            y: e.y,
+                            x: e.x, // these are the mouse coordinates
+                            y: e.y, // these are the mouse coordinates
                             event: {
                                 type: e.type
                             },
@@ -632,7 +635,7 @@ class Recorder {
                     return; // bubble it
                 case 'mousedown':
                     this.mouseDown = e;
-                    if(this.pendingMouseMoveTimeout) {
+                    if (this.pendingMouseMoveTimeout) {
                         clearTimeout(this.pendingMouseMoveTimeout);
                         this.pendingMouseMoveTimeout = null;
                     }
@@ -645,14 +648,14 @@ class Recorder {
                     if (this.mouseDown) { // only record scroll event when the user is moving the slider with the mouse
                         let element = e.target === document ? document.documentElement : e.target;
                         // FIXME: could make sure the elements for mouse down scrolltarget are the same too
-                        this.lastScrollEvents.push({element: element, scrollLeft: element.scrollLeft, scrollTop: element.scrollTop}); // just the last one
+                        this.lastScrollEvents.push({ element: element, scrollLeft: element.scrollLeft, scrollTop: element.scrollTop }); // just the last one
                         clearTimeout(this.pendingScrollTimeout);
                         this.pendingScrollTimeout = setTimeout(
                             this.boundRecordScrollAction,
                             500 // FIXME: make configurable
                         );
                     }
-                    return; // cannot be cancelled anyway
+                    return; // cannot be cancelled anyway - but when this is recorded it needs
                 case 'keydown':
                 case 'keyup':
                     this.handleKey(e);
@@ -761,16 +764,16 @@ class Recorder {
             return;
         }
 
-        let item = this.lastScrollEvents[this.lastScrollEvents.length-1];
+        let item = this.lastScrollEvents[this.lastScrollEvents.length - 1];
         let element = item.element;
         let scrollLeft = null, scrollTop = null; // be undefined
 
-        if(this.lastScrollEvents.length>1) {
-            let prevItem = this.lastScrollEvents[this.lastScrollEvents.length-2];
-            if(prevItem.scrollTop !== item.scrollTop) {
+        if (this.lastScrollEvents.length > 1) {
+            let prevItem = this.lastScrollEvents[this.lastScrollEvents.length - 2];
+            if (prevItem.scrollTop !== item.scrollTop) {
                 scrollTop = item.scrollTop;
             }
-            if(prevItem.scrollLeft !== item.scrollLeft) {
+            if (prevItem.scrollLeft !== item.scrollLeft) {
                 scrollLeft = item.scrollLeft;
             }
         }
@@ -804,29 +807,13 @@ class Recorder {
      * The user has paused long enough to have the mousemove operation recorded.
      */
     _recordMouseMoveAction() {
-        if(!this.pendingMouseMoveTimeout) {
+        if (!this.pendingMouseMoveTimeout) {
             return;
         }
         clearTimeout(this.pendingScrollTimeout);
         this.pendingMouseMoveTimeout = null;
-        this.pushMessage({
-            type: 'mousemove',
-            boundingClientRect: {
-                height: 10,
-                width: 10,
-                top: this.lastMouseMoveEvent.y - 5,
-                left: this.lastMouseMoveEvent.x - 5
-            },
-            x: this.lastMouseMoveEvent.x,
-            y: this.lastMouseMoveEvent.y,
-            event: {
-                type: 'mousemove'
-            },
-            handler: {
-                record: true, // no simulate, no screenshots.
-            }
-        });
-    }
+        this.pushMessage(this.buildMsg(this.lastMouseMoveEvent));
+    };
 
     /**
      * Start/Continue an observed sequence of user key events to some element.
@@ -870,7 +857,7 @@ class Recorder {
             // not when the only thing that would be in the queue is a single keyup
             // related to enter key handling. 1 down, enter down is meant to clear the queue, but if I let go of 1 late, it gets in the queue, which 
             // is unintentional. i.e. don't add a keyup to a flushed (empty) queue
-            if(this.keyEventQueue.length !== 0 || e.type === 'keydown') {
+            if (this.keyEventQueue.length !== 0 || e.type === 'keydown') {
                 this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
                 this._scheduleRecordKeySequence();
             }

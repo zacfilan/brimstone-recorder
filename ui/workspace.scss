@@ -122,6 +122,16 @@ button {
         .overlay {
             position: absolute;
             background: var(--action-color);
+            
+            &.pointer {
+                background: unset;
+                width:12px;
+                height:18px;
+                color: var(--action-color);
+                svg {
+                    height: 18px;
+                }
+            }
         }
     }
 
