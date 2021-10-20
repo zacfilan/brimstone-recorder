@@ -1,177 +1,23 @@
+// https://stackoverflow.com/questions/35939886/find-first-scrollable-parent
+function getScrollParent(element, includeHidden) {
+    var style = getComputedStyle(element);
+    var excludeStaticParent = style.position === "absolute";
+    var overflowRegex = includeHidden ? /(auto|scroll|hidden)/ : /(auto|scroll)/;
 
-// thanks dave. https://blog.davidvassallo.me/2019/09/20/a-javascript-reverse-css-selector/
-var TopLevelObject = {};
-TopLevelObject.DOMNodePathStep = function (value, optimized) {
-    this.value = value;
-    this.optimized = optimized || false;
-}
-TopLevelObject.DOMNodePathStep.prototype = {
-    /**
-     * @override
-     * @return {string}
-     */
-    toString: function () {
-        return this.value;
-    }
-}
-TopLevelObject.DOMPresentationUtils = {}
-
-TopLevelObject.DOMPresentationUtils.cssPath = function (node, optimized) {
-    if (node.nodeType !== Node.ELEMENT_NODE)
-        return "";
-    var steps = [];
-    var contextNode = node;
-    while (contextNode) {
-        var step = TopLevelObject.DOMPresentationUtils._cssPathStep(contextNode, !!optimized, contextNode === node);
-        if (!step)
-            break; // Error - bail out early.
-        steps.push(step);
-        if (step.optimized)
-            break;
-        contextNode = contextNode.parentNode;
-    }
-    steps.reverse();
-    return steps.join(" > ");
-}
-
-TopLevelObject.DOMPresentationUtils._cssPathStep = function (node, optimized, isTargetNode) {
-    if (node.nodeType !== Node.ELEMENT_NODE)
-        return null;
-    var id = node.getAttribute("id");
-    if (optimized) {
-        if (id)
-            return new TopLevelObject.DOMNodePathStep(idSelector(id), true);
-        var nodeNameLower = node.nodeName.toLowerCase();
-        if (nodeNameLower === "body" || nodeNameLower === "head" || nodeNameLower === "html")
-            return new TopLevelObject.DOMNodePathStep(node.tagName.toLowerCase(), true);
-    }
-    var nodeName = node.tagName.toLowerCase();
-    if (id)
-        return new TopLevelObject.DOMNodePathStep(nodeName + idSelector(id), true);
-    var parent = node.parentNode;
-    if (!parent || parent.nodeType === Node.DOCUMENT_NODE)
-        return new TopLevelObject.DOMNodePathStep(nodeName, true);
-    /**
-     * @param {!TopLevelObject.DOMNode} node
-     * @return {!Array.<string>}
-     */
-    function prefixedElementClassNames(node) {
-        var classAttribute = node.getAttribute("class");
-        if (!classAttribute)
-            return [];
-        return classAttribute.split(/\s+/g).filter(Boolean).map(function (name) {
-            // The prefix is required to store "__proto__" in a object-based map.
-            return "$" + name;
-        });
-    }
-    /**
-     * @param {string} id
-     * @return {string}
-     */
-    function idSelector(id) {
-        return "#" + escapeIdentifierIfNeeded(id);
-    }
-    /**
-     * @param {string} ident
-     * @return {string}
-     */
-    function escapeIdentifierIfNeeded(ident) {
-        if (isCSSIdentifier(ident))
-            return ident;
-        var shouldEscapeFirst = /^(?:[0-9]|-[0-9-]?)/.test(ident);
-        var lastIndex = ident.length - 1;
-        return ident.replace(/./g, function (c, i) {
-            return ((shouldEscapeFirst && i === 0) || !isCSSIdentChar(c)) ? escapeAsciiChar(c, i === lastIndex) : c;
-        });
-    }
-    /**
-     * @param {string} c
-     * @param {boolean} isLast
-     * @return {string}
-     */
-    function escapeAsciiChar(c, isLast) {
-        return "\\" + toHexByte(c) + (isLast ? "" : " ");
-    }
-    /**
-     * @param {string} c
-     */
-    function toHexByte(c) {
-        var hexByte = c.charCodeAt(0).toString(16);
-        if (hexByte.length === 1)
-            hexByte = "0" + hexByte;
-        return hexByte;
-    }
-    /**
-     * @param {string} c
-     * @return {boolean}
-     */
-    function isCSSIdentChar(c) {
-        if (/[a-zA-Z0-9_-]/.test(c))
-            return true;
-        return c.charCodeAt(0) >= 0xA0;
-    }
-    /**
-     * @param {string} value
-     * @return {boolean}
-     */
-    function isCSSIdentifier(value) {
-        return /^-?[a-zA-Z_][a-zA-Z0-9_-]*$/.test(value);
-    }
-    var prefixedOwnClassNamesArray = prefixedElementClassNames(node);
-    var needsClassNames = false;
-    var needsNthChild = false;
-    var ownIndex = -1;
-    var elementIndex = -1;
-    var siblings = parent.children;
-    for (var i = 0; (ownIndex === -1 || !needsNthChild) && i < siblings.length; ++i) {
-        var sibling = siblings[i];
-        if (sibling.nodeType !== Node.ELEMENT_NODE)
-            continue;
-        elementIndex += 1;
-        if (sibling === node) {
-            ownIndex = elementIndex;
+    if (style.position === "fixed") return document.body;
+    for (var parent = element; (parent = parent.parentElement);) {
+        style = getComputedStyle(parent);
+        if (excludeStaticParent && style.position === "static") {
             continue;
         }
-        if (needsNthChild)
-            continue;
-        if (sibling.tagName.toLowerCase() !== nodeName)
-            continue;
-        needsClassNames = true;
-        var ownClassNames = prefixedOwnClassNamesArray.values();
-        var ownClassNameCount = 0;
-        for (var name in ownClassNames)
-            ++ownClassNameCount;
-        if (ownClassNameCount === 0) {
-            needsNthChild = true;
-            continue;
-        }
-        var siblingClassNamesArray = prefixedElementClassNames(sibling);
-        for (var j = 0; j < siblingClassNamesArray.length; ++j) {
-            var siblingClass = siblingClassNamesArray[j];
-            if (!ownClassNames.hasOwnProperty(siblingClass))
-                continue;
-            delete ownClassNames[siblingClass];
-            if (!--ownClassNameCount) {
-                needsNthChild = true;
-                break;
-            }
-        }
+        if (overflowRegex.test(style.overflow + style.overflowY + style.overflowX)) return parent;
     }
-    var result = nodeName;
-    if (isTargetNode && nodeName.toLowerCase() === "input" && node.getAttribute("type") && !node.getAttribute("id") && !node.getAttribute("class"))
-        result += "[type=\"" + node.getAttribute("type") + "\"]";
-    if (needsNthChild) {
-        result += ":nth-child(" + (ownIndex + 1) + ")";
-    } else if (needsClassNames) {
-        for (var prefixedName in prefixedOwnClassNamesArray.values())
-            result += "." + escapeIdentifierIfNeeded(prefixedName.substr(1));
-    }
-    return new TopLevelObject.DOMNodePathStep(result, false);
-}
 
+    return document.body;
+}
 
 /**
- * Recorder class: queuue events that are triggered in response to certain user actions, 
+ * Recorder class: queuue events that are triggered in response to certain user actions,
  * and send them back over the postMessage connection to the UI.
  */
 class Recorder {
@@ -189,18 +35,15 @@ class Recorder {
 
     /**
      * Make key press recording perform well by bundling key events.
-     * @type {Event[]} 
+     * @type {Event[]}
      */
     keyEventQueue = [];
-
-    /** are we currently expecting events to only come in from the debugger */
-    _state = Recorder.state.READY;
 
     /** Used to wait and see if a single click becomes a double click. */
     pendingClick = false;
 
     /** The last scroll events seen.
-     * 
+     *
      */
     lastScrollEvents = [];
 
@@ -209,17 +52,27 @@ class Recorder {
      */
     mouseDown = false;
 
+    /**
+     * Contains the last mousedown event seen, x,y is used to figure out the scroll element
+     */
+    lastMouseDownEvent;
+
+    // SCROLL - scroll bar drag action
     /** An identifer for the timeout that will record a scroll action */
     pendingScrollTimeout;
-
     boundRecordScrollAction;
 
+    // MOUSE MOVE
     /** An identifier for the timeout that will record a mouse move action */
     boundMouseMoveTimeoutAction;
     /** the last mouse move event seen */
     lastMouseMoveEvent;
 
-    /** 
+    // MOUSE WHEEL
+    /** The last wheel event in the currently occuring sequence */
+    _wheel;
+
+    /**
      * Hold the current/last event observed.
      * @type {Event}*/
     event;
@@ -243,10 +96,10 @@ class Recorder {
         document.head.appendChild(styleSheet);
     }
 
-    /** 
+    /**
      * Chrome-extension API: For single one time messages . This can respond if need be.
      * These can be targeted by frameId from the extension, or broadcast to all frames.
-     * https://developer.chrome.com/docs/extensions/reference/runtime/#event-onMessage  
+     * https://developer.chrome.com/docs/extensions/reference/runtime/#event-onMessage
      * */
     _runtimeFrameIdSpecificOnMessageHandler(message, sender, sendResponse) {
         // the sender will always be the extension, since the chrome extension api
@@ -292,12 +145,12 @@ class Recorder {
         /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port */
         this._port.onMessage.addListener(this.rx.bind(this));
 
-        /** 
+        /**
          * The main frame needs to post into the child x-origin frames their
-         * relative top, and left offsets. 
+         * relative top, and left offsets.
          * This cannot be done with chrome extension messaging passing :(
          * https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
-         * 
+         *
          * These are handled by the handleEvent method of this object.
          * */
         window.removeEventListener("message", this, { capture: true, passive: false });
@@ -314,10 +167,10 @@ class Recorder {
      * The iframe will relay this information along with its
      * chrome frameID to the extension via chome.runtime.sendMessage.
      *  The extension will then know all frame offsets within their
-     *parent. 
+     *parent.
      */
     postMessageOffsetIntoIframes() {
-        //console.debug(`TX: frame ${this._frameId}:${window.location.href} broadcasts to each child frame their own offset from this frame`);
+        //console.debug(`TX: frame ${ this._frameId }:${ window.location.href } broadcasts to each child frame their own offset from this frame`);
         let iframes = document.getElementsByTagName('IFRAME');
         for (let i = 0; i < iframes.length; ++i) {
             let iframe = iframes[i];
@@ -339,9 +192,9 @@ class Recorder {
 
     /**
      * Enqueue a message to send to the bristone workspace over the recording channel port.
-     * 
+     *
      * If there is nothing pending it will be immediated transmitted.
-     *  
+     *
      * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
      * Note this automatically sends the Sender (frameId) info.
      */
@@ -362,9 +215,9 @@ class Recorder {
     }
 
     /**
-     * If there is something in the queue transmit (tx) it to the extention over the 
+     * If there is something in the queue transmit (tx) it to the extention over the
      * recording channel port.
-     * 
+     *
      * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
      * Note this automatically sends the Sender info.
      * @returns true if anything was transmitted, false otherwise.
@@ -372,7 +225,6 @@ class Recorder {
     tx() {
         if (this.messageQueue.length) {
             let msg = this.messageQueue[0];
-            this._state = Recorder.state.SIMULATE; // FIXME: redundant to this.messageQueue.length
             this._postMessage(msg);
             return true;
         }
@@ -382,11 +234,11 @@ class Recorder {
     /**
      * Receive (rx) message from the extension. These are either
      * acks/complete or stop messages.
-     * 
+     *
      */
     rx(msg) {
         if (msg.broadcast || msg.to === this._frameId) {
-            console.debug(`RX: ${this._frameId}`, msg);
+            console.debug(`RX: ${this._frameId} `, msg);
             switch (msg.type) {
                 case 'complete':
                     // FIXME: eventually compare sequence or id numbers for sanity
@@ -395,9 +247,7 @@ class Recorder {
                     //     break;
                     // }
                     this.messageQueue.shift();
-                    if (!this.tx()) {
-                        this._state = Recorder.state.READY;
-                    }
+                    this.tx();
                     // else we are still transmitting queued messages
                     break;
                 case 'stop':
@@ -439,11 +289,14 @@ class Recorder {
         switch (e.type) {
             case 'wheel':
                 msg.detail = 'wheel';
-                msg.deltaX = e.deltaX;
-                msg.deltaY = e.deltaY;
                 msg.x = e.clientX;
                 msg.y = e.clientY;
-                break;
+                msg.event.deltaX = e.deltaX;
+                msg.event.deltaY = e.deltaY;
+                msg.event.altKey = e.altKey;
+                msg.event.ctrlKey = e.ctrlKey;
+                msg.event.metaKey = e.metaKey;
+                msg.event.shiftKey = e.shiftKey;
             case 'click':
                 msg.detail = e.detail;
             case 'contextmenu':
@@ -464,7 +317,7 @@ class Recorder {
                 ['clientX', 'clientY'].forEach(p =>
                     msg.event[p] = e[p]);
                 msg.handler = {
-                    record: true // no simulate, no screenshots.
+                    record: true
                 };
                 break;
             case 'chord':
@@ -519,186 +372,189 @@ class Recorder {
 
     /** Central callback for all bound event handlers */
     handleEvent(e) {
-        console.debug(`${e.type} frame ${this._frameId}:${window.location.href} handle ${e.timeStamp === 0 ? 'SYNTHETIC' : 'user'} event:`, e);
+        e.brimstoneClass = e.timeStamp === 0 ? 'synthetic' : 'user'; // an event simulated by brimstone
         this.event = e;
+        let msg;
+        // return Recorder.propagate(e); // great for debugging to see when my handling gets in the way
 
-        /** 
-         * A child (possibly x-origin) frame needs to know its
-         * relative top, and left offsets.
-         * 
-         * https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
-         * */
+        // This message can't be folded into the swtich below, we receive it for any user action currently being recorded.
         if (e.type === 'message') {
+            /**
+             * A child (possibly x-origin) frame needs to know its
+             * relative top, and left offsets.
+             *
+             * https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+             * */
             let brimstoneRecorder = e.data.brimstoneRecorder;
             if (!brimstoneRecorder) {
-                return; // some other non-brimstone postedMessage into this frame. We don't care about it.
+                return Recorder.propagate(e); // some other non-brimstone postedMessage into this frame. We don't care about it.
             }
             switch (brimstoneRecorder.func) {
                 case 'relayFrameOffsetToExtension': // *all* children frames get this message
                     this._postMessage({ type: 'frameOffset', func: 'frameOffset', args: brimstoneRecorder.args });
                     break;
             }
-
             /**
              * I want to eat this event, and have no-one else see it, but 'message' is not cancelable.
              * https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel/message_event
              */
-            Recorder.block(e); // does nothing :(
-            return false;
+            return Recorder.cancel(e); // ..so these are pointless
         }
 
-        if (this._state === Recorder.state.BLOCK) {
-            Recorder.block(e);
-            return false;
+        if (e.brimstoneClass === 'synthetic') {
+            return Recorder.propagate(e);
         }
+        // else this is a user generated event
 
-        // if we are done driving the browser (simulating a user input) 
-        // wait for the next user input before we start blocking events.
-        // e.g. a click changes the screen, the app may give focus to some new element text box,
-        // I do not want to lose this state when I take the prereq screenshot for the next action, so I cannot block that focus event.
-        // I wait for a user action to indicate that the screen is ready, and now it's okay to start blocking subsequent events
-        // while I decode the users next action.
-        if (this._state === Recorder.state.READY) {
-            switch (e.type) {
-                case 'wheel':
-                case 'mousemove':
-                case 'mousedown':
-                case 'contextmenu':
-                case 'keydown':
-                case 'change':
-                case 'scroll':
-                    this._state = Recorder.state.RECORD;
-                    //console.debug(`${e.type} ${window.location.href}} switches us to RECORD state`);
-                    break;
-                case 'mouseover':
-                    this._mouseEnterTime = performance.now(); // keep on accounting
-                    return;
-                default:
-                    // mouse move clutters things up
-                    //console.debug(`${e.type} ${window.location.href} passthru while waiting for user input event to switch us to record`);
-                    return;
-            }
-        }
-
-        if (this._state === Recorder.state.SIMULATE) {
-            // how do I know this event came from the debugger versus from from the user?! perhaps this?
-            // https://bugs.chromium.org/p/chromium/issues/detail?id=746690&q=setIgnoreInputEvents&can=2
-
-            // I send a timestamp of 0 on synthetic events to distingush them from user events
-            if ((e.type === 'keydown' || e.type === 'keyup') && e.timeStamp !== 0) {
-                this.handleKey(e); // queue the users typing
-                Recorder.block(e);
-                return false;
+        if (this.messageQueue.length) {
+            // we are waiting on responses from the extension
+            // and we are getting some more user events while we wait.
+            
+            // this is expected for events that are queued and simulated, and recorded in aggregate, so let expected ones go to the big recorder switch
+            // for proper accounting.
+            if (e.type === 'keydown' || e.type === 'keyup' || e.type === 'wheel' || e.type === 'scroll') {
+                ; // expected - hese will be processed by the big recorder swtich
             }
             else {
-                // FIXME: timestamp the other events with 0 when I see the need.              
-                // console.debug(`${e.type} ${window.location.href} ${e.timeStamp} simulated`, e.target, e);
+                // it's not a queuing related event. it could be a hyper user :).
+                // or or a legit event - in response to something we are simulating. (e.g. the app itself could trigger a click event to do work) after we simulate keydown enter.
+                // either way just let the app deal with it.
+                return Recorder.propagate(e);  
             }
         }
         else {
-            let msg;
-            switch (e.type) {
-                case 'mousemove':
-                    if (this.mouseDown || this.pendingClick) {
-                        return; //bubble
-                    }
-                    this.lastMouseMoveEvent = e;
-                    if (!this.pendingMouseMoveTimeout) {
-                        // first. take a screenshot now.
-                        this.pushMessage({
-                            type: 'mousemove',
-                            x: e.x, // these are the mouse coordinates
-                            y: e.y, // these are the mouse coordinates
-                            event: {
-                                type: e.type
-                            },
-                            handler: {
-                                takeScreenshot: true,
-                                //simulate: true, // just drop it i guess
-                                record: false
-                            }
-                        });
-                    }
-                    clearTimeout(this.pendingMouseMoveTimeout);
-                    this.pendingMouseMoveTimeout = setTimeout(
-                        this.boundMouseMoveTimeoutAction,
-                        500 // FIXME: make configurable
-                    );
-                    return; // bubble
-                case 'change':
-                    // handle select elements that update their value by user interacting, e.g. clicking, in the shadow DOM options, where we cannot see these events.
-                    // at this point in time the shadow DOM is closed and the value has already changed.
-                    if (e.target.tagName === 'SELECT') {
-                        let msg = this.buildMsg(e);
-                        this.pushMessage(msg);
-                    }
-                    return; // bubble it
-                case 'mousedown':
-                    this.mouseDown = e;
-                    if (this.pendingMouseMoveTimeout) {
-                        clearTimeout(this.pendingMouseMoveTimeout);
-                        this.pendingMouseMoveTimeout = null;
-                    }
-                    break; // block?
-                case 'mouseup':
-                    this.mouseDown = false;
-                    break;
-                case 'scroll':
-                    console.log(e.target.scrollLeft);
-                    if (this.mouseDown) { // only record scroll event when the user is moving the slider with the mouse
-                        let element = e.target === document ? document.documentElement : e.target;
-                        // FIXME: could make sure the elements for mouse down scrolltarget are the same too
-                        this.lastScrollEvents.push({ element: element, scrollLeft: element.scrollLeft, scrollTop: element.scrollTop }); // just the last one
-                        clearTimeout(this.pendingScrollTimeout);
-                        this.pendingScrollTimeout = setTimeout(
-                            this.boundRecordScrollAction,
-                            500 // FIXME: make configurable
-                        );
-                    }
-                    return; // cannot be cancelled anyway - but when this is recorded it needs
-                case 'keydown':
-                case 'keyup':
-                    this.handleKey(e);
-                    break; // do not execute
-                case 'keypress':
-                    break; // do not execute - these should not even be seen here, they should be synthetic events only.                    
-                case 'contextmenu':
-                case 'dblclick':
-                    this.recordKeySequence();
-                    this.recordWheel();
-                    msg = this.buildMsg(e);
-                    this.pushMessage(msg); // take screenshot and then simulate 
-                    break;
-                case 'click':
-                    // don't know yet if it is a single click or the first of a double click
-                    if (!this.pendingClick) {
-                        this.pendingClick = e;
-                        setTimeout(() => {
-                            this.recordKeySequence();
-                            this.recordWheel();
-                            let msg = this.buildMsg(this.pendingClick);
-                            this.pushMessage(msg); // take screenshot, and then simulate 
-                            this.pendingClick = false;
-                        }, 500);
-                    }
-                    else {
-                        // this is the second single click within 500ms. It should generate a double click.
-                        this.pendingClick = false;
-                        if (e.detail != 2) {
-                            //console.error('sanity check fails. got a 2nd single click within 500ms but not marked as 2nd click.')
-                        }
-                    }
-                    break;
+            // we are not waiting on anything from the the extension
+            // and we are getting some user events
 
-                // these will bubble (via the early return)
-                case 'mouseover': // alow these to bubble so I can see the complex hover stuff like tooltips and menus
-                    /** The time that the users mouse entered the current element, used to record hover effects. */
-                    this._mouseEnterTime = performance.now();
-                case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
-                    return; // bubble
+            // wait for the next action related user input event before we start blocking events.
+            // e.g. a click changes the screen, the app may give focus to some new element text box,
+            // I do not want to lose this state when I take the prereq screenshot for the next action, so I cannot block that focus event.
+            // I wait for a user action to indicate that the screen is ready, and now it's okay to start blocking subsequent events
+            // while I decode the users next action.
+            switch (e.type) {
+                // these should be processed
+                case 'mouseover':
+                    this._mouseEnterTime = performance.now(); // keep on accounting
+                    if (this.pendingMouseMoveTimeout) {
+                        return Recorder.cancel(e);
+                    }
+                case 'focus':
+                case 'blur':
+                case 'focusin':
+                    return Recorder.propagate(e); // focus and friends
             }
-            Recorder.block(e);
-            return false; // should be redundant and not needed, I am blocking all these I hope
+        }
+
+        // the big recorder switch
+        switch (e.type) {
+            case 'mousemove':
+                if (this.mouseDown || this.pendingClick || this.pendingScrollTimeout) {
+                    return Recorder.propagate(e); // bubble? Why does it event matter?
+                }
+                this.lastMouseMoveEvent = e;
+                if (!this.pendingMouseMoveTimeout) {
+                    // first schedule a screenshot now.
+                    this.pushMessage({
+                        type: 'mousemove',
+                        x: e.x, // these are the mouse coordinates
+                        y: e.y, // these are the mouse coordinates
+                        event: {
+                            type: e.type
+                        },
+                        handler: {
+                            takeScreenshot: true
+                        }
+                    });
+                }
+                // if nothing else cancels or resets this in x seconds
+                // it means the user is waiting for a mousemove to be recorded
+                // so schedule that.
+                clearTimeout(this.pendingMouseMoveTimeout);
+                this.pendingMouseMoveTimeout = setTimeout(
+                    this.boundMouseMoveTimeoutAction,
+                    500 // FIXME: make configurable
+                );
+                return Recorder.cancel(e); // none of them take effect in the app, I just want that first screenshot, on the final record do I need to move it?
+            case 'change':
+                // handle select elements that update their value by user interacting, e.g. clicking, in the shadow DOM options, where we cannot see these events.
+                // at this point in time the shadow DOM is closed and the value has already changed.
+                if (e.target.tagName === 'SELECT') {
+                    let msg = this.buildMsg(e);
+                    this.pushMessage(msg);
+                }
+                return Recorder.propagate(e);
+            case 'mousedown':
+                this.mouseDown = e; // down right now
+                this.lastMouseDownEvent = e; // and hag onto it after it is not the last event
+                if (this.pendingMouseMoveTimeout) {
+                    clearTimeout(this.pendingMouseMoveTimeout);
+                    this.pendingMouseMoveTimeout = null;
+                }
+                return Recorder.cancel(e);
+            case 'mouseup':
+                this.mouseDown = false;
+                return Recorder.cancel(e); // ..so these are pointless
+            case 'scroll':
+                let element = e.target === document ? document.documentElement : e.target;
+                // FIXME: could make sure the elements for mouse down scrolltarget are the same too
+                this.lastScrollEvents.push({ element: element, scrollLeft: element.scrollLeft, scrollTop: element.scrollTop }); // just the last one
+                clearTimeout(this.pendingScrollTimeout);
+                this.pendingScrollTimeout = setTimeout(
+                    this.boundRecordScrollAction,
+                    500 // FIXME: make configurable
+                );
+                return Recorder.propagate(e); // not cancellable anyway (i.e cannot preventDefault actions) (wheel event generated)
+            case 'wheel':
+                msg = this.buildMsg(e);
+                msg.handler = this._wheel ? { simulate: true } : { takeScreenshot: true, simulate: true };
+                this._wheel = e;
+                this.pushMessage(msg);
+                return Recorder.cancel(e);
+            case 'keydown':
+            case 'keyup':
+                this.handleKey(e);
+                return Recorder.cancel(e);
+            case 'keypress':
+                return Recorder.cancel(e);
+            case 'contextmenu':
+            case 'dblclick':
+                this.recordKeySequence();
+                this.recordWheel();
+                msg = this.buildMsg(e);
+                this.pushMessage(msg); // take screenshot and then simulate
+                return Recorder.cancel(e);
+            case 'click':
+                // don't know yet if it is a single click or the first of a double click
+                if (!this.pendingClick) {
+                    this.pendingClick = e;
+                    setTimeout(() => {
+                        this.recordKeySequence();
+                        this.recordWheel();
+                        let msg = this.buildMsg(this.pendingClick);
+                        this.pushMessage(msg); // take screenshot, and then simulate
+                        this.pendingClick = false;
+                    }, 500);
+                }
+                else {
+                    // this is the second single click within 500ms. It should generate a double click.
+                    this.pendingClick = false;
+                    if (e.detail != 2) {
+                        //console.error('sanity check fails. got a 2nd single click within 500ms but not marked as 2nd click.')
+                    }
+                }
+                return Recorder.cancel(e);
+            case 'mouseover': // alow these to bubble so I can see the complex hover stuff like tooltips and menus
+                /** The time that the users mouse entered the current element, used to record hover effects. */
+                this._mouseEnterTime = performance.now();
+            case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
+                if (this.pendingMouseMoveTimeout) {
+                    return Recorder.cancel(e);
+                }
+                else {
+                    return Recorder.propagate(e);
+                }
+            default:
+                return Recorder.cancel(e);
         }
     }
 
@@ -751,10 +607,10 @@ class Recorder {
     /**
      * Enough time has passed without the user doing anything to record the last observed scroll event.
      * The start screen for the scroll event must already have been taken. How? Options:
-     * 1. take a screenshot periodically every 500ms to refresh the last screenshot 
+     * 1. take a screenshot periodically every 500ms to refresh the last screenshot
      * 2. take a screenshot on 'other' events, that preceed the scroll event. This is hard, I cannot block the scroll action so the
      *    user must know not to scroll until after the screenshot is taken.
-     *      
+     *
      *      If I use some form of mousemove between recorded events to indicate the last event is done I can take a screenshot
      *      based on that. I also want a visual indicator to the user that brimstone is ready to record your next action. (i.e.) it
      *      has recorded the screen
@@ -765,40 +621,68 @@ class Recorder {
         }
 
         let item = this.lastScrollEvents[this.lastScrollEvents.length - 1];
-        let element = item.element;
+        let x,y;
+        if(this._wheel) {
+            // hovering and using wheel
+            x = this._wheel.clientX;
+            y = this._wheel.clientY;
+        }
+        else {
+            // dragging a scrollbar
+            x = this.lastMouseDownEvent.x;
+            y = this.lastMouseDownEvent.y;
+        }
+
+        let element = getScrollParent(document.elementFromPoint(x, y));
         let scrollLeft = null, scrollTop = null; // be undefined
 
         if (this.lastScrollEvents.length > 1) {
-            let prevItem = this.lastScrollEvents[this.lastScrollEvents.length - 2];
+            let prevItem = this.lastScrollEvents[0];
             if (prevItem.scrollTop !== item.scrollTop) {
                 scrollTop = item.scrollTop;
             }
             if (prevItem.scrollLeft !== item.scrollLeft) {
                 scrollLeft = item.scrollLeft;
             }
+            // FIXME: what if neither?
         }
         else {
             scrollTop = item.scrollTop;
             scrollLeft = item.scrollLeft;
         }
 
+        let description = '';
+        if (scrollTop !== null) {
+            description = this._wheel ? 'mouse wheel ' : 'drag ';
+            description += `v-scroll ${scrollTop}px`;
+        }
+        if (scrollLeft !== null) {
+            if (scrollTop !== null) {
+                description += ', ';
+            }
+            description = this._wheel ? 'mouse shift+wheel ' : 'drag ';
+            description += `h-scroll ${scrollLeft}px`;
+        }
+        this._wheel = null;
+
         clearTimeout(this.pendingScrollTimeout);
+        this.pendingScrollTimeout = false;
         let rect = element.getBoundingClientRect();
         this.pushMessage({
             type: 'scroll',
             boundingClientRect: rect,
-            x: rect.x + rect.width / 2,
-            y: rect = rect.y + rect.height / 2,
+            // the element scrolled is under these points on the scrollbar
+            x: x,
+            y: y,
             event: {
                 type: 'scroll',
-                // x,y is not going to suffice in general for this I believe
-                css: TopLevelObject.DOMPresentationUtils.cssPath(element),
                 scrollTop: scrollTop,
                 scrollLeft: scrollLeft
             },
             handler: {
-                record: true, // no simulate, no screenshots.
-            }
+                record: true
+            },
+            description: description
         });
         this.lastScrollEvents = [];
     }
@@ -817,12 +701,12 @@ class Recorder {
 
     /**
      * Start/Continue an observed sequence of user key events to some element.
-     * 
+     *
      * Send a properly formatted keys message to the extension to implement
      * that. On the first keydown we take a screenshot, before we simulate.
      * We also schedule a callback in the future to send the record message
      * for the aggregate keystrokes.
-     * 
+     *
      * Some special handling for [ENTER] key
      */
     handleKey(e) {
@@ -855,7 +739,7 @@ class Recorder {
         }
         else {
             // not when the only thing that would be in the queue is a single keyup
-            // related to enter key handling. 1 down, enter down is meant to clear the queue, but if I let go of 1 late, it gets in the queue, which 
+            // related to enter key handling. 1 down, enter down is meant to clear the queue, but if I let go of 1 late, it gets in the queue, which
             // is unintentional. i.e. don't add a keyup to a flushed (empty) queue
             if (this.keyEventQueue.length !== 0 || e.type === 'keydown') {
                 this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
@@ -895,25 +779,11 @@ class Recorder {
         if (this._wheel) {
             // any (other) user input signals the end of a scroll input
             let msg = this.buildMsg(this._wheel);
-            this.pushMessage(msg); // record a wheel action, fire and forget 
+            this.pushMessage(msg); // record a wheel action, fire and forget
             this._wheel = false;
         }
     }
 } // end class Recorder
-
-Recorder.state = {
-    /** we are recording, some events are intercepted and blocked, some bubble */
-    RECORD: 0,
-
-    /** we are simulating (driving the browser programmatically) and letting all events through. Everything bubbles. */
-    SIMULATE: 1,
-
-    /** we are ready to start recording (again), but need a user input before we block events */
-    READY: 2,
-
-    /** we are blocking everything. let nothing bubble. */
-    BLOCK: 3
-};
 
 Recorder.events = [
     // comments describe what is done when recording, not handling 'simulated' events.
@@ -939,36 +809,32 @@ Recorder.events = [
     'invalid',      // blocked. ''
     'change',       // blocked. it changes styles. e.g. (x) on a combobox.
 
-    //'mouseout', // not used
+    'mouseout',  // block sometimes...
     'mouseover', // bubble and is used to observe and calculate hoverTime
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event
-    //'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action. 
-    // the first wheel event must take a screenshot and block all subsequent events until that's done.
-    // subsequent wheel events are aggregated.
-    // we decide the the user is no longer scrolling when a non-wheel user action type event occurs.
-    // this records the completed scroll action.
+    'wheel', // blocked. monitored to decide when a user performs a "complete" scroll action.
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Element/scroll_event
-    'scroll', // not cancelable 
+    'scroll', // not cancelable
 
-    // FIXME: I do not ever see these...WHY? 
+    // FIXME: I do not ever see these...WHY?
     'mouseleave',   // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
     'mouseenter'    // blocked. it changes styles. e.g. some hover approximations. Also record how long the user was over the element before they clicked it.
 ];
 
-Recorder.block = function block(e) {
-    if (e.type !== 'mousemove') { // these saturate the logs
-        //console.debug(`${e.type} ${window.location.href} blocking event: ${e.type}`, e.target, e);
-    }
-    else {
-        //console.debug(`${e.type} ${window.location.href} blocked event`);
-    }
+Recorder.cancel = function cancel(e) {
+    console.debug(`${e.type} ${e.brimstoneClass} ${e.cancelable ? '*cancelled' : '*un-cancelable'} `, e);
 
     e.preventDefault();
     e.stopImmediatePropagation();
     e.stopPropagation();
+    return false;
 };
+
+Recorder.propagate = function propagate(e) {
+    console.debug(`${e.type} ${e.brimstoneClass} *propagated`, e);
+}
 
 // create the instance
 new Recorder();
