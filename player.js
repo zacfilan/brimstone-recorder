@@ -16,8 +16,26 @@ var options;
  * 
  * Scroll the element that matches the css to the given value
  */
-function _scroll(css, top, left) {
-    let elem = document.querySelector(css);
+function _scroll(x, y, top, left) {    
+    // https://stackoverflow.com/questions/35939886/find-first-scrollable-parent
+    function getScrollParent(element, includeHidden) {
+        var style = getComputedStyle(element);
+        var excludeStaticParent = style.position === "absolute";
+        var overflowRegex = includeHidden ? /(auto|scroll|hidden)/ : /(auto|scroll)/;
+    
+        if (style.position === "fixed") return document.body;
+        for (var parent = element; (parent = parent.parentElement);) {
+            style = getComputedStyle(parent);
+            if (excludeStaticParent && style.position === "static") {
+                continue;
+            }
+            if (overflowRegex.test(style.overflow + style.overflowY + style.overflowX)) return parent;
+        }
+    
+        return document.body;
+    }
+
+    var elem = getScrollParent(document.elementFromPoint(x, y)); // will this work in a frame ?
     if(top !== null) {
         elem.scrollTop = top;
     }
@@ -182,8 +200,7 @@ export class Player {
             code: action.event.code,
             key: action.event.key,
             windowsVirtualKeyCode: keycode,
-            nativeVirtualKeyCode: keycode,
-            timestamp: 0 // this will let me id a synthetic vs user event.
+            nativeVirtualKeyCode: keycode
 
         });
         // FIXME: Verify that [ENTER] prints correctly when in a textarea
@@ -203,8 +220,7 @@ export class Player {
                 text: keycode == 13 ? '\r' : action.event.key,
                 unmodifiedtext: action.event.key,
                 windowsVirtualKeyCode: keycode,
-                nativeVirtualKeyCode: keycode,
-                timestamp: 0
+                nativeVirtualKeyCode: keycode
             };
             await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
         }
@@ -213,8 +229,7 @@ export class Player {
             code: action.event.code,
             key: action.event.key,
             windowsVirtualKeyCode: action.event.keyCode,
-            nativeVirtualKeyCode: action.event.keyCode,
-            timestamp: 0
+            nativeVirtualKeyCode: action.event.keyCode
         });
     }
 
@@ -299,13 +314,22 @@ export class Player {
 
     async wheel(action) {
         console.debug(`player: dispatch mouseWheel from ${action.x}, ${action.y}`);
+        let modifiers = 0;
+        let event = action.event;
+
+        modifiers |= event.altKey ? 1 : 0;
+        modifiers |= event.ctrlKey ? 2 : 0;
+        modifiers |= event.metaKey ? 4 : 0;
+        modifiers |= event.shiftKey ? 8 : 0;
+
         await this.debuggerSendCommand('Input.dispatchMouseEvent', {
             type: 'mouseWheel',
             x: action.x,
             y: action.y,
-            deltaX: action.deltaX,
-            deltaY: action.deltaY,
-            pointerType: 'mouse'
+            deltaX: action.event.deltaX,
+            deltaY: action.event.deltaY,
+            pointerType: 'mouse',
+            modifiers: modifiers
         });
     }
 
@@ -324,8 +348,7 @@ export class Player {
             code: event.code,
             key: event.key,
             windowsVirtualKeyCode: event.keyCode,
-            nativeVirtualKeyCode: event.keyCode,
-            timestamp: 0
+            nativeVirtualKeyCode: event.keyCode
         });
     }
 
@@ -353,7 +376,7 @@ export class Player {
         let frames = await chrome.scripting.executeScript({
             target: { tabId: this.tab.id/*, frameIds: frameIds*/ },
             function: _scroll,
-            args: [action.event.css, action.event.scrollTop, action.event.scrollLeft]
+            args: [action.x, action.y, action.event.scrollTop, action.event.scrollLeft]
         });
         let errorMessage = frames[0].result;
 
@@ -378,8 +401,7 @@ export class Player {
             code: event.code,
             key: event.key,
             windowsVirtualKeyCode: keycode,
-            nativeVirtualKeyCode: keycode,
-            timestamp: 0
+            nativeVirtualKeyCode: keycode
         });
 
         if (modifiers === 0 || modifiers === 8) {
@@ -401,8 +423,7 @@ export class Player {
                     text: keycode == 13 ? '\r' : event.key,
                     unmodifiedtext: event.key,
                     windowsVirtualKeyCode: keycode,
-                    nativeVirtualKeyCode: keycode,
-                    timestamp: 0
+                    nativeVirtualKeyCode: keycode
                 };
                 await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
             }
@@ -443,7 +464,10 @@ export class Player {
             ++i;
             // await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
 
-            // There is an IMPLICIT mousemove before any *click* action. I don't make it explicit (don't record it) because I might need to do it several times to get to the correct state.
+            // There was a mousemove at some point before any *click* action - the mouse got there after all.
+            // I don't always make the move explicit (don't always record it) because the user doesn't always care. But it DOES affect hover styles.
+            // While I wait for the screen to match, I might need to repeatedlty simulate that mousemove to get the screen into the expcted state for the start
+            // of the click action.
             switch (nextStep.type) {
                 case 'stop':
                 case 'click':
@@ -596,6 +620,7 @@ export class Player {
     async debuggerSendCommand(method, commandParams) {
         let i = 0;
         var lastException;
+        commandParams.timestamp = 0; // this is how i distiguish sythetic events
         for (i = 0; i < 2; ++i) { // at most twice 
             try {
                 return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
@@ -681,7 +706,6 @@ export class Player {
         var getMemory = function () {
             let m = window.performance.memory;
             console.log(`used ${m.usedJSHeapSize} bytes`);
-            debugger;
             return {
                 jsHeapSizeLimit: m.jsHeapSizeLimit,
                 totalJSHeapSize: m.totalJSHeapSize,

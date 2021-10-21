@@ -159,10 +159,10 @@ button svg {
   background: unset;
   width: 12px;
   height: 18px;
-  color: var(--action-color);
 }
 
 .card .screenshot .overlay.pointer svg {
+  color: var(--action-color);
   height: 18px;
 }
 
@@ -186,7 +186,7 @@ button svg {
 .card .title svg {
   height: 20px;
   width: 20px;
-  margin-right: .3em;
+  margin-right: 0.3em;
 }
 
 .card .title svg path {
@@ -297,7 +297,18 @@ button svg {
   border: 1px solid black;
   font-size: 14px;
   padding: 0px 3px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
+}
+
+#content .card.action .screenshot:hover .pulse {
+  -webkit-animation: unset;
+          animation: unset;
+}
+
+#content .card.action .screenshot:hover .pulse-light {
+  -webkit-animation: unset;
+          animation: unset;
+  opacity: 0.25;
 }
 
 #content .card.waiting {
@@ -362,7 +373,7 @@ button svg {
     opacity: 0;
   }
   50% {
-    opacity: 0.5;
+    opacity: 1;
   }
   100% {
     opacity: 0;
@@ -374,7 +385,31 @@ button svg {
     opacity: 0;
   }
   50% {
-    opacity: 0.5;
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@-webkit-keyframes opacity3 {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes opacity3 {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.25;
   }
   100% {
     opacity: 0;
@@ -382,8 +417,13 @@ button svg {
 }
 
 .pulse {
-  -webkit-animation: opacity2 2s infinite;
-          animation: opacity2 2s infinite;
+  -webkit-animation: opacity2 3s infinite;
+          animation: opacity2 3s infinite;
+}
+
+.pulse-light {
+  -webkit-animation: opacity3 3s infinite;
+          animation: opacity3 3s infinite;
 }
 
 #footer {

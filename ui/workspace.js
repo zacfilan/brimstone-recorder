@@ -73,14 +73,14 @@ const player = new Player();
 var uiCardsElement = document.getElementById('cards');
 
 /**
- * cache the last mouse related screenshot taken
+ * cache the last screenshot taken
  * */
 var _lastScreenshot;
 
 /**
- * cache the last keys related screenshot taken
+ * cache the last mouse move 
  * */
-var _lastMouseMoveScreenshot;
+var _lastMouseMove;
 
 
 /** The parsed test.json object, this will change in memory during use.
@@ -827,6 +827,13 @@ async function captureScreenshotAsDataUrl() {
     return _lastScreenshot;
 }
 
+async function ignoreInputCaptureScreenshotAsDataUrl() {
+    await player.debuggerSendCommand('Input.setIgnoreInputEvents', {ignore: true});
+    let ss = await captureScreenshotAsDataUrl();
+    await player.debuggerSendCommand('Input.setIgnoreInputEvents', {ignore: false});
+    return ss;
+}
+
 /** 
  * This is only used during recording. It update the zip file.
  * 
@@ -863,9 +870,9 @@ async function userEventToAction(userEvent, frameId) {
             tabWidth: tab.width,
 
             /** absolute x coordinate of the mouse position as a percent of screenshot */
-            x: (cardModel.x + frameOffset.left) * 100 / tab.width,
+            x: cardModel.x * 100 / tab.width,
             /** absolute y coordinate of the mouse position as a percent of screenshot */
-            y: (cardModel.y + frameOffset.top) * 100 / tab.height
+            y: cardModel.y * 100 / tab.height
         };
     }
 
@@ -873,33 +880,25 @@ async function userEventToAction(userEvent, frameId) {
     switch (userEvent.type) {
         case 'mousemove':
             cardModel.description = 'move mouse here';
-            cardModel.addExpectedScreenshot(_lastScreenshot); // previously taken
             break;
         case 'wheel':
             let direction = '';
             let magnitude;
-            if (cardModel.deltaX) {
-                direction = cardModel.deltaY < 0 ? 'left' : 'right';
-                magnitude = Math.abs(cardModel.deltaY);
+            if (cardModel.event.deltaX) {
+                direction = cardModel.event.deltaX < 0 ? 'left' : 'right';
+                magnitude = Math.abs(cardModel.event.deltaX);
             }
-            else if (cardModel.deltaY) {
-                direction = cardModel.deltaY < 0 ? 'up' : 'down';
-                magnitude = Math.abs(cardModel.deltaY);
+            else if (cardModel.event.deltaY) {
+                direction = cardModel.event.deltaY < 0 ? 'up' : 'down';
+                magnitude = Math.abs(cardModel.event.deltaY);
             }
-            cardModel.description = `mouse here, scroll wheel ${magnitude}px ${direction}`;
+            let scroll = cardModel.event.shiftKey ? 'shift+wheel (h-scroll)' : 'wheel (v-scroll)';
+            
+            cardModel.description = `mouse ${scroll} ${cardModel.event.deltaX}hpx ${cardModel.event.deltaY}vpx`;
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
+
         case 'scroll':
-            cardModel.description = 'scroll';
-            if (cardModel.event.scrollTop !== null) {
-                cardModel.description += ` top to ${cardModel.event.scrollTop}px`;
-            }
-            if (cardModel.event.scrollLeft !== null) {
-                if (cardModel.event.scrollTop !== null) {
-                    cardModel.description += ',';
-                }
-                cardModel.description += ` left to ${cardModel.event.scrollLeft}px`;
-            }
             break;
         case 'keys':
             cardModel.description = 'type ';
@@ -948,18 +947,15 @@ async function userEventToAction(userEvent, frameId) {
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'click':
-            cardModel.description = 'click';
-            await captureScreenshotAsDataUrl();
+            cardModel.description = 'click'; 
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'contextmenu':
             cardModel.description = 'right click';
-            await captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'dblclick':
             cardModel.description = 'double click';
-            await captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'stop':
@@ -1003,10 +999,23 @@ async function onMessageHandler(message, _port) {
             }
             break;
         case 'screenshot':
-            await captureScreenshotAsDataUrl();
+            await ignoreInputCaptureScreenshotAsDataUrl();
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId });
             break;
-        case 'wheel': // this does not ack, because it will always be followed by another operation.
+        case 'wheel': 
+            if (userEvent.handler?.takeScreenshot) {
+                await captureScreenshotAsDataUrl(); // cache that one
+            }
+            if (userEvent.handler?.record) {
+                action = await userEventToAction(userEvent, userEvent.sender.frameId);
+                updateStepInView(action); // record the user action to disk
+            }
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+            }
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
+        // this does not ack, because it will always be followed by another operation.
             // record
             action = await userEventToAction(userEvent, userEvent.sender.frameId);
             updateStepInView(action); // record the user action to disk
@@ -1017,24 +1026,48 @@ async function onMessageHandler(message, _port) {
         case 'mousemove':
             // same as the below except we use a dedicated cached screenshot
             // to allow a mousemove screenshot to not overwrite a pending keys or pending click record event.
+           
+            // in practice these two ifs are mutually exclusive
             if (userEvent.handler?.takeScreenshot) {
-                _lastScreenshot = _lastMouseMoveScreenshot = await captureScreenshotAsDataUrl();
+                _lastMouseMove = userEvent;
+                _lastMouseMove.startScreenshot = await ignoreInputCaptureScreenshotAsDataUrl(); 
             }
             if (userEvent.handler?.record) {
                 action = await userEventToAction(userEvent, userEvent.sender.frameId);
-                action.addExpectedScreenshot(_lastMouseMoveScreenshot);
+                await action.addExpectedScreenshot(_lastMouseMove.startScreenshot );
+                _lastMouseMove.endScreenshot = await captureScreenshotAsDataUrl();
                 updateStepInView(action); // record the user action to disk
             }
+
+            // in practice i don't simuluate a mousemove 
             if (userEvent.handler?.simulate) {
                 await player[userEvent.type](userEvent); // this can result in a navigation to another page.
             }
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
+        case 'scroll':
+                if (userEvent.handler?.takeScreenshot) {
+                    await ignoreInputCaptureScreenshotAsDataUrl();
+                }
+
+                if (userEvent.handler?.record) {
+                    action = await userEventToAction(userEvent, userEvent.sender.frameId);
+                    action.addExpectedScreenshot(_lastScreenshot);
+                    updateStepInView(action); // record the user action to disk
+                }
+
+                // in practice I don't call this
+                if (userEvent.handler?.simulate) {
+                    await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+                }
+
+                postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+                break;
         case 'keys':
         case 'keydown':
         case 'keyup': // better not take a screenshot here!
         case 'change':
-        case 'scroll':
+
             if (userEvent.handler?.takeScreenshot) {
                 await captureScreenshotAsDataUrl();
             }
