@@ -181,7 +181,7 @@ export class TestAction {
             fileName: `step${this.index}_expected.png`
             // png: await Player.dataUrlToPNG(dataUrl) // this is expensive to calculate, defer until you really need it.
         });
-        this.expectedScreenshot.createPngFromDataUrl(); // kick it off but don't wait
+        return this.expectedScreenshot.createPngFromDataUrl(); // kick it off but don't wait
     }
 
     toJSON() {
@@ -329,15 +329,18 @@ export class TestAction {
             let o = this.overlay;
             let calloutY = o.top + o.height;
             let calloutX = o.left;
-            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contenxtmenu') {
-                calloutY = o.y + (100 * ((18 + 25) / o.tabHeight)); // 25px lower than the 18px pointer is
-                calloutX = o.x;
-                html += `<div class='overlay pointer' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>${pointer}</div>`;
+            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type ==='wheel') {
+                html += `
+                <div class='overlay pointer pulse' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>
+                    ${pointer}
+                    </br>
+                    <div class='action callout user-event' data-index='${this.index}'>${this.description}</div>
+                </div>`;
             }
-            html += `
-            <div class='overlay pulse' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>
-            <div class='action callout user-event' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${this.description}</div>
-            `;
+            else {
+                html += `<div class='pulse action callout user-event' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${this.description}</div>`;
+            }
+            html += `<div class='overlay pulse-light' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>`;
         }
 
         let footer = '';

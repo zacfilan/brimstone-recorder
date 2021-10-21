@@ -15,7 +15,7 @@ body {
 }
 
 .error-text {
-    color:red;
+    color: red;
     font-weight: bold;
 }
 
@@ -122,13 +122,13 @@ button {
         .overlay {
             position: absolute;
             background: var(--action-color);
-            
+
             &.pointer {
                 background: unset;
-                width:12px;
-                height:18px;
-                color: var(--action-color);
+                width: 12px;
+                height: 18px;
                 svg {
+                    color: var(--action-color);
                     height: 18px;
                 }
             }
@@ -153,14 +153,14 @@ button {
             path {
                 fill: red;
             }
-            margin-right: .3em;
+            margin-right: 0.3em;
         }
 
         &:hover {
             cursor: pointer;
             background: rgba(0, 0, 0, 0.3);
         }
-        
+
         .stepNumber {
             margin-left: auto; // right align him
         }
@@ -235,7 +235,16 @@ button {
                 border: 1px solid black;
                 font-size: 14px;
                 padding: 0px 3px;
-                font-family: 'Courier New', Courier, monospace;
+                font-family: "Courier New", Courier, monospace;
+            }
+        }
+        .screenshot:hover {
+            .pulse {
+                animation: unset;
+            }
+            .pulse-light {
+                animation: unset;
+                opacity: 0.25;
             }
         }
     }
@@ -301,7 +310,19 @@ button {
         opacity: 0;
     }
     50% {
-        opacity: 0.5;
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes opacity3 {
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.25;
     }
     100% {
         opacity: 0;
@@ -309,7 +330,11 @@ button {
 }
 
 .pulse {
-    animation: opacity2 2s infinite;
+    animation: opacity2 3s infinite;
+}
+
+.pulse-light {
+    animation: opacity3 3s infinite;
 }
 
 #footer {
@@ -356,7 +381,7 @@ button {
         padding: 10px;
         details {
             height: 100px;
-        
+
             .stack {
                 user-select: text;
 
