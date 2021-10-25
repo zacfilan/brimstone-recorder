@@ -34,7 +34,7 @@ function _scroll(x, y, top, left) {
     
         return document.body;
     }
-
+    debugger;
     var elem = getScrollParent(document.elementFromPoint(x, y)); // will this work in a frame ?
     if(top !== null) {
         elem.scrollTop = top;
@@ -231,6 +231,10 @@ export class Player {
             windowsVirtualKeyCode: action.event.keyCode,
             nativeVirtualKeyCode: action.event.keyCode
         });
+    }
+
+    wait(action) {
+        return; // 'nuff said
     }
 
     async dblclick(action) {
@@ -468,21 +472,21 @@ export class Player {
             // I don't always make the move explicit (don't always record it) because the user doesn't always care. But it DOES affect hover styles.
             // While I wait for the screen to match, I might need to repeatedlty simulate that mousemove to get the screen into the expcted state for the start
             // of the click action.
-            switch (nextStep.type) {
-                case 'stop':
-                case 'click':
-                case 'dblclick':
-                case 'contextmenu':
-                case 'wheel':
-                    // if the next step is any implicit mouse operation, we want to mousein into the next location, so as to change the screen correctly with hover effect.
-                    // this requires moving (back) to the current location first, then into the next location 
-                    await this.mousemove(this.mouseLocation);
-                    await this.mousemove(nextStep);
-                    if (nextStep.hoverTime) {
-                        await sleep(nextStep.hoverTime);
-                    }
-                    break;
-            }
+            // switch (nextStep.type) {
+            //     case 'stop':
+            //     case 'click':
+            //     case 'dblclick':
+            //     case 'contextmenu':
+            //     case 'wheel':
+            //         // if the next step is any implicit mouse operation, we want to mousein into the next location, so as to change the screen correctly with hover effect.
+            //         // this requires moving (back) to the current location first, then into the next location 
+            //         await this.mousemove(this.mouseLocation);
+            //         await this.mousemove(nextStep);
+            //         if (nextStep.hoverTime) {
+            //             await sleep(nextStep.hoverTime);
+            //         }
+            //         break;
+            // }
 
             differencesPng = false; // if the last time through we were able to take a screenshot or not
 
@@ -606,7 +610,6 @@ export class Player {
     async _debuggerSendCommandRaw(method, commandParams) {
         let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
-            console.warn('result:', result, 'lastError:', chrome.runtime.lastError.message);
             throw new Error(chrome.runtime.lastError.message);
         }
         return result; // the debugger method may be a getter of some kind.
@@ -626,12 +629,13 @@ export class Player {
                 return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
             }
             catch (e) {
-                console.warn('got', e);
                 lastException = e;
                 if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
+                    console.log(`warn got exception while running debugger cmd ${method}:`, commandParams, e);
                     await this.attachDebugger({ tab: this.tab });
                 }
                 else {
+                    console.warn(`got exception while running debugger cmd ${method}:`, commandParams, e);
                     throw lastException;
                 }
             }
@@ -685,8 +689,10 @@ export class Player {
 
         // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
         // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
-        await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
-        this._debuggerAttachPromise = this.tab.resizeViewport();  // reset the viewport - I wish chrome did this.
+        //await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
+
+        this._debuggerAttachPromise = sleep(500) // the animation should practically be done after this, but even if it isn't we can deal with it
+            .then(() => this.tab.resizeViewport()); // reset the viewport - I wish chrome did this.
 
         await this._debuggerAttachPromise;
         console.debug(`debugger attached`);
