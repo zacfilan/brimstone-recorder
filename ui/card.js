@@ -328,8 +328,8 @@ export class TestAction {
         if (this.overlay) {
             let o = this.overlay;
             let calloutY = o.top + o.height;
-            let calloutX = o.left;
-            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type ==='wheel') {
+            let calloutX = Math.max(o.left, 0);
+            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type ==='scroll' || this.type === 'wait') {
                 html += `
                 <div class='overlay pointer pulse' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>
                     ${pointer}
@@ -371,6 +371,7 @@ export class TestAction {
 }
 
 /**
+ * The currently constructed test. 
  * @type {TestAction[]}
  */
 TestAction.instances = [];

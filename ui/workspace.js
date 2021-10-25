@@ -32,13 +32,56 @@ window.document.title = 'Brimstone - untitled';
 
 // catch all unhandled rejections and report them
 window.addEventListener('unhandledrejection', function (e) {
+    //try { stopScreenShotPolling(); } catch (e) { }
     errorDialog(e.reason);
 });
 
 window.addEventListener("error", function (e) {
+    //try { stopScreenShotPolling(); } catch (e) { }
     errorDialog(e.error);
     return false;
 });
+
+let pendingScreenShotTimeout = null
+async function replaceScreenshot() {
+    if (!pendingScreenShotTimeout) {
+        return;
+    }
+    try {
+        console.log('replacing last screenshot');
+        await captureScreenshotAsDataUrl();
+        let lastAction = TestAction.instances[TestAction.instances.length - 1];
+        // use the lower cost option, just the dataurl don't make into a PNG
+        // that will come later when we create a user action.
+        lastAction.expectedScreenshot = new Screenshot({
+            dataUrl: _lastScreenshot
+        });
+        updateStepInView(TestAction.instances[TestAction.instances.length - 2]);
+        //startScreenShotPolling();
+    }
+    catch (e) {
+        console.log('error replacing last screenshot', e);
+        // the capture can fail if the app is in the middle of a navigation, in which case don't worry about the
+        // screen, we will get it once it settles.
+    }
+}
+
+/** start the periodic timeout that grabs a screenshot */
+function startScreenShotPolling() {
+    clearTimeout(pendingScreenShotTimeout);
+    pendingScreenShotTimeout = null;
+    pendingScreenShotTimeout = setTimeout(
+        replaceScreenshot,
+        1000
+    );
+}
+
+/** stop the periodic timeout that grabs a screenshot */
+function stopScreenShotPolling() {
+    clearTimeout(pendingScreenShotTimeout);
+    pendingScreenShotTimeout = null;
+}
+
 
 /** The index of the first card showing in big step area */
 function currentStepIndex() {
@@ -524,7 +567,16 @@ async function debuggerOnDetach(source, reason) {
     }
     else {
         // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
-        await player.attachDebugger({ tab }); // it's the same tab...
+        // this can also happen if the user closes the application tab being recorded (for some user reason) in the middle of a recording.
+        try {
+            await player.attachDebugger({ tab }); // it's the same tab...
+        }
+        catch (e) {
+            stopRecording();
+            stopPlaying();
+            console.error(e);
+            throw new Error("Unable to reattach the debugger.");
+        }
     }
 };
 
@@ -568,27 +620,11 @@ async function playingWebNavigationOnCompleteHandler(details) {
     }
 }
 
-async function startRecording(tab) {
-    console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
-    console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
-
-    //chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
-    //chrome.tabs.onUpdated.addListener(tabsOnUpdatedHandler);
-
-    // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
-    //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
-    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
-    chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
-
-    // tell all the content scripts what frame they are in
-    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tab.id }, response))); // get all frames
-    for (let i = 0; i < frames.length; ++i) {
-        let frame = frames[i];
-        await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
-    }
-
-    await hideCursor();
-
+/** 
+ * Establish the recording communication channel between the tab being recorded and the brimstone workspace window.
+ * This is in the global variable: port.
+ */
+function connectPort() {
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
 
     // connect to all frames in the the active tab in this window. 
@@ -611,20 +647,57 @@ async function startRecording(tab) {
         });
 
     port.onMessage.addListener(onMessageHandler);
+}
+
+/**  
+ * tell all the content scripts what frame they are in via chrome.tab.sendMessage
+ */
+async function tellRecordersTheirFrameIds() {
+    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tab.id }, response))); // get all frames
+    for (let i = 0; i < frames.length; ++i) {
+        let frame = frames[i];
+        await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
+    }
+}
+
+async function startRecording(tab) {
+    console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+
+    //chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
+    //chrome.tabs.onUpdated.addListener(tabsOnUpdatedHandler);
+
+    // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
+    //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
+    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
+    chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
+
+    await tellRecordersTheirFrameIds();
+
+    await hideCursor();
+    await tab.resizeViewport(); // this can be called on a navigation, and the tab needs to be the correct size before the port is established, in case it decides to send us some mousemoves
+
+    connectPort();
+
+    await captureScreenshotAsDataUrl(); // grab the first screenshot
+
     console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
 }
 
 function stopRecording(tab) {
+    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
+    //stopScreenShotPolling();
+
     $('#recordButton').removeClass('active');
     setToolbarState();
     // tell all frames to stop recording. i.e. disable the event handlers if possible.
     try {
         postMessage({ type: 'stop', broadcast: true });
+        port.disconnect();
     }
     catch (e) {
         console.warn(e);
     }
-    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
 }
 
 async function focusTab() {
@@ -641,14 +714,10 @@ $('#recordButton').on('click', async function () {
         let button = $(this);
         if (button.hasClass('active')) {
             // before I take the last screenshot the window must have focus again.
-            await focusTab();
-            let action = await userEventToAction({
-                type: 'stop',
-                x: -1,
-                y: -1
-            });
+            //await focusTab();
+            let last = TestAction.instances[TestAction.instances.length-1];
+            last.addExpectedScreenshot(last.expectedScreenshot.dataUrl); // build the final png
             stopRecording();
-            updateStepInView(action);
             return;
         }
 
@@ -675,21 +744,20 @@ $('#recordButton').on('click', async function () {
         }
 
         await startRecording(tab);
-        if (url) { // cache the starting page
-            await captureScreenshotAsDataUrl();
-        }
+        //startScreenShotPolling(); // and start polling
 
         button.addClass('active');
         setToolbarState();
 
+        // by the time we get here we have set up the 2 starting actions.
+        // and should be polling for the screenshot
+
         if (!TestAction.instances.length) {
             // update the UI: insert the first text card in the ui
-            let userEvent = {
-                type: 'start', // start recording
+            await recordUserAction({
+                type: 'start',
                 url: tab.url
-            };
-            let action = await userEventToAction(userEvent);
-            updateStepInView(action);
+            });
         }
         else {
             // we are updating our recording: recording over or appending to an existing test
@@ -828,19 +896,20 @@ async function captureScreenshotAsDataUrl() {
 }
 
 async function ignoreInputCaptureScreenshotAsDataUrl() {
-    await player.debuggerSendCommand('Input.setIgnoreInputEvents', {ignore: true});
+    await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: true });
     let ss = await captureScreenshotAsDataUrl();
-    await player.debuggerSendCommand('Input.setIgnoreInputEvents', {ignore: false});
+    await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: false });
     return ss;
 }
 
 /** 
- * This is only used during recording. It update the zip file.
+ * This is only used during recording. 
  * 
  * Process a user event received from the content script (during recording)
  * screenshot, annotate event and convert to card
  */
-async function userEventToAction(userEvent, frameId) {
+async function userEventToAction(userEvent) {
+    let frameId = userEvent?.sender?.frameId;
     let frameOffset = await getFrameOffset(frameId);
 
     let cardModel = new TestAction(userEvent);
@@ -878,8 +947,18 @@ async function userEventToAction(userEvent, frameId) {
 
     let dataUrl = '';
     switch (userEvent.type) {
+        case 'wait':
+            cardModel.description = 'wait';
+            break;
         case 'mousemove':
-            cardModel.description = 'move mouse here';
+            if (cardModel.start) {
+                cardModel.description = 'start move mouse here';
+                cardModel.addExpectedScreenshot(_lastScreenshot);
+            }
+            else {
+                cardModel.description = 'move mouse to here';
+                // inherit it     
+            }
             break;
         case 'wheel':
             let direction = '';
@@ -893,12 +972,12 @@ async function userEventToAction(userEvent, frameId) {
                 magnitude = Math.abs(cardModel.event.deltaY);
             }
             let scroll = cardModel.event.shiftKey ? 'shift+wheel (h-scroll)' : 'wheel (v-scroll)';
-            
+
             cardModel.description = `mouse ${scroll} ${cardModel.event.deltaX}hpx ${cardModel.event.deltaY}vpx`;
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
-
         case 'scroll':
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'keys':
             cardModel.description = 'type ';
@@ -906,9 +985,6 @@ async function userEventToAction(userEvent, frameId) {
             for (let i = 0; i < userEvent.event.length; ++i) {
                 let event = userEvent.event[i];
 
-
-                // this could be extended to arbitrary chords, but I don't really care if e.g. 'a' and 'b' are both down at the same time
-                // I only care if a modifier key is down and followed by another downkey.
                 if (event.type === 'keydown') {
                     let isModifierKey = keycode2modifier[event.keyCode] || 0;
                     let modifiers = 0;
@@ -930,6 +1006,7 @@ async function userEventToAction(userEvent, frameId) {
                 }
                 // else keyup, nothing to report
             }
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'keydown':
         case 'keypress':
@@ -940,14 +1017,10 @@ async function userEventToAction(userEvent, frameId) {
             else {
                 cardModel.description += userEvent.event.key;
             }
-            break;
-        case 'chord':
-            cardModel.description = 'type ' + userEvent.keysDown.map(k => k.key).join('-'); // e.g. Ctrl-a
-            await captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'click':
-            cardModel.description = 'click'; 
+            cardModel.description = 'click';
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'contextmenu':
@@ -956,11 +1029,6 @@ async function userEventToAction(userEvent, frameId) {
             break;
         case 'dblclick':
             cardModel.description = 'double click';
-            cardModel.addExpectedScreenshot(_lastScreenshot);
-            break;
-        case 'stop':
-            cardModel.description = 'stop recording';
-            await captureScreenshotAsDataUrl();
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'start': {
@@ -976,6 +1044,7 @@ async function userEventToAction(userEvent, frameId) {
         }
         case 'change':
             cardModel.description = `change value to ${cardModel.event.value}`;
+            cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         default:
             cardModel.description = 'Unknown!';
@@ -985,120 +1054,134 @@ async function userEventToAction(userEvent, frameId) {
 }
 
 /** 
+ * set up the step and start refreshing the next expected screen */
+async function recordUserAction(userEvent) {
+    let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+
+    // show the latest screenshot in the expected card and start polling it
+    await captureScreenshotAsDataUrl();
+    let wait = await userEventToAction({ type: 'expect' }); // create a new waiting action
+    // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
+    wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
+
+    updateStepInView(action); // update the UI
+    //startScreenShotPolling();
+}
+
+/** 
  * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
 */
 async function onMessageHandler(message, _port) {
     let userEvent = message;
-    console.debug(`RX: ${userEvent.type}`, userEvent);
+    console.debug(`RX: ${userEvent.type} ${userEvent.sender.href}`, userEvent);
     let action;
+
+    //stopScreenShotPolling();
     userEvent._view = constants.view.EXPECTED;
+    // the last one contains the screenshot the user was looking at in the expected when they recorded this action
+    userEvent.index = Math.max(0, TestAction.instances.length - 1); // used by userEventToAction constructor
     switch (userEvent.type) {
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {
                 _resolvePostMessageResponsePromise(userEvent.args);
             }
             break;
-        case 'screenshot':
-            await ignoreInputCaptureScreenshotAsDataUrl();
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId });
-            break;
-        case 'wheel': 
-            if (userEvent.handler?.takeScreenshot) {
-                await captureScreenshotAsDataUrl(); // cache that one
-            }
-            if (userEvent.handler?.record) {
-                action = await userEventToAction(userEvent, userEvent.sender.frameId);
-                updateStepInView(action); // record the user action to disk
-            }
-            if (userEvent.handler?.simulate) {
-                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
-            }
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
-            break;
-        // this does not ack, because it will always be followed by another operation.
-            // record
-            action = await userEventToAction(userEvent, userEvent.sender.frameId);
-            updateStepInView(action); // record the user action to disk
-            //
+        // the user is actively waiting for the screen to change
+        case 'wait':
+            await captureScreenshotAsDataUrl(); // grab latest image
+            let lastAction = TestAction.instances[userEvent.index ]; // grab current expected action playholder (2nd card)
 
-            // no simulation required
+            // refresh the expected action placeholder the user sees.
+            // use the lower cost option, just the dataurl don't make into a PNG
+            // that will come later when we create the next user action.
+            lastAction.expectedScreenshot = new Screenshot({
+                dataUrl: _lastScreenshot
+            });
+            updateStepInView(TestAction.instances[TestAction.instances.length - 2]);
+
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'mousemove':
-            // same as the below except we use a dedicated cached screenshot
-            // to allow a mousemove screenshot to not overwrite a pending keys or pending click record event.
-           
-            // in practice these two ifs are mutually exclusive
-            if (userEvent.handler?.takeScreenshot) {
-                _lastMouseMove = userEvent;
-                _lastMouseMove.startScreenshot = await ignoreInputCaptureScreenshotAsDataUrl(); 
+            if (userEvent.start) {
+                // MOUSEMOVE START
+                let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+
+                let wait = await userEventToAction({ type: 'expect' }); // create a new waiting action
+
+                wait.addExpectedScreenshot(_lastScreenshot); // something to show immediately, and will be used again when mousemove completes
+                updateStepInView(action); // update the UI
             }
-            if (userEvent.handler?.record) {
-                action = await userEventToAction(userEvent, userEvent.sender.frameId);
-                await action.addExpectedScreenshot(_lastMouseMove.startScreenshot );
-                _lastMouseMove.endScreenshot = await captureScreenshotAsDataUrl();
-                updateStepInView(action); // record the user action to disk
-            }
-
-            // in practice i don't simuluate a mousemove 
-            if (userEvent.handler?.simulate) {
-                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
-            }
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
-            break;
-        case 'scroll':
-                if (userEvent.handler?.takeScreenshot) {
-                    await ignoreInputCaptureScreenshotAsDataUrl();
+            else {
+                // MOUSEMOVE END
+                userEvent.index = TestAction.instances.length - 2; // assuming this is a mousemove start
+                let mouseMoveStart = TestAction.instances[userEvent.index];
+                if (mouseMoveStart.type !== 'mousemove' || !mouseMoveStart.start) {
+                    throw new Error("Expected a mousemove start to preceed a mousemove end");
                 }
-
-                if (userEvent.handler?.record) {
-                    action = await userEventToAction(userEvent, userEvent.sender.frameId);
-                    action.addExpectedScreenshot(_lastScreenshot);
-                    updateStepInView(action); // record the user action to disk
-                }
-
-                // in practice I don't call this
-                if (userEvent.handler?.simulate) {
-                    await player[userEvent.type](userEvent); // this can result in a navigation to another page.
-                }
-
-                postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
-                break;
-        case 'keys':
-        case 'keydown':
-        case 'keyup': // better not take a screenshot here!
-        case 'change':
-
-            if (userEvent.handler?.takeScreenshot) {
+                userEvent.expectedScreenshot = mouseMoveStart.expectedScreenshot;
+                // there is a bit of a hack in here for mouseend - it doesn't replace the expectedScreenshot, it reuses the start one
+                let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+                
+                // set up the expected
                 await captureScreenshotAsDataUrl();
-            }
-            if (userEvent.handler?.record) {
-                action = await userEventToAction(userEvent, userEvent.sender.frameId);
-                action.addExpectedScreenshot(_lastScreenshot);
-                updateStepInView(action); // record the user action to disk
-            }
-            if (userEvent.handler?.simulate) {
-                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+                TestAction.instances[userEvent.index + 1].expectedScreenshot = new Screenshot({
+                    dataUrl: _lastScreenshot
+                });
+                                
+                updateStepInView(action); // update the UI
+                //startScreenShotPolling();
             }
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'click':
         case 'contextmenu':
         case 'dblclick':
-        case 'chord':
-            // record
-            action = await userEventToAction(userEvent, userEvent.sender.frameId);
-            updateStepInView(action);
+            // it takes a mouse move to get here. if it wasn't allowed to end (fast user) we want to grab and reuse the pre-requisite screenshot of the mousemove.
+            // (this is user error, if they want the right state they must wait and check, so acceptable.) 
+            // if it is allowed to end, then still, we want to grab and reuse the pre-requisite screenshot of the mousemove
 
-            await player[action.type](action); // simulate
+            // but we CANNOT take a SS here for the start state, because of :hover and :active issues on mouseover and mousedown respectively.
+            recordUserAction(userEvent);
 
-            /* 
-                we can't record the shadow dom open options screen on a select dropdown
-                like we 'normally' would before an option is clicked in it, 
-                because we can't see events in the shadow dom (much less preempt or block them).
-                so take a snapshot of the screen 'likely' to be what they see after the simulate step
-            */
-            if (userEvent.event?.target?.tagName === 'SELECT') {
-                await captureScreenshotAsDataUrl();
+            // these need to be simulated because I do double click detection in the recorder itself, which intercepts click.
+            // FIXME: why must I do that? I am using an old start state anyway...
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+            }
+
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
+        case 'scroll':
+            // it takes a mouse move to get here. if it wasn't allowed to end (fast user) then the last screenshot taken is the 
+            // pre-requisite screenshot of the mousemove. this is user error, if they want the right state they must wait and check, so acceptable. 
+            // if it is allowed to end, then it would be as expected.
+
+            // but we CANNOT take a SS here for the start state, because of :hover and :active issues on mouseover and mousedown respectively.
+            recordUserAction(userEvent);
+
+            // these need to be simulated because I do double click detection in the recorder itself, which intercepts click.
+            // FIXME: why must I do that? I am using an old start state anyway...
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+            }
+
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
+
+        // keyevents should work almost the same as mousemove except, i want more/faster visual feedback for the user, which is 
+        // why i simulate them. this lets the browser update the screen, even though I don't take a screenshot everytime.
+        case 'keys':
+        case 'change':
+            recordUserAction(userEvent);
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
+        case 'keydown':
+        case 'keyup':
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+            }
+            if (userEvent.handler?.record) {
+                recordUserAction(userEvent);
             }
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
@@ -1106,7 +1189,6 @@ async function onMessageHandler(message, _port) {
         case 'connect':
             console.debug(`connection established from frame ${userEvent.sender.frameId}`);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
-
             break;
         default:
             console.warn(`unexpected userEvent received <${userEvent.type}>`);
@@ -1132,8 +1214,7 @@ async function webNavigationOnCompleteHandler(details) {
         tab.width = width;
 
         await startRecording(tab);
-        await tab.resizeViewport();
-
+        //startScreenShotPolling();
     }
     catch (e) {
         // this can be some intermediate redirect page(s) that the user doesn't actually interact with
