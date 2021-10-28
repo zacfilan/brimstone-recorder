@@ -8,6 +8,8 @@ export const constants = {
         /** it doesn't match. (here is what we expected) */
         EXPECTED: 'expected',
 
+        DYNAMIC: 'dynamic',
+
         /** it doesn't match. (here is what we got) */
         ACTUAL: 'actual',
 
@@ -329,7 +331,7 @@ export class TestAction {
             let o = this.overlay;
             let calloutY = o.top + o.height;
             let calloutX = Math.max(o.left, 0);
-            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type ==='scroll' || this.type === 'wait') {
+            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type === 'scroll' || this.type === 'wait') {
                 html += `
                 <div class='overlay pointer pulse' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>
                     ${pointer}
@@ -452,6 +454,9 @@ export class Step {
                             title.text += ' - final screenshot';
                         }
                         title.text += '.';
+                        break;
+                    case constants.view.DYNAMIC:
+                        title.text += 'Expecting result';
                         break;
                     case constants.view.ACTUAL:
                         title.text += 'Actual result.';

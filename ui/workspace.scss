@@ -240,11 +240,10 @@ button {
         }
         .screenshot:hover {
             .pulse {
-                animation: unset;
+                animation: opacity2 3s infinite;
             }
             .pulse-light {
-                animation: unset;
-                opacity: 0.25;
+                animation: opacity3 3s infinite;
             }
         }
     }
@@ -330,11 +329,12 @@ button {
 }
 
 .pulse {
-    animation: opacity2 3s infinite;
+    animation: unset;
 }
 
 .pulse-light {
-    animation: opacity3 3s infinite;
+    animation: unset;
+    opacity: 0.25;
 }
 
 #footer {
