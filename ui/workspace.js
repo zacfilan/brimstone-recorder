@@ -24,7 +24,7 @@ keycode2modifier[CTRL_KEYCODE] = 2;
 keycode2modifier[META_KEYCODE] = 4;
 keycode2modifier[SHIFT_KEYCODE] = 8;
 
-//disableConsole(); // can be reenabled in the debugger later
+disableConsole(); // can be reenabled in the debugger later
 
 setToolbarState();
 

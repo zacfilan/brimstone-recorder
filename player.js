@@ -606,12 +606,12 @@ export class Player {
      * @throws {Exception} on failure.
      */
     async _debuggerSendCommandRaw(method, commandParams) {
-        //console.debug(`  begin debugger send command ${method}`, commandParams);
+        console.debug(`  begin debugger send command ${method}`, commandParams);
         let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
         }        
-        //console.debug(`  end   debugger send command ${method}`, commandParams);
+        console.debug(`  end   debugger send command ${method}`, commandParams);
         return result; // the debugger method may be a getter of some kind.
     }
 

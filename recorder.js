@@ -476,6 +476,7 @@ class Recorder {
         this.event = e;
         let msg;
         console.debug(`${e.type} ${e.brimstoneClass} SEEN`, e);
+        // return Recorder.propagate(e); // for debugging
 
         // This message can't be folded into the swtich below, we receive it for any user action currently being recorded.
         if (e.type === 'message') {
@@ -538,30 +539,29 @@ class Recorder {
             // 
             // I wait for a user action to indicate that the screen is ready, and now it's okay to start blocking subsequent events
             // while I decode the users next action.
-            switch (e.type) {
-                // these should be processed
-                case 'mouseout':
-                case 'mouseover':
-                    this._mouseEnterTime = performance.now(); // keep on accounting
-                // propagate (update screen) is correct for the case above
-                // but if I am mousemoving *through* elements that react to mouseover I don't want to leave them highlighted.
-                // (think pink menu items in the trail of the mousemove) so i did  this
-                // if (this.pendingMouseMoveTimeout) { // we don't have anything in the tx queue to the extension, but we are "waiting" on a timeout.
-                //     return Recorder.cancel(e); 
-                // }
-                // yet this is what allows the toolips to show!
-                case 'focus':
-                case 'blur':
-                case 'focusin':
-                    return Recorder.propagate(e); // focus and friends
-            }
+            // switch (e.type) {
+            //     // these should be processed
+            //     case 'mouseout':
+            //     case 'mouseover':
+            //         this._mouseEnterTime = performance.now(); // keep on accounting
+            //     // propagate (update screen) is correct for the case above
+            //     // but if I am mousemoving *through* elements that react to mouseover I don't want to leave them highlighted.
+            //     // (think pink menu items in the trail of the mousemove) so i did  this
+            //     // if (this.pendingMouseMoveTimeout) { // we don't have anything in the tx queue to the extension, but we are "waiting" on a timeout.
+            //     //     return Recorder.cancel(e); 
+            //     // }
+            //     // yet this is what allows the toolips to show!
+            //     case 'focus':
+            //     case 'blur':
+            //     case 'focusin':
+            //         return Recorder.propagate(e); // focus and friends
+            // }
             // anythig else falls thru to the bug recorder switch
         }
 
         // the big recorder switch
         switch (e.type) {
             case 'mousemove':
-
                 if (this.lastScrollEvents.length) {
                     this._recordScrollAction(); // terminate that if it is pending.
                 }
@@ -589,15 +589,6 @@ class Recorder {
                 if (!this.mouseMovePending) {
                     this.mouseMovePending = e;
                     this.activeElement = document.activeElement;
-                    //let msg = this.buildMsg(this.lastMouseMoveEvent);
-                    //msg.start = true;
-                    // starting a mouse move user action.
-                    // signal to the extension to use the last screenshot taken as the start. 
-                    // the extension is updating that last screenshot whenever it wants periodically. 
-                    // could it update it before this request gets to the extension, but after the user moves the mouse
-                    // over the button? cause that race condition sucks. timestamp or something...
-
-                    // I don't need to see the start image this.pushMessage(msg);
                 }
                 else {
                     // user is still moving the mouse. the user is not waiting.
@@ -618,6 +609,12 @@ class Recorder {
                 // at this point in time the shadow DOM is closed and the value has already changed.
                 if (e.target.tagName === 'SELECT') {
                     let msg = this.buildMsg(e);
+                    // when the shadow DOM options closes the mouse is likely somewhere else, which starts a mouseMove, which can change some hover styles etc.
+                    if(this.mouseMovePending) {
+                        //normally we would say, "hey wait until the mouse move is done man". But it's effectively done now. So finish it.
+                        clearTimeout(this.pendingMouseMoveTimeout);
+                        this._recordMouseMoveEnd();
+                    }
                     this.pushMessage(msg);
                 }
                 return Recorder.propagate(e);
@@ -727,14 +724,10 @@ class Recorder {
                 /** The time that the users mouse entered the current element, used to record hover effects. */
                 this._mouseEnterTime = performance.now();
             case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
-                // if (this.pendingMouseMoveTimeout) {
-                //     return Recorder.cancel(e);
-                // }
-                // else {
                 return Recorder.propagate(e);
             //}
             default:
-                return Recorder.cancel(e);
+                return Recorder.propagate(e); // why block other events?
         }
     }
 
