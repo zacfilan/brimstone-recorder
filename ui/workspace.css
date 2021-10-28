@@ -301,14 +301,13 @@ button svg {
 }
 
 #content .card.action .screenshot:hover .pulse {
-  -webkit-animation: unset;
-          animation: unset;
+  -webkit-animation: opacity2 3s infinite;
+          animation: opacity2 3s infinite;
 }
 
 #content .card.action .screenshot:hover .pulse-light {
-  -webkit-animation: unset;
-          animation: unset;
-  opacity: 0.25;
+  -webkit-animation: opacity3 3s infinite;
+          animation: opacity3 3s infinite;
 }
 
 #content .card.waiting {
@@ -417,13 +416,14 @@ button svg {
 }
 
 .pulse {
-  -webkit-animation: opacity2 3s infinite;
-          animation: opacity2 3s infinite;
+  -webkit-animation: unset;
+          animation: unset;
 }
 
 .pulse-light {
-  -webkit-animation: opacity3 3s infinite;
-          animation: opacity3 3s infinite;
+  -webkit-animation: unset;
+          animation: unset;
+  opacity: 0.25;
 }
 
 #footer {

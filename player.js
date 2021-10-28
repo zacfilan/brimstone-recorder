@@ -79,12 +79,8 @@ export class Player {
 
     _playbackComplete = false;
 
-    /** resolved when the last scheduled debugger detach is done. */
-    _debuggerDetachPromise;
-
-    /** resolved when the last scheduled debugger attached is done. */
-    _debuggerAttachPromise;
-
+    /** mode switch either 'playing' or 'recording', something of a hack. */
+    usedFor;
     /** Know if there are navigations in flight. */
     _navigationsInFlight = 0;
 
@@ -131,13 +127,15 @@ export class Player {
             if (this.onBeforePlay) {
                 await this.onBeforePlay(action);
             }
-            console.log(`[${action.index}] : ${action.description}`);
 
+            console.log(`begin play [${action.index}] : ${action.description}`);
             // if we are resume(ing) we are picking up from an error state, meaning we already
             // performed the action, we just need to do the verification again for the first action.
             if (!resume || i !== startIndex) {
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
             }
+            console.log(`end   play [${action.index}] : ${action.description}`);
+
 
             // remember any mousemoving operation, implicit or explicit
             switch (action.type) {
@@ -608,10 +606,12 @@ export class Player {
      * @throws {Exception} on failure.
      */
     async _debuggerSendCommandRaw(method, commandParams) {
+        //console.debug(`  begin debugger send command ${method}`, commandParams);
         let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
-        }
+        }        
+        //console.debug(`  end   debugger send command ${method}`, commandParams);
         return result; // the debugger method may be a getter of some kind.
     }
 
@@ -633,6 +633,9 @@ export class Player {
                 if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
                     console.log(`warn got exception while running debugger cmd ${method}:`, commandParams, e);
                     await this.attachDebugger({ tab: this.tab });
+                    if(this.usedFor === 'playing'){
+                        await sleep(2000);
+                    }
                 }
                 else {
                     console.warn(`got exception while running debugger cmd ${method}:`, commandParams, e);
@@ -645,38 +648,12 @@ export class Player {
         }
     }
 
-    /** 
-     * Schedule detaching the debugger from the current tab.
-     * Unused? 
-     * */
-    async detachDebugger(debugee) {
-        if (!this.tab) {
-            return;
-        }
-
-        if (!debugee) {
-            debugee = {
-                tabId: this.tab.id
-            }
-        }
-
-        this._debugger_detach_requested = true; // in the onDetach handler don't try to reattach
-        await (new Promise(_resolve => chrome.debugger.detach(debugee, _resolve))); // should trigger the attach automagically
-        if (chrome.runtime.lastError?.message) {
-            throw new Error(chrome.runtime.lastError.message);
-        }
-    }
-
     /** Schedule attaching the debugger to the given tab.
     * @param {Tab} tab The tab to attach to
     */
     async attachDebugger({ tab }) {
         console.debug(`schedule attach debugger`);
-
-        await this._debuggerDetachPromise; // if there is one in flight wait for it.
-        this._debugger_detach_requested = false;
         this.tab = tab;
-
 
         await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", _resolve)));
         if (chrome.runtime.lastError?.message) {
@@ -691,12 +668,9 @@ export class Player {
         // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
         //await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
 
-        this._debuggerAttachPromise = sleep(500) // the animation should practically be done after this, but even if it isn't we can deal with it
-            .then(() => this.tab.resizeViewport()); // reset the viewport - I wish chrome did this.
-
-        await this._debuggerAttachPromise;
+        await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
+        await this.tab.resizeViewport();
         console.debug(`debugger attached`);
-        return this._debuggerAttachPromise;
     };
 
     async stopPlaying() {

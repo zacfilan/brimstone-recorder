@@ -8,7 +8,7 @@ const inactive = {path: '../images/grey_b_32.png', title: 'Brimstone is not acti
 async function set({path, text, color, title}) {
     let p = [];
     if(title) {
-        //chrome.action.setBadgeText({text});
+        chrome.action.setBadgeText({text:''});
         p.push(chrome.action.setTitle({title}));
         //chrome.action.setBadgeBackgroundColor({color});
     }

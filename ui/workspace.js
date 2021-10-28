@@ -110,7 +110,7 @@ const urlParams = new URLSearchParams(window.location.search);
 var tab = new Tab();
 
 /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
-const windowId = parseInt(urlParams.get('parent'), 10)
+let windowId = parseInt(urlParams.get('parent'), 10)
 const player = new Player();
 
 var uiCardsElement = document.getElementById('cards');
@@ -357,6 +357,17 @@ async function attachDebuggerToTab(args) {
         [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
     }
 
+    // weird case, when the user closes the window that spawned the workspace - perhaps it should also close the workspace, but I dunno.
+    if (!activeChromeTab) {
+        let window = await chrome.windows.create({
+            url: 'about:blank',
+            type: "normal",
+            focused: false
+        });
+        windowId = window.id;
+        [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+    }
+
     let w = await chrome.windows.get(activeChromeTab.windowId);
     if (w.state !== 'normal') {
         window.alert(`The window state of the tab you want to record or playback is '${w.state}'. It will be set to 'normal' to continue.`);
@@ -462,6 +473,17 @@ $('#playButton').on('click', async function () {
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
         let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+
+        // weird case, when the user closes the window that spawned the workspace - perhaps it should also close the workspace, but I dunno.
+        if (!activeChromeTab) {
+            let window = await chrome.windows.create({
+                url: 'about:blank',
+                type: "normal",
+                focused: false
+            });
+            windowId = window.id;
+            [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+        }
         let url = false;
 
         // we can resume a failed step, which means we don't drive the action just check the screenshot results of it.
@@ -565,19 +587,19 @@ async function debuggerOnDetach(source, reason) {
         stopRecording();
         stopPlaying(); // FIXME: refactor for less code
     }
-    else {
-        // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
-        // this can also happen if the user closes the application tab being recorded (for some user reason) in the middle of a recording.
-        try {
-            await player.attachDebugger({ tab }); // it's the same tab...
-        }
-        catch (e) {
-            stopRecording();
-            stopPlaying();
-            console.error(e);
-            throw new Error("Unable to reattach the debugger.");
-        }
-    }
+    // else {
+    //     // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
+    //     // this can also happen if the user closes the application tab being recorded (for some user reason) in the middle of a recording.
+    //     try {
+    //         await player.attachDebugger({ tab }); // it's the same tab...
+    //     }
+    //     catch (e) {
+    //         stopRecording();
+    //         stopPlaying();
+    //         console.error(e);
+    //         throw new Error("Unable to reattach the debugger.");
+    //     }
+    // }
 };
 
 chrome.debugger.onDetach.addListener(debuggerOnDetach);
@@ -595,6 +617,7 @@ async function hideCursor() {
 }
 
 async function startPlaying(tab) {
+    player.usedFor = 'playing';
     // only listen for navigations, when we are actively playing, and remove the listener when we are not.
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
     chrome.webNavigation.onCompleted.removeListener(playingWebNavigationOnCompleteHandler);
@@ -661,6 +684,8 @@ async function tellRecordersTheirFrameIds() {
 }
 
 async function startRecording(tab) {
+    player.usedFor = 'recording';
+
     console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
     console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
 
@@ -715,7 +740,7 @@ $('#recordButton').on('click', async function () {
         if (button.hasClass('active')) {
             // before I take the last screenshot the window must have focus again.
             //await focusTab();
-            let last = TestAction.instances[TestAction.instances.length-1];
+            let last = TestAction.instances[TestAction.instances.length - 1];
             last.addExpectedScreenshot(last.expectedScreenshot.dataUrl); // build the final png
             stopRecording();
             return;
@@ -760,16 +785,11 @@ $('#recordButton').on('click', async function () {
             });
         }
         else {
-            // we are updating our recording: recording over or appending to an existing test
-            let index = currentStepIndex();
-            // see last screen, make mine look like that (play)
-            // hit record
-            // this screen needs to go, it will be replaced by the required screen for the next recorded action
-
-            // see some step - i need to make the screen look like the screen in the useraction
-            // hit record
-            // this action and screen need to go, i am doing a new recording.
-            TestAction.instances.splice(index); // remove the last 'action'. it is just an image w/o an action
+            // we are appending to an existing test
+            let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - nuless the user is showing the last only!)
+            TestAction.instances.splice(index + 2); // anything after these 2 is gone.
+            // we assume the app in in the state of the second card, containing the expected state.
+            // when we record it will replace this card.
         }
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
@@ -895,12 +915,12 @@ async function captureScreenshotAsDataUrl() {
     return _lastScreenshot;
 }
 
-async function ignoreInputCaptureScreenshotAsDataUrl() {
-    await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: true });
-    let ss = await captureScreenshotAsDataUrl();
-    await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: false });
-    return ss;
-}
+// async function ignoreInputCaptureScreenshotAsDataUrl() {
+//     await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: true });
+//     let ss = await captureScreenshotAsDataUrl();
+//     await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: false });
+//     return ss;
+// }
 
 /** 
  * This is only used during recording. 
@@ -951,29 +971,7 @@ async function userEventToAction(userEvent) {
             cardModel.description = 'wait';
             break;
         case 'mousemove':
-            if (cardModel.start) {
-                cardModel.description = 'start move mouse here';
-                cardModel.addExpectedScreenshot(_lastScreenshot);
-            }
-            else {
-                cardModel.description = 'move mouse to here';
-                // inherit it     
-            }
-            break;
-        case 'wheel':
-            let direction = '';
-            let magnitude;
-            if (cardModel.event.deltaX) {
-                direction = cardModel.event.deltaX < 0 ? 'left' : 'right';
-                magnitude = Math.abs(cardModel.event.deltaX);
-            }
-            else if (cardModel.event.deltaY) {
-                direction = cardModel.event.deltaY < 0 ? 'up' : 'down';
-                magnitude = Math.abs(cardModel.event.deltaY);
-            }
-            let scroll = cardModel.event.shiftKey ? 'shift+wheel (h-scroll)' : 'wheel (v-scroll)';
-
-            cardModel.description = `mouse ${scroll} ${cardModel.event.deltaX}hpx ${cardModel.event.deltaY}vpx`;
+            cardModel.description = 'move mouse to here';
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
         case 'scroll':
@@ -1081,6 +1079,17 @@ async function onMessageHandler(message, _port) {
     // the last one contains the screenshot the user was looking at in the expected when they recorded this action
     userEvent.index = Math.max(0, TestAction.instances.length - 1); // used by userEventToAction constructor
     switch (userEvent.type) {
+        case 'error':
+            // remove current expected
+            if (TestAction.instances.length > 2) {
+                TestAction.instances.splice(TestAction.instances.length - 1); // the expected and the mouseove start
+
+                // rename the mouse start step, cause that needs to be re-recorded.
+                TestAction.instances[TestAction.instances.length - 1].type = 'wait';
+                updateStepInView(TestAction.instances[TestAction.instances.length - 2]); // update the UI 
+            }
+            stopRecording(); // I need to broadcast stop to all the frames
+            break;
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {
                 _resolvePostMessageResponsePromise(userEvent.args);
@@ -1089,7 +1098,7 @@ async function onMessageHandler(message, _port) {
         // the user is actively waiting for the screen to change
         case 'wait':
             await captureScreenshotAsDataUrl(); // grab latest image
-            let lastAction = TestAction.instances[userEvent.index ]; // grab current expected action playholder (2nd card)
+            let lastAction = TestAction.instances[userEvent.index]; // grab current expected action playholder (2nd card)
 
             // refresh the expected action placeholder the user sees.
             // use the lower cost option, just the dataurl don't make into a PNG
@@ -1097,42 +1106,12 @@ async function onMessageHandler(message, _port) {
             lastAction.expectedScreenshot = new Screenshot({
                 dataUrl: _lastScreenshot
             });
+            lastAction._view = constants.view.DYNAMIC;
             updateStepInView(TestAction.instances[TestAction.instances.length - 2]);
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'mousemove':
-            if (userEvent.start) {
-                // MOUSEMOVE START
-                let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
-
-                let wait = await userEventToAction({ type: 'expect' }); // create a new waiting action
-
-                wait.addExpectedScreenshot(_lastScreenshot); // something to show immediately, and will be used again when mousemove completes
-                updateStepInView(action); // update the UI
-            }
-            else {
-                // MOUSEMOVE END
-                userEvent.index = TestAction.instances.length - 2; // assuming this is a mousemove start
-                let mouseMoveStart = TestAction.instances[userEvent.index];
-                if (mouseMoveStart.type !== 'mousemove' || !mouseMoveStart.start) {
-                    throw new Error("Expected a mousemove start to preceed a mousemove end");
-                }
-                userEvent.expectedScreenshot = mouseMoveStart.expectedScreenshot;
-                // there is a bit of a hack in here for mouseend - it doesn't replace the expectedScreenshot, it reuses the start one
-                let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
-                
-                // set up the expected
-                await captureScreenshotAsDataUrl();
-                TestAction.instances[userEvent.index + 1].expectedScreenshot = new Screenshot({
-                    dataUrl: _lastScreenshot
-                });
-                                
-                updateStepInView(action); // update the UI
-                //startScreenShotPolling();
-            }
-            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
-            break;
         case 'click':
         case 'contextmenu':
         case 'dblclick':
@@ -1144,7 +1123,10 @@ async function onMessageHandler(message, _port) {
             recordUserAction(userEvent);
 
             // these need to be simulated because I do double click detection in the recorder itself, which intercepts click.
-            // FIXME: why must I do that? I am using an old start state anyway...
+            // FIXME: why must I simulate these?
+
+            // Could recorder passively monitor, and propagate them? i need to record *something*. is it a single click or a double click that I want to record?
+            // I am using an old start state anyway...
             if (userEvent.handler?.simulate) {
                 await player[userEvent.type](userEvent); // this can result in a navigation to another page.
             }
@@ -1152,22 +1134,9 @@ async function onMessageHandler(message, _port) {
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'scroll':
-            // it takes a mouse move to get here. if it wasn't allowed to end (fast user) then the last screenshot taken is the 
-            // pre-requisite screenshot of the mousemove. this is user error, if they want the right state they must wait and check, so acceptable. 
-            // if it is allowed to end, then it would be as expected.
-
-            // but we CANNOT take a SS here for the start state, because of :hover and :active issues on mouseover and mousedown respectively.
             recordUserAction(userEvent);
-
-            // these need to be simulated because I do double click detection in the recorder itself, which intercepts click.
-            // FIXME: why must I do that? I am using an old start state anyway...
-            if (userEvent.handler?.simulate) {
-                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
-            }
-
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
-
         // keyevents should work almost the same as mousemove except, i want more/faster visual feedback for the user, which is 
         // why i simulate them. this lets the browser update the screen, even though I don't take a screenshot everytime.
         case 'keys':

@@ -137,26 +137,17 @@ async function actionOnClickedHandler(tab) {
 chrome.action.onClicked.addListener(actionOnClickedHandler);
 
 // https://developer.chrome.com/docs/extensions/reference/runtime/#event-onInstalled
-chrome.runtime.onInstalled.addListener(function (details) {
+chrome.runtime.onInstalled.addListener(async function (details) {
   switch (details.reason) {
     case 'install':
     case 'update':
-      chrome.tabs.create({
-        url: './version.html'
-      });
-
-      // // https://developer.chrome.com/docs/extensions/reference/notifications/#method-create
-      // chrome.notifications.create({
-      //   message: `New version ${chrome.runtime.getManifest().version}`,
-      //   silent: true,
-      //   title: 'Brimstone Recorder Updated',
-      //   iconUrl: './images/orange_b_128.png',
-      //   contextMessage: 'Have fun! 👍',
-      //   //buttons: []
-      //   type: 'basic' // "basic", "image", "list", or "progress"
-      // });
+      await (Promise.all([
+        chrome.action.setIcon({ path: 'images/grey_b_32.png' }),
+        chrome.action.setTitle({ title: `Brimstone updated to ${chrome.runtime.getManifest().version}.` }),
+        chrome.action.setBadgeText({text: '✓'}),
+        chrome.action.setBadgeBackgroundColor({color: 'green'})
+      ]));
       break;
-
     case 'chrome_update':
     case 'shared_module_update':
     default:
