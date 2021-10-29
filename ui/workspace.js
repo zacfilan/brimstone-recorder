@@ -32,15 +32,31 @@ window.document.title = 'Brimstone - untitled';
 
 // catch all unhandled rejections and report them
 window.addEventListener('unhandledrejection', function (e) {
-    //try { stopScreenShotPolling(); } catch (e) { }
     errorDialog(e.reason);
 });
 
 window.addEventListener("error", function (e) {
-    //try { stopScreenShotPolling(); } catch (e) { }
     errorDialog(e.error);
     return false;
 });
+
+async function countDown(seconds) {
+    let expectedScreenIndex = currentStepIndex() + 1;
+    let action = TestAction.instances[expectedScreenIndex];
+    action.overlay = {
+        height: 100,
+        width: 100,
+        top:0,
+        left:0
+    };
+    for(let i = seconds ; i; --i) {
+        action.overlay.html = `<div class="countdown">${i}</div>`;
+        updateStepInView(TestAction.instances[expectedScreenIndex]);
+        await sleep(1000);
+    }
+    delete action.overlay;
+    updateStepInView(TestAction.instances[expectedScreenIndex]);
+}
 
 let pendingScreenShotTimeout = null
 async function replaceScreenshot() {
@@ -57,7 +73,6 @@ async function replaceScreenshot() {
             dataUrl: _lastScreenshot
         });
         updateStepInView(TestAction.instances[TestAction.instances.length - 2]);
-        //startScreenShotPolling();
     }
     catch (e) {
         console.log('error replacing last screenshot', e);
@@ -65,23 +80,6 @@ async function replaceScreenshot() {
         // screen, we will get it once it settles.
     }
 }
-
-/** start the periodic timeout that grabs a screenshot */
-function startScreenShotPolling() {
-    clearTimeout(pendingScreenShotTimeout);
-    pendingScreenShotTimeout = null;
-    pendingScreenShotTimeout = setTimeout(
-        replaceScreenshot,
-        1000
-    );
-}
-
-/** stop the periodic timeout that grabs a screenshot */
-function stopScreenShotPolling() {
-    clearTimeout(pendingScreenShotTimeout);
-    pendingScreenShotTimeout = null;
-}
-
 
 /** The index of the first card showing in big step area */
 function currentStepIndex() {
@@ -647,7 +645,7 @@ async function playingWebNavigationOnCompleteHandler(details) {
  * Establish the recording communication channel between the tab being recorded and the brimstone workspace window.
  * This is in the global variable: port.
  */
-function connectPort() {
+async function startRecorders() {
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
 
     // connect to all frames in the the active tab in this window. 
@@ -670,6 +668,7 @@ function connectPort() {
         });
 
     port.onMessage.addListener(onMessageHandler);
+    await captureScreenshotAsDataUrl(); // grab the first screenshot
 }
 
 /**  
@@ -683,14 +682,11 @@ async function tellRecordersTheirFrameIds() {
     }
 }
 
-async function startRecording(tab) {
+async function prepareToRecord(tab) {
     player.usedFor = 'recording';
 
-    console.debug(`begin - start recording port connection process for tab ${tab.id} ${tab.url}`);
+    console.debug(`begin - preparing to record tab ${tab.id} ${tab.url}`);
     console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
-
-    //chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
-    //chrome.tabs.onUpdated.addListener(tabsOnUpdatedHandler);
 
     // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
@@ -698,20 +694,14 @@ async function startRecording(tab) {
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
 
     await tellRecordersTheirFrameIds();
-
     await hideCursor();
     await tab.resizeViewport(); // this can be called on a navigation, and the tab needs to be the correct size before the port is established, in case it decides to send us some mousemoves
 
-    connectPort();
-
-    await captureScreenshotAsDataUrl(); // grab the first screenshot
-
-    console.debug(`end   - start recording port connection process for tab ${tab.id} ${tab.url}`);
+   console.debug(`end   - preparing to record tab ${tab.id} ${tab.url}`);
 }
 
 function stopRecording(tab) {
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
-    //stopScreenShotPolling();
 
     $('#recordButton').removeClass('active');
     setToolbarState();
@@ -768,8 +758,7 @@ $('#recordButton').on('click', async function () {
             await attachDebuggerToTab();
         }
 
-        await startRecording(tab);
-        //startScreenShotPolling(); // and start polling
+        await prepareToRecord(tab);
 
         button.addClass('active');
         setToolbarState();
@@ -778,6 +767,8 @@ $('#recordButton').on('click', async function () {
         // and should be polling for the screenshot
 
         if (!TestAction.instances.length) {
+            startRecorders();
+
             // update the UI: insert the first text card in the ui
             await recordUserAction({
                 type: 'start',
@@ -788,6 +779,13 @@ $('#recordButton').on('click', async function () {
             // we are appending to an existing test
             let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - nuless the user is showing the last only!)
             TestAction.instances.splice(index + 2); // anything after these 2 is gone.
+            
+            //updateThumbs();
+            await countDown(3);
+
+            // rename that
+            startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
+
             // we assume the app in in the state of the second card, containing the expected state.
             // when we record it will replace this card.
         }
@@ -1041,6 +1039,13 @@ async function userEventToAction(userEvent) {
             break;
         }
         case 'change':
+            // change is a funny one. it is only sent on selects that change their value, which happens *after* the user interacts with the shadowDOM
+            // i can't detect when the shadowdom is opened (or interacted with at all), so i can't detect the start of a change action. i can't turn off
+            // the auto screenshot updating mechanism, so it keeps clicking away while the user interacts with the shadow dom.
+            // i only know when the action is done by getting the change event. 
+            // so what is the prerequistie starting state for the change operation?
+            // might just be unknowable!
+
             cardModel.description = `change value to ${cardModel.event.value}`;
             cardModel.addExpectedScreenshot(_lastScreenshot);
             break;
@@ -1061,9 +1066,9 @@ async function recordUserAction(userEvent) {
     let wait = await userEventToAction({ type: 'expect' }); // create a new waiting action
     // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
     wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
+    wait._view = constants.view.DYNAMIC;
 
     updateStepInView(action); // update the UI
-    //startScreenShotPolling();
 }
 
 /** 
@@ -1074,7 +1079,6 @@ async function onMessageHandler(message, _port) {
     console.debug(`RX: ${userEvent.type} ${userEvent.sender.href}`, userEvent);
     let action;
 
-    //stopScreenShotPolling();
     userEvent._view = constants.view.EXPECTED;
     // the last one contains the screenshot the user was looking at in the expected when they recorded this action
     userEvent.index = Math.max(0, TestAction.instances.length - 1); // used by userEventToAction constructor
@@ -1141,6 +1145,7 @@ async function onMessageHandler(message, _port) {
         // why i simulate them. this lets the browser update the screen, even though I don't take a screenshot everytime.
         case 'keys':
         case 'change':
+            // i just don't know how to record in the shadowDOM very well!!
             recordUserAction(userEvent);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
@@ -1182,8 +1187,8 @@ async function webNavigationOnCompleteHandler(details) {
         tab.height = height;
         tab.width = width;
 
-        await startRecording(tab);
-        //startScreenShotPolling();
+        await prepareToRecord(tab);
+        startRecorders();
     }
     catch (e) {
         // this can be some intermediate redirect page(s) that the user doesn't actually interact with

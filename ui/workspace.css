@@ -166,6 +166,13 @@ button svg {
   height: 18px;
 }
 
+.card .screenshot .overlay .countdown {
+  width: 100%;
+  height: 100%;
+  font-size: 25vw;
+  text-align: center;
+}
+
 .card.empty {
   height: 200px;
   background: grey;
@@ -318,10 +325,6 @@ button svg {
 
 #content .card.waiting.edit .screenshot {
   cursor: crosshair;
-}
-
-#content .card.waiting .screenshot .overlay {
-  display: none;
 }
 
 #content .card.waiting .screenshot .action {

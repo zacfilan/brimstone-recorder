@@ -132,6 +132,14 @@ button {
                     height: 18px;
                 }
             }
+
+            .countdown {
+                width: 100%;
+                height: 100%;
+                font-size: 25vw;
+                text-align: center;
+            }
+
         }
     }
 
@@ -257,9 +265,6 @@ button {
         }
 
         .screenshot {
-            .overlay {
-                display: none;
-            }
             .action {
                 display: none;
             }

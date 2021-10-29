@@ -476,7 +476,7 @@ class Recorder {
         this.event = e;
         let msg;
         console.debug(`${e.type} ${e.brimstoneClass} SEEN`, e);
-        // return Recorder.propagate(e); // for debugging
+        //return Recorder.propagate(e); // for debugging
 
         // This message can't be folded into the swtich below, we receive it for any user action currently being recorded.
         if (e.type === 'message') {
@@ -590,10 +590,7 @@ class Recorder {
                     this.mouseMovePending = e;
                     this.activeElement = document.activeElement;
                 }
-                else {
-                    // user is still moving the mouse. the user is not waiting.
-                    this.cancelScheduleWaitActionDetection();
-                }
+                this.cancelScheduleWaitActionDetection();
 
                 // if user does not perform a mouse move for 500ms (configurable) we decide they've stopped moving the mouse for this mousemove action.
                 clearTimeout(this.pendingMouseMoveTimeout);
@@ -610,7 +607,7 @@ class Recorder {
                 if (e.target.tagName === 'SELECT') {
                     let msg = this.buildMsg(e);
                     // when the shadow DOM options closes the mouse is likely somewhere else, which starts a mouseMove, which can change some hover styles etc.
-                    if(this.mouseMovePending) {
+                    if (this.mouseMovePending) {
                         //normally we would say, "hey wait until the mouse move is done man". But it's effectively done now. So finish it.
                         clearTimeout(this.pendingMouseMoveTimeout);
                         this._recordMouseMoveEnd();
