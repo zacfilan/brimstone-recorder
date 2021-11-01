@@ -166,13 +166,6 @@ button svg {
   height: 18px;
 }
 
-.card .screenshot .overlay .countdown {
-  width: 100%;
-  height: 100%;
-  font-size: 25vw;
-  text-align: center;
-}
-
 .card.empty {
   height: 200px;
   background: grey;
@@ -207,12 +200,6 @@ button svg {
 
 .card .title .stepNumber {
   margin-left: auto;
-}
-
-.card .user-events {
-  color: white;
-  border-top: 1px solid black;
-  padding: 1em 1em 1em 0;
 }
 
 .card .meter {
@@ -263,9 +250,6 @@ button svg {
   }
 }
 
-/***********************/
-/* second card in step */
-/***********************/
 #content {
   display: -webkit-box;
   display: -ms-flexbox;
@@ -325,14 +309,17 @@ button svg {
 
 #content .card.waiting.edit .screenshot {
   cursor: crosshair;
+  position: unset;
 }
 
-#content .card.waiting .screenshot .action {
+#content .card.waiting .screenshot .overlay {
   display: none;
 }
 
-#content .card.waiting.edit .screenshot {
-  position: unset;
+#content .card.waiting .screenshot .overlay.countdown {
+  display: block;
+  font-size: 20vw;
+  text-align: center;
 }
 
 #content .card.waiting.play .meter,
@@ -372,49 +359,49 @@ button svg {
 
 @-webkit-keyframes opacity2 {
   0% {
-    opacity: 0;
-  }
-  50% {
     opacity: 1;
   }
-  100% {
+  50% {
     opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
 
 @keyframes opacity2 {
   0% {
-    opacity: 0;
-  }
-  50% {
     opacity: 1;
   }
-  100% {
+  50% {
     opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
 
 @-webkit-keyframes opacity3 {
   0% {
-    opacity: 0;
-  }
-  50% {
     opacity: 0.25;
   }
-  100% {
+  50% {
     opacity: 0;
+  }
+  100% {
+    opacity: 0.25;
   }
 }
 
 @keyframes opacity3 {
   0% {
-    opacity: 0;
-  }
-  50% {
     opacity: 0.25;
   }
-  100% {
+  50% {
     opacity: 0;
+  }
+  100% {
+    opacity: 0.25;
   }
 }
 

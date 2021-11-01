@@ -132,14 +132,6 @@ button {
                     height: 18px;
                 }
             }
-
-            .countdown {
-                width: 100%;
-                height: 100%;
-                font-size: 25vw;
-                text-align: center;
-            }
-
         }
     }
 
@@ -172,12 +164,6 @@ button {
         .stepNumber {
             margin-left: auto; // right align him
         }
-    }
-
-    .user-events {
-        color: white;
-        border-top: 1px solid black;
-        padding: 1em 1em 1em 0;
     }
 
     .meter {
@@ -215,9 +201,6 @@ button {
     }
 }
 
-/***********************/
-/* second card in step */
-/***********************/
 #content {
     display: flex;
     flex-direction: row;
@@ -262,15 +245,19 @@ button {
     .card.waiting {
         &.edit .screenshot {
             cursor: crosshair;
+            position: unset;
         }
 
-        .screenshot {
-            .action {
-                display: none;
+        .screenshot {            
+            .overlay  {
+                display:none;
+
+                &.countdown {
+                    display:block;
+                    font-size: 20vw;
+                    text-align: center;
+                }
             }
-        }
-        &.edit .screenshot {
-            position: unset;
         }
 
         &.play .meter,
@@ -311,25 +298,25 @@ button {
 
 @keyframes opacity2 {
     0% {
-        opacity: 0;
-    }
-    50% {
         opacity: 1;
     }
-    100% {
+    50% {
         opacity: 0;
+    }
+    100% {
+        opacity: 1;
     }
 }
 
 @keyframes opacity3 {
     0% {
-        opacity: 0;
-    }
-    50% {
         opacity: 0.25;
     }
-    100% {
+    50% {
         opacity: 0;
+    }
+    100% {
+        opacity: 0.25;
     }
 }
 

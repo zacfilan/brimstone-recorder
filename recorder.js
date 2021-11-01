@@ -16,6 +16,11 @@ function getScrollParent(element, includeHidden) {
     return document.body;
 }
 
+/** This is how we distingguish synthetic events from user events.
+ * And apparently only 0 can be set in the player.
+ */
+const SYNTHETIC_EVENT_TIMESTAMP = 0;
+
 /**
  * Recorder class: queuue events that are triggered in response to certain user actions,
  * and send them back over the postMessage connection to the UI.
@@ -29,6 +34,9 @@ class Recorder {
     reset() {
         /** The chrome extension frameid this instance is running in. */
         this._frameId = 0;
+
+        /** attach this to a easter egg in the app so i can debug easily */
+        this.debugging = false;
 
         /** Two way communication with the workspace */
         this._port = false;
@@ -67,8 +75,12 @@ class Recorder {
         this.boundRecordScrollAction = false
 
         // MOUSE MOVE
-        /** the last mouse move event seen */
+        /** the last mouse over event seen */
+        this.lastMouseOverEvent = false;
+        /** the last mousemove event seen */
         this.lastMouseMoveEvent = false;
+        /** What element did we start the mousemove on/from */
+        this.mouseMoveStartingElement = false;
         /** there is a mouse move action still being recorded */
         this.mouseMovePending = false;
 
@@ -364,7 +376,14 @@ class Recorder {
         };
 
         switch (e.type) {
+            case 'mousemove':
+                msg.event.clientX = e.clientX;
+                msg.event.clientY = e.clientY;
+                msg.x = msg.event.clientX;
+                msg.y = msg.event.clientY;
+                break;
             case 'connect':
+            case 'mouseover':
                 msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
                 msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
                 break;
@@ -393,12 +412,6 @@ class Recorder {
                 ['clientX', 'clientY'].forEach(p =>
                     msg.event[p] = e[p]);
                 msg.handler = { simulate: true };
-                break;
-            case 'mousemove':
-                msg.x = e.x;
-                msg.y = e.y;
-                ['clientX', 'clientY'].forEach(p =>
-                    msg.event[p] = e[p]);
                 break;
             case 'change':
                 msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
@@ -430,8 +443,9 @@ class Recorder {
     /** record a completed (ended) mousemove */
     _recordMouseMoveEnd() {
         // ending a mouse move user action.
+        this.mouseMovePending = false;
         this.pendingMouseMoveTimeout = null;
-        let msg = this.buildMsg(this.lastMouseMoveEvent);
+        let msg = this.buildMsg(this.lastMouseOverEvent);
         this.pushMessage(msg);
     }
 
@@ -470,14 +484,47 @@ class Recorder {
         }
     }
 
+    clearPendingMouseMove() {
+        this.mouseMovePending = false;
+        clearTimeout(this.pendingMouseMoveTimeout);
+        this.pendingMouseMoveTimeout = null;
+    }
+
+    startMouseMove(e) {
+        this.lastMouseMoveEvent = e;
+        clearTimeout(this.pendingMouseMoveTimeout);
+        this.pendingMouseMoveTimeout = setTimeout(
+            () => {
+                if (!this.mouseMovePending) {
+                    return;
+                }
+
+                this.clearPendingMouseMove();
+
+                if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                    let msg = this.buildMsg(this.lastMouseMoveEvent);
+                    this.pushMessage(msg);
+                }
+                // else - we endedup back where we started, treat that as not moving.
+            },
+            500 // FIXME: make configurable
+        );
+
+        if (!this.mouseMovePending) {
+            this.mouseMovePending = true; // a mouse move action has started
+            this.mouseMoveStartingElement = e.target;
+            this.pushMessage({ type: 'save-lastscreenshot' });
+        }
+    }
+
     /** Central callback for all bound event handlers */
     handleEvent(e) {
-        e.brimstoneClass = e.timeStamp === 0 ? 'synthetic' : 'user'; // an event simulated by brimstone
+        e.brimstoneClass = e.timeStamp === SYNTHETIC_EVENT_TIMESTAMP ? 'synthetic' : 'user'; // an event simulated by brimstone
         this.event = e;
         let msg;
-        console.debug(`${e.type} ${e.brimstoneClass} SEEN`, e);
         //return Recorder.propagate(e); // for debugging
 
+        console.debug(`${e.type} ${e.brimstoneClass} SEEN`, e);
         // This message can't be folded into the swtich below, we receive it for any user action currently being recorded.
         if (e.type === 'message') {
             /**
@@ -562,63 +609,39 @@ class Recorder {
         // the big recorder switch
         switch (e.type) {
             case 'mousemove':
-                if (this.lastScrollEvents.length) {
-                    this._recordScrollAction(); // terminate that if it is pending.
-                }
-
-                // you gotta at least move the mouse a bit to record this
-                // navigations to a new page trigger this even though the mouse didn't actually move.
-                if (this.lastMouseMoveEvent &&
-                    this.lastMouseMoveEvent.clientX == e.clientX &&
-                    this.lastMouseMoveEvent.clientY === e.clientY) {
-                    return Recorder.propagate(e);
-                }
-
-                if (this.mouseDown || this.pendingClick) {
-                    return Recorder.propagate(e); // bubble? Why does it even matter?
-                }
-
-                // if the user moves the mouse within 500ms (configurable) of a mousedown, or somekind of click, let's call that a fat fingered user error
-                this.lastMouseMoveEvent = e;
-                console.log(`YO ${e.timeStamp} - ${this.lastMouseDownEvent.timeStamp} = ${e.timeStamp - this.lastMouseDownEvent.timeStamp}`);
-                if (e.timeStamp - this.lastMouseDownEvent.timeStamp < 500) {
-                    this.recoverableUserError('mousedown');
-                    return Recorder.cancel(e);
-                }
-
+                this.startMouseMove(e);
+                return Recorder.propagate(e);
+            case 'mouseover':
                 if (!this.mouseMovePending) {
-                    this.mouseMovePending = e;
-                    this.activeElement = document.activeElement;
+                    // the DOM has changed out from under the mouse. e.g. shadow DOM popup "closes", or other dialog is closed, revealing what is below it.
+                    this.startMouseMove(this.lastMouseOverEvent); // pretend we got there from whereever we knew the mouse was last
                 }
-                this.cancelScheduleWaitActionDetection();
-
-                // if user does not perform a mouse move for 500ms (configurable) we decide they've stopped moving the mouse for this mousemove action.
-                clearTimeout(this.pendingMouseMoveTimeout);
-                this.pendingMouseMoveTimeout = setTimeout(
-                    () => this._recordMouseMoveEnd(),
-                    500 // FIXME: make configurable
-                );
-
-
+                this.lastMouseOverEvent = e;
+                return Recorder.propagate(e); // wait for when we moveout of *this* element to record the "mouse move user action"
+            case 'mouseout':
                 return Recorder.propagate(e);
             case 'change':
-                // handle select elements that update their value by user interacting, e.g. clicking, in the shadow DOM options, where we cannot see these events.
-                // at this point in time the shadow DOM is closed and the value has already changed.
+                // this is not a direct user input, but it is (indirectly) the only way to identify
+                // when a select value was changed via a user interacting in the shadow DOM (where the record cannot monitor events).
+                // in this case, at this point in time the shadow DOM is closed and the value has already changed.
                 if (e.target.tagName === 'SELECT') {
                     let msg = this.buildMsg(e);
-                    // when the shadow DOM options closes the mouse is likely somewhere else, which starts a mouseMove, which can change some hover styles etc.
-                    if (this.mouseMovePending) {
-                        //normally we would say, "hey wait until the mouse move is done man". But it's effectively done now. So finish it.
-                        clearTimeout(this.pendingMouseMoveTimeout);
-                        this._recordMouseMoveEnd();
-                    }
-                    this.pushMessage(msg);
+                    // when the shadow DOM options closes the mouse can be over some other element, which will get caught by a mouseover event
+                    
+                    this.clearPendingMouseMove(); // would have to be a a fast shadow dom interaction to need to cancel it, but might as well
+                    
+                    this.pushMessage(msg); // the change needs to be recorded, although it is a non-ui action
                 }
                 return Recorder.propagate(e);
             case 'mousedown':
                 if (this.mouseMovePending) {
-                    this.recoverableUserError();
-                    return Recorder.cancel(e);
+                    if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                        this.recoverableUserError();
+                        return Recorder.cancel(e);
+                    }
+                    else {
+                        this.clearPendingMouseMove();
+                    }
                 }
 
                 this._recordScrollAction(); // terminate any pending scroll actions
@@ -628,6 +651,7 @@ class Recorder {
                 return Recorder.cancel(e); // recall I am going to simulate the whole click or double click, so I don't release to the app
             case 'mouseup':
                 this.mouseDown = false;
+                this.lastMouseMoveEvent = e;
                 return Recorder.cancel(e); // going to simulate the whole click or double click, so I don't release this to the app
             case 'scroll':
                 clearTimeout(this.waitActionDetectionTimeout);
@@ -674,8 +698,13 @@ class Recorder {
             case 'contextmenu':
             case 'dblclick':
                 if (this.mouseMovePending) {
-                    this.recoverableUserError();
-                    return Recorder.cancel(e);
+                    if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                        this.recoverableUserError();
+                        return Recorder.cancel(e);
+                    }
+                    else {
+                        this.clearPendingMouseMove();
+                    }
                 }
 
                 this.recordKeySequence(); // teminate and pending keys
@@ -686,8 +715,13 @@ class Recorder {
                 return Recorder.cancel(e);
             case 'click':
                 if (this.mouseMovePending) {
-                    this.recoverableUserError();
-                    return Recorder.cancel(e);
+                    if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                        this.recoverableUserError();
+                        return Recorder.cancel(e);
+                    }
+                    else {
+                        this.clearPendingMouseMove();
+                    }
                 }
 
                 clearTimeout(this.waitActionDetectionTimeout);
@@ -698,8 +732,13 @@ class Recorder {
                     this.pendingClick = e;
                     setTimeout(() => {
                         if (this.mouseMovePending) {
-                            this.recoverableUserError();
-                            return;
+                            if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                                this.recoverableUserError(); // and you are on a differnet element that you started the mousemove on
+                                return;
+                            }
+                            else {
+                                this.clearPendingMouseMove();
+                            }
                         }
 
                         this.recordKeySequence(); // teminate any pending keys

@@ -149,7 +149,9 @@ export class Player {
                     break;
             }
             start = performance.now();
-            await this.verifyScreenshot(next);
+            if(next.expectedScreenshot) { // i don't record an image for shandowdom 
+                await this.verifyScreenshot(next);
+            }
             stop = performance.now();
             next.latency = ((stop - start) / 1000).toFixed(1);
 
@@ -314,6 +316,10 @@ export class Player {
         });
     }
 
+    async mouseover(action) {
+        return await this.mousemove(action);
+    }
+
     async wheel(action) {
         console.debug(`player: dispatch mouseWheel from ${action.x}, ${action.y}`);
         let modifiers = 0;
@@ -370,7 +376,7 @@ export class Player {
             throw new Error(errorMessage); // I'd want to know that.
         }
 
-        await this.click(action); // to close the open shadow dom options
+        //await this.click(action); // to close the open shadow dom options
     }
 
     async scroll(action) {
@@ -623,7 +629,7 @@ export class Player {
     async debuggerSendCommand(method, commandParams) {
         let i = 0;
         var lastException;
-        commandParams.timestamp = 0; // this is how i distiguish sythetic events
+        commandParams.timestamp = Player.SYNTHETIC_EVENT_TIMESTAMP; 
         for (i = 0; i < 2; ++i) { // at most twice 
             try {
                 return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
@@ -732,3 +738,9 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
         diffPng
     };
 };
+
+/**
+ * This is how i distiguish sythetic events from user events in the recorder.
+ * And only 0 works?!
+ */
+Player.SYNTHETIC_EVENT_TIMESTAMP = 0;

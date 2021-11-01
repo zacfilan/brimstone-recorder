@@ -331,18 +331,25 @@ export class TestAction {
             let o = this.overlay;
             let calloutY = o.top + o.height;
             let calloutX = Math.max(o.left, 0);
-            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type === 'scroll' || this.type === 'wait') {
+            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type === 'scroll' || this.type === 'wait' || this.type === 'mouseover') {
                 html += `
                 <div class='overlay pointer pulse' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>
                     ${pointer}
                     </br>
-                    <div class='action callout user-event' data-index='${this.index}'>${this.description}</div>
+                    <div class='action' data-index='${this.index}'>${this.description}</div>
                 </div>`;
             }
             else {
-                html += `<div class='pulse action callout user-event' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${this.description}</div>`;
+                html += `<div class='overlay pulse action' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${this.description}</div>`;
             }
-            html += `<div class='overlay pulse-light' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'>${o.html ? o.html : ''}</div>`;
+
+            // highlight the whole rectangle element we are acting on
+            if(o.html) {
+                html += `<div class='overlay pulse-light countdown' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'>${o.html ? o.html : ''}</div>`;
+            }
+            else {
+                html += `<div class='overlay pulse-light' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>`;
+            }
         }
 
         let footer = '';

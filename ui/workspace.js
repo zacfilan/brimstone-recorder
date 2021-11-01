@@ -46,16 +46,16 @@ async function countDown(seconds) {
     action.overlay = {
         height: 100,
         width: 100,
-        top:0,
-        left:0
+        top: 0,
+        left: 0
     };
-    for(let i = seconds ; i; --i) {
-        action.overlay.html = `<div class="countdown">${i}</div>`;
-        updateStepInView(TestAction.instances[expectedScreenIndex]);
+    for (let i = seconds; i; --i) {
+        action.overlay.html = i;
+        updateStepInView(TestAction.instances[expectedScreenIndex-1]);
         await sleep(1000);
     }
     delete action.overlay;
-    updateStepInView(TestAction.instances[expectedScreenIndex]);
+    updateStepInView(TestAction.instances[expectedScreenIndex-1]);
 }
 
 let pendingScreenShotTimeout = null
@@ -114,9 +114,14 @@ const player = new Player();
 var uiCardsElement = document.getElementById('cards');
 
 /**
- * cache the last screenshot taken
+ * asynchronously updated "latest" view of the appn
  * */
 var _lastScreenshot;
+
+/** 
+ * lock down the screen state at a point in time
+*/
+var _lastSavedScreenshot;
 
 /**
  * cache the last mouse move 
@@ -697,7 +702,7 @@ async function prepareToRecord(tab) {
     await hideCursor();
     await tab.resizeViewport(); // this can be called on a navigation, and the tab needs to be the correct size before the port is established, in case it decides to send us some mousemoves
 
-   console.debug(`end   - preparing to record tab ${tab.id} ${tab.url}`);
+    console.debug(`end   - preparing to record tab ${tab.id} ${tab.url}`);
 }
 
 function stopRecording(tab) {
@@ -779,7 +784,7 @@ $('#recordButton').on('click', async function () {
             // we are appending to an existing test
             let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - nuless the user is showing the last only!)
             TestAction.instances.splice(index + 2); // anything after these 2 is gone.
-            
+
             //updateThumbs();
             await countDown(3);
 
@@ -970,7 +975,7 @@ async function userEventToAction(userEvent) {
             break;
         case 'mousemove':
             cardModel.description = 'move mouse to here';
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            cardModel.addExpectedScreenshot(_lastSavedScreenshot);
             break;
         case 'scroll':
             cardModel.addExpectedScreenshot(_lastScreenshot);
@@ -1043,11 +1048,11 @@ async function userEventToAction(userEvent) {
             // i can't detect when the shadowdom is opened (or interacted with at all), so i can't detect the start of a change action. i can't turn off
             // the auto screenshot updating mechanism, so it keeps clicking away while the user interacts with the shadow dom.
             // i only know when the action is done by getting the change event. 
-            // so what is the prerequistie starting state for the change operation?
+            // so what is the pre-requisite starting state for the change operation?
             // might just be unknowable!
 
             cardModel.description = `change value to ${cardModel.event.value}`;
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            // cardModel.addExpectedScreenshot(_lastScreenshot); // so don't add one!
             break;
         default:
             cardModel.description = 'Unknown!';
@@ -1063,7 +1068,7 @@ async function recordUserAction(userEvent) {
 
     // show the latest screenshot in the expected card and start polling it
     await captureScreenshotAsDataUrl();
-    let wait = await userEventToAction({ type: 'expect' }); // create a new waiting action
+    let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
     // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
     wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
     wait._view = constants.view.DYNAMIC;
@@ -1099,9 +1104,18 @@ async function onMessageHandler(message, _port) {
                 _resolvePostMessageResponsePromise(userEvent.args);
             }
             break;
+        case 'save-lastscreenshot':
+            _lastSavedScreenshot = _lastScreenshot;
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break
         // the user is actively waiting for the screen to change
         case 'wait':
             await captureScreenshotAsDataUrl(); // grab latest image
+
+            if (!_lastSavedScreenshot) {
+                _lastSavedScreenshot = _lastScreenshot;
+            }
+
             let lastAction = TestAction.instances[userEvent.index]; // grab current expected action playholder (2nd card)
 
             // refresh the expected action placeholder the user sees.
@@ -1144,9 +1158,14 @@ async function onMessageHandler(message, _port) {
         // keyevents should work almost the same as mousemove except, i want more/faster visual feedback for the user, which is 
         // why i simulate them. this lets the browser update the screen, even though I don't take a screenshot everytime.
         case 'keys':
+            // i just don't know how to record in the shadowDOM very well!!
+            recordUserAction(userEvent);
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
         case 'change':
             // i just don't know how to record in the shadowDOM very well!!
             recordUserAction(userEvent);
+            //_lastSavedScreenshot = _lastScreenshot; // reset mousemove start-screens to the current screen
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'keydown':
