@@ -283,6 +283,10 @@ button svg {
   border: 1px solid black;
   border-radius: 6px;
   padding: 5px;
+  max-width: 200px;
+  max-height: 200px;
+  overflow: auto;
+  z-index: 9999999;
 }
 
 #content .card.action .action .modifier {
@@ -303,6 +307,16 @@ button svg {
 #content .card.action .screenshot:hover .pulse-light {
   -webkit-animation: opacity3 3s infinite;
           animation: opacity3 3s infinite;
+}
+
+#content .card.action .screenshot .overlay.action:hover {
+  -webkit-animation: unset;
+          animation: unset;
+}
+
+#content .card.action .screenshot .overlay.pointer:hover {
+  -webkit-animation: unset;
+          animation: unset;
 }
 
 #content .card.waiting {

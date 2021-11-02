@@ -219,7 +219,7 @@ button {
             font-size: 18px;
             background: var(--action-color);
             margin: 3px;
-            border: 1px solid black;
+            border: 1px solid black; 
             border-radius: 6px;
             padding: 5px;
             .modifier {
@@ -231,15 +231,31 @@ button {
                 padding: 0px 3px;
                 font-family: "Courier New", Courier, monospace;
             }
+            max-width:200px; 
+            max-height:200px;
+            overflow: auto;
+            z-index: 9999999;
         }
-        .screenshot:hover {
-            .pulse {
-                animation: opacity2 3s infinite;
+
+        .screenshot {
+            &:hover {
+                .pulse {
+                    animation: opacity2 3s infinite;
+                }
+                .pulse-light {
+                    animation: opacity3 3s infinite;
+                }
             }
-            .pulse-light {
-                animation: opacity3 3s infinite;
+
+            .overlay.action:hover {
+                    animation: unset;
+            }
+            
+            .overlay.pointer:hover {
+                animation: unset;        
             }
         }
+        
     }
 
     /***********************/
