@@ -62,6 +62,8 @@ function _changeSelectValue(x, y, value) {
         }
         select.value = value;
         select.dispatchEvent(new Event('change'));
+
+        select.focus(); // used in conjunction with the keypres escape to close the shadow DOM
     }
     catch (e) {
         return e.message;
@@ -136,7 +138,6 @@ export class Player {
             }
             console.log(`end   play [${action.index}] : ${action.description}`);
 
-
             // remember any mousemoving operation, implicit or explicit
             switch (action.type) {
                 case 'click':
@@ -149,9 +150,14 @@ export class Player {
                     break;
             }
             start = performance.now();
-            if(next.expectedScreenshot) { // i don't record an image for shandowdom 
+            
+            if(!next.expectedScreenshot || next.shadowDOMAction) { // i don't record an image for shandowdom 
+                next._match = constants.view.PASS;
+            }
+            else {
                 await this.verifyScreenshot(next);
             }
+
             stop = performance.now();
             next.latency = ((stop - start) / 1000).toFixed(1);
 
@@ -376,7 +382,14 @@ export class Player {
             throw new Error(errorMessage); // I'd want to know that.
         }
 
-        //await this.click(action); // to close the open shadow dom options
+        // used in conjustion with the inscript focus to hit escape on the SELECT.
+        await this.keypress({
+            event : {
+                keyCode: 27,
+                code: 'Escape',
+                key: 'Escape',
+            }
+        });
     }
 
     async scroll(action) {

@@ -163,6 +163,9 @@ export class TestAction {
      * @type {string}*/
     name;
 
+    /** did this action happen in the shadownDOM? */
+    shadowDOMAction = false;
+
     constructor(args) {
         Object.assign(this, args);
 
@@ -205,7 +208,8 @@ export class TestAction {
             hoverTime: this.hoverTime,
             deltaX: this.deltaX, // only on wheel actions 
             deltaY: this.deltaY, // only on wheel actions
-            name: this.name // optional
+            name: this.name, // optional
+            shadowDOMAction: this.shadowDOMAction
         };
 
         if (this.expectedScreenshot) {
@@ -316,6 +320,8 @@ export class TestAction {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
         //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
+        let imageClasses = this.shadowDOMAction ? 'class="shadowDOM"' : '';
+        let shadowDesc = this.shadowDOMAction ? '(shadowDOM) ': ''
         let html = `
     <div class='card ${this.classes()} ${className}' data-index=${this.index}>
         <div title='${title.tooltip}' class='click-to-change-view title'>${title.text}<div class="stepNumber">${this.index + 1}</div></div>
@@ -324,7 +330,7 @@ export class TestAction {
             <span style="width:100%;"><span class="match-status"></span></span>
         </div>
         <div class='screenshot'>
-            <img src='${src}'>`;
+            <img ${imageClasses} src='${src}'>`;
 
         // FIXME: calculate the best location for the callout, based on the location of the overlay
         if (this.overlay) {
@@ -336,11 +342,11 @@ export class TestAction {
                 <div class='overlay pointer pulse' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>
                     ${pointer}
                     </br>
-                    <div class='action' data-index='${this.index}'>${this.description}</div>
+                    <div class='action' data-index='${this.index}'>${shadowDesc}${this.description}</div>
                 </div>`;
             }
             else {
-                html += `<div class='overlay pulse action' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${this.description}</div>`;
+                html += `<div class='overlay pulse action' data-index='${this.index}' style='top:${calloutY}%;left:${calloutX}%;'>${shadowDesc}${this.description}</div>`;
             }
 
             // highlight the whole rectangle element we are acting on

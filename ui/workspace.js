@@ -40,6 +40,9 @@ window.addEventListener("error", function (e) {
     return false;
 });
 
+/** used to *not* record pre-requisite screenshots when in the shadowDOM. */
+var shadowDOMScreenshot = 0;
+
 async function countDown(seconds) {
     let expectedScreenIndex = currentStepIndex() + 1;
     let action = TestAction.instances[expectedScreenIndex];
@@ -51,11 +54,11 @@ async function countDown(seconds) {
     };
     for (let i = seconds; i; --i) {
         action.overlay.html = i;
-        updateStepInView(TestAction.instances[expectedScreenIndex-1]);
+        updateStepInView(TestAction.instances[expectedScreenIndex - 1]);
         await sleep(1000);
     }
     delete action.overlay;
-    updateStepInView(TestAction.instances[expectedScreenIndex-1]);
+    updateStepInView(TestAction.instances[expectedScreenIndex - 1]);
 }
 
 let pendingScreenShotTimeout = null
@@ -668,7 +671,7 @@ async function startRecorders() {
          */
         function (_port) {
             console.debug('port was disconnected', _port, chrome.runtime.lastError);
-            port.onMessage.removeListener(onMessageHandler); // this particular port is no good anymore so, kill the listener on it. needed?
+            port?.onMessage?.removeListener(onMessageHandler); // this particular port is no good anymore so, kill the listener on it. needed?
             port = false;
         });
 
@@ -925,6 +928,19 @@ async function captureScreenshotAsDataUrl() {
 //     return ss;
 // }
 
+/**
+ * Add the _lastScavedScreenshot to the cardmodel if that screenshot wasn't of
+ * an open shadowDOM
+ *  @param {TestAction} cardModel The action to add the screenshot to
+ */
+function addExpectedScreenshot(cardModel, ss = _lastScreenshot) {
+    if (shadowDOMScreenshot) {
+        --shadowDOMScreenshot;
+        cardModel.shadowDOMAction = true;
+    }
+    cardModel.addExpectedScreenshot(ss);
+}
+
 /** 
  * This is only used during recording. 
  * 
@@ -973,12 +989,17 @@ async function userEventToAction(userEvent) {
         case 'wait':
             cardModel.description = 'wait';
             break;
+        case 'mouseover':
+            // this is sort of an error case!
+            cardModel.description = 'orphaned mouseover observed here';
+            addExpectedScreenshot(cardModel, _lastScreenshot);
+            break;
         case 'mousemove':
             cardModel.description = 'move mouse to here';
-            cardModel.addExpectedScreenshot(_lastSavedScreenshot);
+            addExpectedScreenshot(cardModel, _lastSavedScreenshot);
             break;
         case 'scroll':
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            addExpectedScreenshot(cardModel);
             break;
         case 'keys':
             cardModel.description = 'type ';
@@ -1007,7 +1028,7 @@ async function userEventToAction(userEvent) {
                 }
                 // else keyup, nothing to report
             }
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            addExpectedScreenshot(cardModel);
             break;
         case 'keydown':
         case 'keypress':
@@ -1018,19 +1039,19 @@ async function userEventToAction(userEvent) {
             else {
                 cardModel.description += userEvent.event.key;
             }
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            addExpectedScreenshot(cardModel);
             break;
         case 'click':
             cardModel.description = 'click';
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            addExpectedScreenshot(cardModel);
             break;
         case 'contextmenu':
             cardModel.description = 'right click';
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            addExpectedScreenshot(cardModel);
             break;
         case 'dblclick':
             cardModel.description = 'double click';
-            cardModel.addExpectedScreenshot(_lastScreenshot);
+            addExpectedScreenshot(cardModel);
             break;
         case 'start': {
             cardModel.description = `goto ${cardModel.url}`;
@@ -1044,15 +1065,23 @@ async function userEventToAction(userEvent) {
             break;
         }
         case 'change':
-            // change is a funny one. it is only sent on selects that change their value, which happens *after* the user interacts with the shadowDOM
-            // i can't detect when the shadowdom is opened (or interacted with at all), so i can't detect the start of a change action. i can't turn off
-            // the auto screenshot updating mechanism, so it keeps clicking away while the user interacts with the shadow dom.
-            // i only know when the action is done by getting the change event. 
-            // so what is the pre-requisite starting state for the change operation?
-            // might just be unknowable!
+            // change is not a direct UI action. it is only sent on SELECTs that change their value, which happens *after* the user interacts with the shadowDOM.
+            // recorder can't detect when the shadowdom is opened (or interacted with at all), so it can't detect the start of a change action. it can't turn off
+            // the auto screenshot updating mechanism (don't know we are in the shadow DOM), so it keeps clicking away while the user interacts with the shadow dom.
+            // (hence the _lastScreenshot contains the state where the shadowDOM options are open and the user has clicked the new one, which is not the correct pre-requisite)
+            // it only knows when the action is done by getting the change event. 
+            // so there is no pre-requisite starting state for a change operation, it's not a directly observable UI action.
+            // +1 shadowDOMScreenshot
+
+            // furthur, during record, after the change event occurs, the shadowDOM is closed and the mouse may be somewhere new, without an observed mousemove.
+            // i.e. there was a mousemove that started in the shadow DOM (which can't be seen) and ended somewhere else that can be seen. in order to record this mousemove it would
+            // need the pre-requiste state of the mousemove, which occurs when the shadowDOM is open.
+            // i decided that, the recorder won't use shadowDOM screenshots at all, so this (next) pre-requisite one too should be ignored.
+            // +1 shadowDOMScreenshot
 
             cardModel.description = `change value to ${cardModel.event.value}`;
-            // cardModel.addExpectedScreenshot(_lastScreenshot); // so don't add one!
+            shadowDOMScreenshot += 2;
+            addExpectedScreenshot(cardModel);
             break;
         default:
             cardModel.description = 'Unknown!';
@@ -1129,6 +1158,8 @@ async function onMessageHandler(message, _port) {
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
+        
+        case 'mouseover':
         case 'mousemove':
         case 'click':
         case 'contextmenu':
@@ -1163,9 +1194,19 @@ async function onMessageHandler(message, _port) {
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'change':
-            // i just don't know how to record in the shadowDOM very well!!
-            recordUserAction(userEvent);
-            //_lastSavedScreenshot = _lastScreenshot; // reset mousemove start-screens to the current screen
+            //recordUserAction(userEvent);
+            let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+
+            // show the latest screenshot in the expected card and start polling it
+            await captureScreenshotAsDataUrl();
+            let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
+            // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
+            wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
+            wait._view = constants.view.DYNAMIC;
+            wait.shadowDOMAction = true;
+
+            updateStepInView(action); // update the UI
+
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'keydown':

@@ -117,8 +117,11 @@ button {
         padding: none;
         img {
             width: 100%;
+            &.shadowDOM {
+                opacity: .1;
+            }
         }
-
+ 
         .overlay {
             position: absolute;
             background: var(--action-color);
@@ -131,7 +134,7 @@ button {
                     color: var(--action-color);
                     height: 18px;
                 }
-            }
+            } 
         }
     }
 

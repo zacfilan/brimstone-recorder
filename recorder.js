@@ -75,8 +75,6 @@ class Recorder {
         this.boundRecordScrollAction = false
 
         // MOUSE MOVE
-        /** the last mouse over event seen */
-        this.lastMouseOverEvent = false;
         /** the last mousemove event seen */
         this.lastMouseMoveEvent = false;
         /** What element did we start the mousemove on/from */
@@ -129,7 +127,8 @@ class Recorder {
      * wait action and record it.
      */
     recordWaitAction() {
-        if (!this.waitActionDetectionTimeout) {
+        if (!this.waitActionDetectionTimeout || this.messageQueue.length) {
+            this.waitActionDetectionTimeout = null;
             return;
         }
         this.waitActionDetectionTimeout = null;
@@ -326,7 +325,7 @@ class Recorder {
                         this.mouseMovePending = false; // now we are really done
                     }
                     if (!this.tx()) {
-                        this.scheduleWaitActionDetection();
+                        this.scheduleWaitActionDetection(); // the queue is empty right now, if it is still empty in 1 sec take a picture
                     }
                     // else we are still transmitting queued messages
                     break;
@@ -445,7 +444,7 @@ class Recorder {
         // ending a mouse move user action.
         this.mouseMovePending = false;
         this.pendingMouseMoveTimeout = null;
-        let msg = this.buildMsg(this.lastMouseOverEvent);
+        let msg = this.buildMsg(this.lastMouseMoveEvent);
         this.pushMessage(msg);
     }
 
@@ -501,7 +500,7 @@ class Recorder {
 
                 this.clearPendingMouseMove();
 
-                if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                if (this.mouseMoveStartingElement !== this.lastMouseMoveEvent.target) {
                     let msg = this.buildMsg(this.lastMouseMoveEvent);
                     this.pushMessage(msg);
                 }
@@ -561,7 +560,7 @@ class Recorder {
             // this is expected for events that are queued and simulated, and recorded in aggregate, so let expected ones go to the big recorder switch
             // for proper accounting.
             // FIXME: can't I replace all these with pending* varables
-            if (this.mouseMovePending || this.pendingClick || e.type === 'keydown' || e.type === 'keyup' || e.type === 'wheel' || e.type === 'scroll') {
+            if (this.messageQueue[0].type === 'wait' || this.mouseMovePending || this.pendingClick || e.type === 'keydown' || e.type === 'keyup' || e.type === 'wheel' || e.type === 'scroll') {
                 ; // expected - these will be processed by the big recorder swtich
             }
             else {
@@ -572,39 +571,6 @@ class Recorder {
                 return Recorder.propagate(e);
             }
         }
-        else {
-            // we are not waiting on anything from the the extension
-            // and we are getting some user events
-            // this isn't enough
-
-            // e.g. a handled click changed the screen. maybe...
-            // * the mouse is now over some new element OR
-            // * the app programatically gives focus to some new element text box
-            // * etc...
-            //
-            // I do not want to lose this state when I eventually take the prereq screenshot for the next action, so I must propagate these events.
-            // 
-            // I wait for a user action to indicate that the screen is ready, and now it's okay to start blocking subsequent events
-            // while I decode the users next action.
-            // switch (e.type) {
-            //     // these should be processed
-            //     case 'mouseout':
-            //     case 'mouseover':
-            //         this._mouseEnterTime = performance.now(); // keep on accounting
-            //     // propagate (update screen) is correct for the case above
-            //     // but if I am mousemoving *through* elements that react to mouseover I don't want to leave them highlighted.
-            //     // (think pink menu items in the trail of the mousemove) so i did  this
-            //     // if (this.pendingMouseMoveTimeout) { // we don't have anything in the tx queue to the extension, but we are "waiting" on a timeout.
-            //     //     return Recorder.cancel(e); 
-            //     // }
-            //     // yet this is what allows the toolips to show!
-            //     case 'focus':
-            //     case 'blur':
-            //     case 'focusin':
-            //         return Recorder.propagate(e); // focus and friends
-            // }
-            // anythig else falls thru to the bug recorder switch
-        }
 
         // the big recorder switch
         switch (e.type) {
@@ -612,12 +578,6 @@ class Recorder {
                 this.startMouseMove(e);
                 return Recorder.propagate(e);
             case 'mouseover':
-                if (!this.mouseMovePending) {
-                    // the DOM has changed out from under the mouse. e.g. shadow DOM popup "closes", or other dialog is closed, revealing what is below it.
-                    this.startMouseMove(this.lastMouseOverEvent); // pretend we got there from whereever we knew the mouse was last
-                }
-                this.lastMouseOverEvent = e;
-                return Recorder.propagate(e); // wait for when we moveout of *this* element to record the "mouse move user action"
             case 'mouseout':
                 return Recorder.propagate(e);
             case 'change':
@@ -635,7 +595,7 @@ class Recorder {
                 return Recorder.propagate(e);
             case 'mousedown':
                 if (this.mouseMovePending) {
-                    if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                    if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError();
                         return Recorder.cancel(e);
                     }
@@ -698,7 +658,7 @@ class Recorder {
             case 'contextmenu':
             case 'dblclick':
                 if (this.mouseMovePending) {
-                    if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                    if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError();
                         return Recorder.cancel(e);
                     }
@@ -715,7 +675,7 @@ class Recorder {
                 return Recorder.cancel(e);
             case 'click':
                 if (this.mouseMovePending) {
-                    if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                    if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError();
                         return Recorder.cancel(e);
                     }
@@ -732,7 +692,7 @@ class Recorder {
                     this.pendingClick = e;
                     setTimeout(() => {
                         if (this.mouseMovePending) {
-                            if (this.mouseMoveStartingElement !== this.lastMouseOverEvent.target) {
+                            if (this.mouseMoveStartingElement !== this.pendingClick.target) {
                                 this.recoverableUserError(); // and you are on a differnet element that you started the mousemove on
                                 return;
                             }

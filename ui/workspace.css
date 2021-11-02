@@ -150,6 +150,10 @@ button svg {
   width: 100%;
 }
 
+.card .screenshot img.shadowDOM {
+  opacity: .1;
+}
+
 .card .screenshot .overlay {
   position: absolute;
   background: var(--action-color);
