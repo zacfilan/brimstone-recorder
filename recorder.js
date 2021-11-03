@@ -221,6 +221,16 @@ class Recorder {
             this.exit();
         });
 
+        // I want to know when this page get's navigated away from
+        // https://developers.google.com/web/updates/2018/07/page-lifecycle-api#events
+        document.onvisibilitychange = () => {
+            // https://developers.google.com/web/updates/2018/07/page-lifecycle-api#state-hidden
+            if (document.visibilityState === 'hidden') {
+                // the whole sequence is recorded immediately (anything before this event has already been simulated)
+                this.recordKeySequence(); 
+            }
+        }
+
         //start listening for messages back from the workspace
         /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port */
         this._port.onMessage.addListener(this.rx.bind(this));
@@ -867,8 +877,10 @@ class Recorder {
      * that. On the first keydown we take a screenshot, before we simulate.
      * We also schedule a callback in the future to send the record message
      * for the aggregate keystrokes.
-     *
-     * Some special handling for [ENTER] key
+     * 
+     * This should work very miuch like mousemove recording, except we simulate the keystrokes to
+     * give fast feedback to the user in the app.
+     * 
      */
     handleKey(e) {
         this.mouseDown = false; // FIXME: WTF? cancel mousemove recording in process
@@ -877,35 +889,8 @@ class Recorder {
             return;
         }
         let record = false;
-
-        if (e.keyCode === 13) {
-            if (e.type === 'keydown') {
-                if (this.keyEventQueue.length === 0) {
-                    // no pending key presses
-                    record = true; // so this enter key down event will be an indiviudal recorded action, ss taken before, simulated last
-                    // fall thro to record, then simulate the [ENTER] key by its lonesome
-                }
-                else {
-                    // there are pending key events
-                    this.keyEventQueue.push(e); // throw the [ENTER] keydown event on the end
-                    this.recordKeySequence(); // the whole sequence is recorded immediately (anything before this event has already been simulated)
-                    // fallthru to just simulate the [ENTER] key event
-                }
-            }
-            else {
-                // keyup enter
-                // just fall thru to only simulate it
-            }
-        }
-        else {
-            // not when the only thing that would be in the queue is a single keyup
-            // related to enter key handling. 1 down, enter down is meant to clear the queue, but if I let go of 1 late, it gets in the queue, which
-            // is unintentional. i.e. don't add a keyup to a flushed (empty) queue
-            if (this.keyEventQueue.length !== 0 || e.type === 'keydown') {
-                this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
-                this._scheduleRecordKeySequence();
-            }
-        }
+        this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
+        this._scheduleRecordKeySequence();
 
         let rect = e.target.getBoundingClientRect();
         this.pushMessage({
@@ -925,7 +910,6 @@ class Recorder {
                 shiftKey: e.shiftKey
             },
             handler: {
-                record: record, // enter can navigate to another page, where we lose this recorders context, so we need to force the recording of this key
                 simulate: true
             }
         });
