@@ -1,22 +1,35 @@
 /** Various user settable options. */
-var options = {
+export class Options {
+    /** The maximum time waite for an expected screenshot to match an actua screenshot during playback, in seconds. */
+    MAX_VERIFY_TIMEOUT = 15; 
+
+    /** If true the blinking text cursor (properly caret) will be hidden during recording and during playback.
+     * This speeds up playback.
+    */
+    hideCursor = true;
+
+    /** Used in the png matching algorithm. Pixels are allowed some color variance, to deal with anti-aliasing for example.
+     * Lower numbers are more strict.
+     */
+    pixelMatchThreshhold = .1;
 };
 
+var options = new Options();
 
 /** load the user settable options from chrome storage
  * 
  */
 export async function loadOptions() {
     let results = await (new Promise(resolve => chrome.storage.local.get('options', resolve)));
-    var defaults = {
-        MAX_VERIFY_TIMEOUT: 15, // seconds;
-        hideCursor: true
-    };
-    Object.assign(defaults, results.options); // start with defaults and overwrite with stored values
-    Object.assign(options, defaults); // then update the exportable set
+    Object.assign(options, results.options); // start with defaults and overwrite with stored values
     return options;
 }
 
+/**
+ * 
+ * @param {Options} options 
+ * @returns when complete
+ */
 export function saveOptions(options) {
     return new Promise(resolve =>  chrome.storage.local.set({options}, resolve));
 }

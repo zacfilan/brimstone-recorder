@@ -1,5 +1,7 @@
 import { Player } from "../player.js"
 import { Screenshot } from "./screenshot.js";
+import { loadOptions } from "../options.js";
+
 const PNG = png.PNG;
 
 export const constants = {
@@ -280,7 +282,15 @@ export class TestAction {
     * so this.acceptablePixelDifferences, must exist
     */
     async pixelDiff() {
-        let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(this.expectedScreenshot.png, this.actualScreenshot.png, this.acceptablePixelDifferences?.png);
+        let options = await loadOptions();
+
+        let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng }
+            = Player.pngDiff(
+                this.expectedScreenshot.png,
+                this.actualScreenshot.png,
+                this.acceptablePixelDifferences?.png,
+                options.pixelMatchThreshhold // should I store match threshholds per card?
+            );
         this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         this.acceptablePixelDifferences.png = diffPng;
 
@@ -321,7 +331,7 @@ export class TestAction {
         //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
         let imageClasses = this.shadowDOMAction ? 'class="shadowDOM"' : '';
-        let shadowDesc = this.shadowDOMAction ? '(shadowDOM) ': ''
+        let shadowDesc = this.shadowDOMAction ? '(shadowDOM) ' : ''
         let html = `
     <div class='card ${this.classes()} ${className}' data-index=${this.index}>
         <div title='${title.tooltip}' class='click-to-change-view title'>${title.text}<div class="stepNumber">${this.index + 1}</div></div>
@@ -350,7 +360,7 @@ export class TestAction {
             }
 
             // highlight the whole rectangle element we are acting on
-            if(o.html) {
+            if (o.html) {
                 html += `<div class='overlay pulse-light countdown' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'>${o.html ? o.html : ''}</div>`;
             }
             else {

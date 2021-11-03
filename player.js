@@ -16,13 +16,13 @@ var options;
  * 
  * Scroll the element that matches the css to the given value
  */
-function _scroll(x, y, top, left) {    
+function _scroll(x, y, top, left) {
     // https://stackoverflow.com/questions/35939886/find-first-scrollable-parent
     function getScrollParent(element, includeHidden) {
         var style = getComputedStyle(element);
         var excludeStaticParent = style.position === "absolute";
         var overflowRegex = includeHidden ? /(auto|scroll|hidden)/ : /(auto|scroll)/;
-    
+
         if (style.position === "fixed") return document.body;
         for (var parent = element; (parent = parent.parentElement);) {
             style = getComputedStyle(parent);
@@ -31,15 +31,15 @@ function _scroll(x, y, top, left) {
             }
             if (overflowRegex.test(style.overflow + style.overflowY + style.overflowX)) return parent;
         }
-    
+
         return document.body;
     }
     debugger;
     var elem = getScrollParent(document.elementFromPoint(x, y)); // will this work in a frame ?
-    if(top !== null) {
+    if (top !== null) {
         elem.scrollTop = top;
     }
-    if(left !== null) {
+    if (left !== null) {
         elem.scrollLeft = left;
     }
 }
@@ -86,6 +86,9 @@ export class Player {
     /** Know if there are navigations in flight. */
     _navigationsInFlight = 0;
 
+    /** sensatively parameter to pixelmatch, lower is stricter */
+    pixelMatchThreshhold = .1;
+
     constructor() {
         /**
          * The tab we are playing on.
@@ -110,6 +113,7 @@ export class Player {
 
         options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
+        this.pixelMatchThreshhold = options.pixelMatchThreshhold;
         let v = await getHydratedForPlayPromise();
 
         this._actions = actions;
@@ -150,8 +154,8 @@ export class Player {
                     break;
             }
             start = performance.now();
-            
-            if(!next.expectedScreenshot || next.shadowDOMAction) { // i don't record an image for shandowdom 
+
+            if (!next.expectedScreenshot || next.shadowDOMAction) { // i don't record an image for shandowdom 
                 next._match = constants.view.PASS;
             }
             else {
@@ -384,7 +388,7 @@ export class Player {
 
         // used in conjustion with the inscript focus to hit escape on the SELECT.
         await this.keypress({
-            event : {
+            event: {
                 keyCode: 27,
                 code: 'Escape',
                 key: 'Escape',
@@ -534,7 +538,13 @@ export class Player {
             }
 
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
-            let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } = Player.pngDiff(nextStep.expectedScreenshot.png, nextStep.actualScreenshot.png, nextStep.acceptablePixelDifferences?.png);
+            let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } 
+                = Player.pngDiff(
+                    nextStep.expectedScreenshot.png, 
+                    nextStep.actualScreenshot.png, 
+                    nextStep.acceptablePixelDifferences?.png,
+                    this.pixelMatchThreshhold
+                    );
 
             // FIXME: this should be factored into the card I think
             nextStep.numDiffPixels = numDiffPixels;
@@ -629,7 +639,7 @@ export class Player {
         let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
-        }        
+        }
         console.debug(`  end   debugger send command ${method}`, commandParams);
         return result; // the debugger method may be a getter of some kind.
     }
@@ -642,7 +652,7 @@ export class Player {
     async debuggerSendCommand(method, commandParams) {
         let i = 0;
         var lastException;
-        commandParams.timestamp = Player.SYNTHETIC_EVENT_TIMESTAMP; 
+        commandParams.timestamp = Player.SYNTHETIC_EVENT_TIMESTAMP;
         for (i = 0; i < 2; ++i) { // at most twice 
             try {
                 return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
@@ -652,7 +662,7 @@ export class Player {
                 if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
                     console.log(`warn got exception while running debugger cmd ${method}:`, commandParams, e);
                     await this.attachDebugger({ tab: this.tab });
-                    if(this.usedFor === 'playing'){
+                    if (this.usedFor === 'playing') {
                         await sleep(2000);
                     }
                 }
@@ -735,7 +745,7 @@ Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
     return png;
 }
 
-Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
+Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThreshhold) {
     const { width, height } = expectedPng;
 
     if (actualPng.width !== width || actualPng.height !== height) {
@@ -743,7 +753,19 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng) {
     }
 
     const diffPng = new PNG({ width, height }); // new 
-    var { numDiffPixels, numMaskedPixels, numUnusedMaskedPixels } = pixelmatch(expectedPng.data, actualPng.data, diffPng.data, width, height, { threshold: .1, ignoreMask: maskPng?.data });
+    var { numDiffPixels, numMaskedPixels, numUnusedMaskedPixels } =
+        pixelmatch(
+            expectedPng.data,
+            actualPng.data,
+            diffPng.data,
+            width,
+            height,
+            {
+                threshold: pixelMatchThreshhold,
+                ignoreMask: maskPng?.data
+            }
+        );
+        
     return {
         numUnusedMaskedPixels,
         numDiffPixels,

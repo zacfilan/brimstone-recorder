@@ -9,8 +9,8 @@ const defaultOptions = {
     aaColor: [255, 165, 0], // color of anti-aliased pixels in diff output (orange)
     diffColor: [255, 0, 0], // color of different pixels in diff output (red)
     diffColorAlt: null,     // whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two
-    diffMask: false,         // draw the diff over a transparent background (a mask)
-    ignoreMask: false   // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
+    diffMask: false,        // draw the diff over a transparent background (a mask)
+    ignoreMask: false       // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
 };
 
 
