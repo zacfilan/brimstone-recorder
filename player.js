@@ -89,6 +89,12 @@ export class Player {
     /** sensatively parameter to pixelmatch, lower is stricter */
     pixelMatchThreshhold = .1;
 
+    /**
+     * control the speed at which typing multiple back to back characters occurs.
+     * used to simuate slower human typers.
+     */
+     interKeypressDelay = 0;
+
     constructor() {
         /**
          * The tab we are playing on.
@@ -114,6 +120,7 @@ export class Player {
         options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
         this.pixelMatchThreshhold = options.pixelMatchThreshhold;
+        this.interKeypressDelay = options.interKeypressDelay;
         let v = await getHydratedForPlayPromise();
 
         this._actions = actions;
@@ -459,6 +466,10 @@ export class Player {
         for (let i = 0; i < action.event.length; ++i) {
             let event = action.event[i];
             await this[event.type]({ event }); // pretend it is a distinct action
+            // simulate slower typing
+            if(this.interKeypressDelay) {
+                await sleep(this.interKeypressDelay);
+            }
         }
     }
 

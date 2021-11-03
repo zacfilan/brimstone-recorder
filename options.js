@@ -12,6 +12,12 @@ export class Options {
      * Lower numbers are more strict.
      */
     pixelMatchThreshhold = .1;
+
+    /** delay in ms between typed characters.
+     * simulates slower typing 
+     * 0 50 100 seem pretty good
+    */
+    interKeypressDelay = 0;
 };
 
 var options = new Options();

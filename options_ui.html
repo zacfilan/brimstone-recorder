@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html>
-<head><title>Brimstone Extension Options</title></head>
+
+<head>
+    <title>Brimstone Extension Options</title>
+</head>
+
 <body>
 
     <table>
@@ -14,7 +18,7 @@
         </tr>
         <tr>
             <td>
-                Hide cursor for performance 
+                Hide cursor for performance
             </td>
             <td>
                 <input type="checkbox" id="hideCursor"></input>
@@ -22,25 +26,48 @@
         </tr>
         <tr>
             <td>
-                Pixel color matching threshold. Smaller is more sensitive.
+                Pixel matching
             </td>
             <!-- 0 to 1 is allowed but high values essentially match everything -->
             <td>
-                <input type="range" min="0" max=".2" step=".1" value=".1" id="pixelMatchThreshold"></input>
+                Lenient<input type="range" min="0" max="2" step="1" value="1" id="pixelMatchSenstivity" list="sensitivitySettings">
+                <datalist id="sensitivitySettings">
+                    <option>.2</option>
+                    <option>.1</option>
+                    <option>0</option>
+                </datalist>
+                Strict
             </td>
         </tr>
+        <tr>
+            <td>
+                Typing speed
+            </td>
+            <!-- 0 to 1 is allowed but high values essentially match everything -->
+            <td>
+                Slower<input type="range" min="0" max="2" step="1" id="typingSpeed" list="speedSettings">
+                <datalist id="speedSettings">
+                    <option>100</option>
+                    <option>50</option>
+                    <option>0</option>
+                </datalist>
+                Faster
+            </td>
+        </tr>
+
     </table>
 
 
-<br>
+    <br>
 
-<div id="status"></div>
-
-
+    <div id="status"></div>
 
 
-<button id="save">Save</button> <button id="reset">Restore Defaults</button>
 
-<script type="module" src="options_controller.js"></script>
+
+    <button id="save">Save</button> <button id="reset">Restore Defaults</button>
+
+    <script type="module" src="options_controller.js"></script>
 </body>
+
 </html>
