@@ -25,10 +25,6 @@ keycode2modifier[CTRL_KEYCODE] = 2;
 keycode2modifier[META_KEYCODE] = 4;
 keycode2modifier[SHIFT_KEYCODE] = 8;
 
-disableConsole(); // can be reenabled in the debugger later
-
-setToolbarState();
-
 window.document.title = 'Brimstone - untitled';
 
 async function errorHandler(e) {
@@ -68,6 +64,18 @@ let windowId = parseInt(urlParams.get('parent'), 10);
  * and probably have less conflicting extensions.
  */
 (async function main() {
+    let options = await loadOptions();
+    if(options.developerMode) {
+        window.alert(`🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`);
+        await sleep(1000);
+        debugger;
+    }
+    else {
+        disableConsole(); // can be reenabled in the debugger later
+    }
+
+    setToolbarState();
+
     let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
     if(!allowedIncognitoAccess) {
         let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
@@ -78,9 +86,11 @@ let windowId = parseInt(urlParams.get('parent'), 10);
         }
     }
 
-    // if(window.devicePixelRatio !== 1) {
-    //     throw new Errors.PixelScalingError();
-    // }
+    if(options.experimentalFeatures) {
+        if(window.devicePixelRatio !== 1) {
+            throw new Errors.PixelScalingError();
+        }
+    }
 })();
 
 

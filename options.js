@@ -21,10 +21,20 @@ export class Options {
 
     /**
      * Record incognito always
+     * playback will be set to whichever mode the test was recorded in
      */
     recordIncognito = true;
 
-    // playback will be set to whichever mode the test was recorded in
+    /**
+     * 
+     */
+    experimentalFeatures = false;
+
+
+    /**
+     * Allow provide a way to debug better after deploy
+     */
+    developerMode = false;
 };
 
 var options = new Options();

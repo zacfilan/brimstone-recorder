@@ -1,5 +1,6 @@
 import { sleep } from "./utilities.js";
 import * as Errors from "./error.js";
+import { loadOptions } from "./options.js";
 
 export class Tab {
     constructor() {
@@ -33,9 +34,13 @@ export class Tab {
     async fromChromeTabId(id) {
         this.chromeTab = await chrome.tabs.get(id);
         this.zoomFactor = await chrome.tabs.getZoom(id);
-        // if (this.zoomFactor !== 1) {
-        //     throw new Errors.PixelScalingError(`The chrome zoom factor must equal 1. It is currently ${this.zoomFactor}`);
-        // }
+
+        let options = await loadOptions();
+        if (options.experimentalFeatures) {
+            if (this.zoomFactor !== 1) {
+                throw new Errors.PixelScalingError(`The chrome zoom factor must equal 1. It is currently ${this.zoomFactor}`);
+            }
+        }
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
         this.url = this.chromeTab.url;
@@ -60,6 +65,7 @@ export class Tab {
      * Resize the viewport of this tab to match its width, height and zoom properties.
      * */
     async resizeViewport() {
+        let options = await loadOptions();
         // empirically, it needs to be visible to work
         await chrome.windows.update(this.windowId, { focused: true });
 
@@ -73,9 +79,11 @@ export class Tab {
             }
             distance = await this.getViewport();
 
-            // if (distance.devicePixelRatio !== 1) {
-            //     throw new Errors.PixelScalingError();
-            // }
+            if (options.experimentalFeatures) {
+                if (distance.devicePixelRatio !== 1) {
+                    throw new Errors.PixelScalingError();
+                }
+            }
 
             if (distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
                 // it's wrong
