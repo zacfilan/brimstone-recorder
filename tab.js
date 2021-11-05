@@ -33,9 +33,9 @@ export class Tab {
     async fromChromeTabId(id) {
         this.chromeTab = await chrome.tabs.get(id);
         this.zoomFactor = await chrome.tabs.getZoom(id);
-        if (this.zoomFactor !== 1) {
-            throw new Errors.PixelScalingError(`The chrome zoom factor must equal 1. It is currently ${this.zoomFactor}`);
-        }
+        // if (this.zoomFactor !== 1) {
+        //     throw new Errors.PixelScalingError(`The chrome zoom factor must equal 1. It is currently ${this.zoomFactor}`);
+        // }
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
         this.url = this.chromeTab.url;
@@ -73,9 +73,9 @@ export class Tab {
             }
             distance = await this.getViewport();
 
-            if (distance.devicePixelRatio !== 1) {
-                throw new Errors.PixelScalingError();
-            }
+            // if (distance.devicePixelRatio !== 1) {
+            //     throw new Errors.PixelScalingError();
+            // }
 
             if (distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
                 // it's wrong

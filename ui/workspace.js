@@ -73,14 +73,14 @@ let windowId = parseInt(urlParams.get('parent'), 10);
         let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
         await chrome.tabs.update(activeChromeTab.id, { url: `chrome://extensions/?id=${chrome.runtime.id}` });
         while (!allowedIncognitoAccess) {
-            window.alert(`🟡 Extension requires manual user intervention to allow incognito. Please flip the switch, "Allow in Incognito" so it\'s blue.\n\nOnce you do, this workpace will reload.`);
+            window.alert(`🟡 Extension requires manual user intervention to allow incognito. Please flip the switch, "Allow in Incognito" so it\'s blue.\n\nOnce you do, please reopen the workspace.`);
             allowedIncognitoAccess =  await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
         }
     }
 
-    if(window.devicePixelRatio !== 1) {
-        throw new Errors.PixelScalingError();
-    }
+    // if(window.devicePixelRatio !== 1) {
+    //     throw new Errors.PixelScalingError();
+    // }
 })();
 
 
