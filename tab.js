@@ -11,21 +11,9 @@ export class Tab {
         this.height = 0;
         /** The actual (or desired) width of the tab, may differ from the associated chromeTab property */
         this.width = 0;
-        /** The actual (or desired) zoomFactor of the tab, may differ from the associated chromeTab property */
-        this.zoomFactor = 1;
 
         /** The chrome tab url, or perhaps the original that redirected to the chrome tab url. */
         this.url = null;
-    }
-
-    /** The number of pixels in the width when a zoomFactor is applied. */
-    get zoomWidth() {
-        return Math.round(this.width * this.zoomFactor);
-    }
-
-    /** The number of pixels in the height when zoomFactor is applied. */
-    get zoomHeight() {
-        return Math.round(this.height * this.zoomFactor);
     }
 
     /** 
@@ -33,14 +21,6 @@ export class Tab {
      */
     async fromChromeTabId(id) {
         this.chromeTab = await chrome.tabs.get(id);
-        this.zoomFactor = await chrome.tabs.getZoom(id);
-
-        let options = await loadOptions();
-        if (options.experimentalFeatures) {
-            if (this.zoomFactor !== 1) {
-                throw new Errors.PixelScalingError(`The chrome zoom factor must equal 1. It is currently ${this.zoomFactor}`);
-            }
-        }
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
         this.url = this.chromeTab.url;
@@ -62,7 +42,7 @@ export class Tab {
     }
 
     /** 
-     * Resize the viewport of this tab to match its width, height and zoom properties.
+     * Resize the viewport of this tab to match its width and height properties.
      * */
     async resizeViewport() {
         let options = await loadOptions();
@@ -77,19 +57,20 @@ export class Tab {
             if (i) {
                 await sleep(137); // we get once chance to be fast
             }
-            distance = await this.getViewport();
 
-            if (options.experimentalFeatures) {
-                if (distance.devicePixelRatio !== 1) {
-                    throw new Errors.PixelScalingError();
+            await chrome.tabs.setZoom(this.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
+            distance = await this.getViewport(); // get viewport data
+            if(options.experimentalFeatures) {
+                if(distance.devicePixelRatio !== 1) {
+                    throw new Errors.PixelScalingError(); // this must be windows scaling, I cannot reset that.
                 }
             }
 
-            if (distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
+            if (distance.innerHeight != this.height || distance.innerWidth != this.width) {
                 // it's wrong
                 await chrome.windows.update(this.windowId, {
-                    width: distance.borderWidth + this.zoomWidth,
-                    height: distance.borderHeight + this.zoomHeight
+                    width: distance.borderWidth + this.width,
+                    height: distance.borderHeight + this.height
                 });
                 console.debug(`  resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
             }

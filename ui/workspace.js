@@ -32,7 +32,7 @@ async function errorHandler(e) {
         case Errors.PixelScalingError:
             let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
             await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
-            window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. Both the Brimstone workspace and the Chrome window being recorded must be unscaled.\n\nSet your Chrome zoom to 100%. Set your windows monitor display scale to 100%, or use an unscaled display. Restart Chrome, try again.\n\nWorksace will close when you hit [OK].`);
+            window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorksace will close when you hit [OK].`);
             // bail
             await chrome.windows.remove(w.id); // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason
             break;
@@ -83,12 +83,6 @@ let windowId = parseInt(urlParams.get('parent'), 10);
         while (!allowedIncognitoAccess) {
             window.alert(`🟡 Extension requires manual user intervention to allow incognito. Please flip the switch, "Allow in Incognito" so it\'s blue.\n\nOnce you do, please reopen the workspace.`);
             allowedIncognitoAccess =  await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
-        }
-    }
-
-    if(options.experimentalFeatures) {
-        if(window.devicePixelRatio !== 1) {
-            throw new Errors.PixelScalingError();
         }
     }
 })();
@@ -447,7 +441,6 @@ async function attachDebuggerToTab(args) {
     args?.height && (tab.height = args.height);
     args?.width && (tab.width = args.width);
     args?.url && (tab.url = args.url); // don't want where we end up on redirect, want where we started
-    tab.zoomFactor = 1; // FIXME this needs to come from the test itself! 
 
     await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached, the recorder does not need to be injected
 }
@@ -743,7 +736,7 @@ async function prepareToRecord(tab) {
     player.usedFor = 'recording';
 
     console.debug(`begin - preparing to record tab ${tab.id} ${tab.url}`);
-    console.debug(`      -  tab is ${tab.width}x${tab.height} w/ zoom of ${tab.zoomFactor}`);
+    console.debug(`      -  tab is ${tab.width}x${tab.height}`);
 
     // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
