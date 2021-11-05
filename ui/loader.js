@@ -1,5 +1,5 @@
 import { loadOptions, saveOptions } from "../options.js";
-import { constants, TestAction } from "./card.js";
+import { constants, TestAction, TestMetaData, } from "./card.js";
 import { Screenshot } from "./screenshot.js";
 
 /** the zipfile */
@@ -38,11 +38,7 @@ export async function loadFile() {
     let test = JSON.parse(await zip.file("test.json").async("string"));
 
     let actions = test.steps;
-
-    // if the test has meta data, then update the currently running set of options with this data
-    let options = await loadOptions();
-    options.hideCursor = test.meta?.hideCursor ?? false;
-    await saveOptions(options);
+    TestAction.meta = Object.assign(new TestMetaData(), test.meta || {}); // re-hydrate the meta options
 
     let screenshotPromises = [];
     for (let i = 0; i < actions.length; ++i) {

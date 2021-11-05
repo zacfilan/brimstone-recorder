@@ -2,12 +2,13 @@ import { Player } from "../player.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
-import { TestAction, getCard, constants, Step } from "./card.js";
+import { TestAction, getCard, constants, Step, TestMetaData } from "./card.js";
 import { sleep, errorDialog } from "../utilities.js";
 import { enableConsole, disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
+import * as Errors from "../error.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
 const version = 'v' + chrome.runtime.getManifest().version;
@@ -30,15 +31,58 @@ setToolbarState();
 
 window.document.title = 'Brimstone - untitled';
 
-// catch all unhandled rejections and report them
-window.addEventListener('unhandledrejection', function (e) {
-    errorDialog(e.reason);
-});
+async function errorHandler(e) {
+    switch(e.constructor) {
+        case Errors.PixelScalingError:
+            let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+            await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
+            window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. Both the Brimstone workspace and the Chrome window being recorded must be unscaled.\n\nSet your Chrome zoom to 100%. Set your windows monitor display scale to 100%, or use an unscaled display. Restart Chrome, try again.\n\nWorksace will close when you hit [OK].`);
+            // bail
+            await chrome.windows.remove(w.id); // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason
+            break;
+        default:
+            errorDialog(e);
+            break;
+        }
+}
 
-window.addEventListener("error", function (e) {
-    errorDialog(e.error);
+// catch all unhandled promise rejections and report them. i.e. any throws that occur within a promise chain.
+window.addEventListener('unhandledrejection', async function(promiseRejectionEvent) {
+    await errorHandler(promiseRejectionEvent.reason);
     return false;
 });
+
+window.addEventListener("error", async function(errorEvent) {
+    await errorHandler(errorEvent.error);
+    return false;
+});
+
+/** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
+// grab the parent window id from the query parameter
+const urlParams = new URLSearchParams(window.location.search);
+let windowId = parseInt(urlParams.get('parent'), 10);
+
+/**
+ * allow this extension in incognito please. it increases the likelyhood that a test
+ * recorded by person user can be replayed by another, since they will use common localstorage,
+ * and probably have less conflicting extensions.
+ */
+(async function main() {
+    let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
+    if(!allowedIncognitoAccess) {
+        let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
+        await chrome.tabs.update(activeChromeTab.id, { url: `chrome://extensions/?id=${chrome.runtime.id}` });
+        while (!allowedIncognitoAccess) {
+            window.alert(`🟡 Extension requires manual user intervention to allow incognito. Please flip the switch, "Allow in Incognito" so it\'s blue.\n\nOnce you do, this workpace will reload.`);
+            allowedIncognitoAccess =  await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
+        }
+    }
+
+    if(window.devicePixelRatio !== 1) {
+        throw new Errors.PixelScalingError();
+    }
+})();
+
 
 /** used to *not* record pre-requisite screenshots when in the shadowDOM. */
 var shadowDOMScreenshot = 0;
@@ -102,16 +146,11 @@ function isPlaying() {
     return $('#playButton').hasClass('active');
 }
 
-// grab the parent window id from the query parameter
-const urlParams = new URLSearchParams(window.location.search);
-
 /** The tab being recorded/played
  * @type {Tab}
  */
 var tab = new Tab();
 
-/** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
-let windowId = parseInt(urlParams.get('parent'), 10)
 const player = new Player();
 
 var uiCardsElement = document.getElementById('cards');
@@ -364,11 +403,12 @@ async function attachDebuggerToTab(args) {
     }
 
     // weird case, when the user closes the window that spawned the workspace - perhaps it should also close the workspace, but I dunno.
-    if (!activeChromeTab) {
+    if (!activeChromeTab || activeChromeTab.incognito !== args.incognito) {
         let window = await chrome.windows.create({
-            url: 'about:blank',
+            //url: 'about:blank',
             type: "normal",
-            focused: false
+            focused: false, // why do i leave focus in the workspace?, i think because it mimics playback?
+            incognito: args.incognito
         });
         windowId = window.id;
         [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
@@ -514,7 +554,8 @@ $('#playButton').on('click', async function () {
             tab: activeChromeTab,
             width: actions[0].tabWidth,
             height: actions[0].tabHeight,
-            url: url
+            url: url,
+            incognito: TestAction.meta.incognito
         });
 
         await startPlaying(tab);
@@ -615,8 +656,6 @@ chrome.debugger.onDetach.addListener(debuggerOnDetach);
  * Read value from Options, write into TestAction.meta.
  */
 async function hideCursor() {
-    let options = await loadOptions();
-    TestAction.meta.hideCursor = options.hideCursor;
     if (TestAction.meta.hideCursor) {
         await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
     }
@@ -758,12 +797,14 @@ $('#recordButton').on('click', async function () {
             }
             options.url = url;
             saveOptions(options); // no need to wait
-            await attachDebuggerToTab({ url: url }); // get us there bro
+            TestAction.meta = new TestMetaData();
+            TestAction.meta.incognito = options.recordIncognito;
+            await attachDebuggerToTab({ url: url, incognito: TestAction.meta.incognito }); // get us there bro
         }
         else {
             // we are recording over some steps, don't do an initial navigate
             //FIXME: need to reset the lastScreenshot to whatever
-            await attachDebuggerToTab();
+            await attachDebuggerToTab({ incognito: TestAction.meta.incognito });
         }
 
         await prepareToRecord(tab);
@@ -814,7 +855,10 @@ async function stopPlaying() {
 
 $('#clearButton').on('click', async () => {
     // remove the cards
+    // FIXME abstract this away in a Test instance
     TestAction.instances = [];
+    TestAction.meta = new TestMetaData();
+
     setToolbarState();
     window.document.title = `Brimstone - untitled`;
 
@@ -1158,7 +1202,6 @@ async function onMessageHandler(message, _port) {
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
-        
         case 'mouseover':
         case 'mousemove':
         case 'click':

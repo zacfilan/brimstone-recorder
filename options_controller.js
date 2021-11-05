@@ -13,7 +13,10 @@ const pixelMatchThreshholds = [
 // Saves options to chrome.storage
 async function save_options() {
     options.MAX_VERIFY_TIMEOUT = parseInt(matchTimeout.value, 10);
+   
     options.hideCursor = document.getElementById('hideCursor').checked;
+    options.recordIncognito = document.getElementById('recordIncognito').checked;
+
     options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
     options.interKeypressDelay = interkeyPressDelays[parseInt(document.getElementById('typingSpeed').value, 10)];
     await saveOptions(options);
@@ -35,6 +38,7 @@ async function restore_options() {
     options = await loadOptions();
     document.getElementById('matchTimeout').value = options.MAX_VERIFY_TIMEOUT;
     document.getElementById('hideCursor').checked = options.hideCursor;
+    document.getElementById('recordIncognito').checked = options.recordIncognito;
     document.getElementById('pixelMatchSenstivity').value = pixelMatchThreshholds.indexOf(options.pixelMatchThreshhold);
     document.getElementById('typingSpeed').value = interkeyPressDelays.indexOf(options.interKeypressDelay);
 }

@@ -18,6 +18,13 @@ export class Options {
      * 0 50 100 seem pretty good
     */
     interKeypressDelay = 0;
+
+    /**
+     * Record incognito always
+     */
+    recordIncognito = true;
+
+    // playback will be set to whichever mode the test was recorded in
 };
 
 var options = new Options();

@@ -401,19 +401,22 @@ export class TestAction {
  */
 TestAction.instances = [];
 
+export class TestMetaData {
+    /** The version of brimstone-recorder used to record this test. */
+    version = 'v' + chrome.runtime.getManifest().version;
+
+    /** Should we hide the cursor for this test for performance? */
+    hideCursor = true;
+
+    /** Was this test recorded in (and hence should be played back in) incognito? */
+    incognito = true;
+};
+
 /**
  * Metadata about the current set of test actions.
  */
-TestAction.meta = {
-    /** The version of brimstone-recorder used to record this test. */
-    version: 'v' + chrome.runtime.getManifest().version,
+TestAction.meta = new TestMetaData();
 
-    /** Should we hide the cursor for this test for performance? */
-    hideCursor: true,
-
-    /** Was this test recorded (and should be played back) incognito? */
-    incognito: false
-};
 
 /**
  * An action followed by the next expected screen: action, expected screen

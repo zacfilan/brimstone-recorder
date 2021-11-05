@@ -1,4 +1,5 @@
-import {sleep} from "./utilities.js";
+import { sleep } from "./utilities.js";
+import * as Errors from "./error.js";
 
 export class Tab {
     constructor() {
@@ -33,7 +34,7 @@ export class Tab {
         this.chromeTab = await chrome.tabs.get(id);
         this.zoomFactor = await chrome.tabs.getZoom(id);
         if (this.zoomFactor !== 1) {
-            throw new Error(`The zoom factor must equal 1. It is currently ${this.zoomFactor}`);
+            throw new Errors.PixelScalingError(`The chrome zoom factor must equal 1. It is currently ${this.zoomFactor}`);
         }
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
@@ -55,22 +56,28 @@ export class Tab {
         return this.chromeTab.windowId;
     }
 
-    /** Resize the viewport of this tab to match its width, height and zoom properties.
+    /** 
+     * Resize the viewport of this tab to match its width, height and zoom properties.
      * */
     async resizeViewport() {
         // empirically, it needs to be visible to work
         await chrome.windows.update(this.windowId, { focused: true });
 
         console.debug(`resize viewport to ${this.width}x${this.height} requested`);
- 
+
         let i = 0; let distance;
         let matched = 0;
         for (i = 0; i < 10; i++) {
-            if(i) {
+            if (i) {
                 await sleep(137); // we get once chance to be fast
             }
             distance = await this.getViewport();
-            if(distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
+
+            if (distance.devicePixelRatio !== 1) {
+                throw new Errors.PixelScalingError();
+            }
+
+            if (distance.innerHeight != this.zoomHeight || distance.innerWidth != this.zoomWidth) {
                 // it's wrong
                 await chrome.windows.update(this.windowId, {
                     width: distance.borderWidth + this.zoomWidth,
@@ -80,15 +87,15 @@ export class Tab {
             }
             else {
                 // measure twice cut once? It seems that I may be getting a stale measurement the first time.
-                if(++matched>1) {
+                if (++matched > 1) {
                     break;
                 }
             }
         }
 
-        console.debug(`  viewport now measured to be ${distance.innerWidth}x${distance.innerHeight}`);
+        console.debug(`  viewport now measured to be ${distance.innerWidth}x${distance.innerHeight} `);
         if (i == 10) {
-            throw new Error("cannot set desired viewport");
+            throw new Errors.ResizeViewportError();
         }
     }
 
@@ -103,7 +110,8 @@ export class Tab {
                 innerHeight: top.innerHeight,
 
                 clientWidth: document.documentElement.clientWidth,
-                clientHeight: document.documentElement.clientHeight
+                clientHeight: document.documentElement.clientHeight,
+                devicePixelRatio: window.devicePixelRatio
             };
         }
 
