@@ -11,7 +11,7 @@ export class Options {
     /** Used in the png matching algorithm. Pixels are allowed some color variance, to deal with anti-aliasing for example.
      * Lower numbers are more strict.
      */
-    pixelMatchThreshhold = .1;
+    pixelMatchThreshhold = .2; // different screens seem to render a little different...
 
     /** delay in ms between typed characters.
      * simulates slower typing 
@@ -24,6 +24,12 @@ export class Options {
      * playback will be set to whichever mode the test was recorded in
      */
     recordIncognito = true;
+
+    /**
+     * Sometimes we neeed to create a new window in order to record or play incognito.
+     * Should we close the previous test window when we do this.
+     */
+    closeOldTestWindowOnCreate = true;
 
     /**
      * 

@@ -127,7 +127,6 @@ export class Player {
         let v = await getHydratedForPlayPromise();
 
         this._actions = actions;
-        this.mouseLocation = { x: -1, y: -1 }; // off the viewport I guess
 
         // start timer
         let start;
@@ -152,27 +151,15 @@ export class Player {
             }
             console.log(`end   play [${action.index}] : ${action.description}`);
 
-            // remember any mousemoving operation, implicit or explicit
-            switch (action.type) {
-                case 'click':
-                case 'dblclick':
-                case 'contextmenu':
-                case 'mousemove':
-                case 'wheel':
-                    /** Remember any mousemoving operation played, implicit or explicit */
-                    this.mouseLocation = { x: action.x, y: action.y };
-                    break;
-            }
             start = performance.now();
-
             if (!next.expectedScreenshot || next.shadowDOMAction) { // i don't record an image for shandowdom 
                 next._match = constants.view.PASS;
             }
             else {
                 await this.verifyScreenshot(next);
             }
-
             stop = performance.now();
+
             next.latency = ((stop - start) / 1000).toFixed(1);
 
             action._view = constants.view.EXPECTED;
@@ -204,7 +191,7 @@ export class Player {
         console.debug("player: start");
         // If we just recorded it and want to play it back, we can reuse the window we recorded it from
         // We can reuse the tab we launched the UI from.
-        await chrome.tabs.update(this.tab.id, {
+        await chrome.tabs.update(this.tab.chromeTab.id, {
             highlighted: true,
             active: true,
             url: action.url
@@ -386,7 +373,7 @@ export class Player {
     async change(action) {
         // FIXME: I need to run this in the correct frame!
         let frames = await chrome.scripting.executeScript({
-            target: { tabId: this.tab.id/*, frameIds: frameIds*/ },
+            target: { tabId: this.tab.chromeTab.id /*, frameIds: frameIds*/ },
             function: _changeSelectValue,
             args: [action.x, action.y, action.event.value]
         });
@@ -409,7 +396,7 @@ export class Player {
     async scroll(action) {
         // FIXME: I need to run this in the correct frame!
         let frames = await chrome.scripting.executeScript({
-            target: { tabId: this.tab.id/*, frameIds: frameIds*/ },
+            target: { tabId: this.tab.chromeTab.id/*, frameIds: frameIds*/ },
             function: _scroll,
             args: [action.x, action.y, action.event.scrollTop, action.event.scrollLeft]
         });
@@ -650,7 +637,7 @@ export class Player {
      */
     async _debuggerSendCommandRaw(method, commandParams) {
         console.debug(`  begin debugger send command ${method}`, commandParams);
-        let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.id }, method, commandParams, resolve)));
+        let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
         }
@@ -692,13 +679,13 @@ export class Player {
     }
 
     /** Schedule attaching the debugger to the given tab.
-    * @param {Tab} tab The tab to attach to
+    * @param {{tab: Tab}} 
     */
     async attachDebugger({ tab }) {
         console.debug(`schedule attach debugger`);
         this.tab = tab;
 
-        await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.id }, "1.3", _resolve)));
+        await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id}, "1.3", _resolve)));
         if (chrome.runtime.lastError?.message) {
             if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
                 throw new Error(chrome.runtime.lastError.message); // not sure how to handle that.
@@ -737,7 +724,7 @@ export class Player {
 
         }
         let frames = await chrome.scripting.executeScript({
-            target: { tabId: this.tab.id },
+            target: { tabId: this.tab.chromeTab.id },
             function: getMemory
         });
 

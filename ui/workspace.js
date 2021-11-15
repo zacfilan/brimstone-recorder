@@ -27,36 +27,50 @@ keycode2modifier[SHIFT_KEYCODE] = 8;
 
 window.document.title = 'Brimstone - untitled';
 
+/** The testing tab being recorded/played
+ * @type {Tab}
+ */
+var applicationUnderTestTab = new Tab();
+const player = new Player();
+/** used to *not* record pre-requisite screenshots when in the shadowDOM. */
+var shadowDOMScreenshot = 0;
+
 async function errorHandler(e) {
-    switch(e.constructor) {
+    let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+    await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
+    switch (e.constructor) {
         case Errors.PixelScalingError:
-            let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
-            await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
-            window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorksace will close when you hit [OK].`);
+             window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
             // bail
+            try {
+                await chrome.windows.remove(applicationUnderTestTab.chromeWindow.id);
+            }
+            catch (e) {
+                console.log(e);
+            }
             await chrome.windows.remove(w.id); // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason
+
+            break;
+        case Errors.ReuseTestWindow:
+            //let replay = window.confirm(`🛑 You are trying to record new steps and insert them into an existing test, but there is no current Chrome test window that matches your current test requirements.\n\nI can replay your test to the current step. After which you should be able to insert newly recorded steps.\n\nWould you like to do this?`);
+            window.alert(`🛑 You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
             break;
         default:
             errorDialog(e);
             break;
-        }
+    }
 }
 
 // catch all unhandled promise rejections and report them. i.e. any throws that occur within a promise chain.
-window.addEventListener('unhandledrejection', async function(promiseRejectionEvent) {
+window.addEventListener('unhandledrejection', async function (promiseRejectionEvent) {
     await errorHandler(promiseRejectionEvent.reason);
     return false;
 });
 
-window.addEventListener("error", async function(errorEvent) {
+window.addEventListener("error", async function (errorEvent) {
     await errorHandler(errorEvent.error);
     return false;
 });
-
-/** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
-// grab the parent window id from the query parameter
-const urlParams = new URLSearchParams(window.location.search);
-let windowId = parseInt(urlParams.get('parent'), 10);
 
 /**
  * allow this extension in incognito please. it increases the likelyhood that a test
@@ -65,7 +79,7 @@ let windowId = parseInt(urlParams.get('parent'), 10);
  */
 (async function main() {
     let options = await loadOptions();
-    if(options.developerMode) {
+    if (options.developerMode) {
         window.alert(`🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`);
         await sleep(1000);
         debugger;
@@ -75,21 +89,30 @@ let windowId = parseInt(urlParams.get('parent'), 10);
     }
 
     setToolbarState();
+    /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
+    // grab the parent window id from the query parameter   
+    const urlParams = new URLSearchParams(window.location.search);
+    let _windowId = parseInt(urlParams.get('parent'), 10);
+    applicationUnderTestTab.fromWindowId(_windowId); // start with this one
 
     let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
-    if(!allowedIncognitoAccess) {
-        let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-        await chrome.tabs.update(activeChromeTab.id, { url: `chrome://extensions/?id=${chrome.runtime.id}` });
-        while (!allowedIncognitoAccess) {
-            window.alert(`🟡 Extension requires manual user intervention to allow incognito. Please flip the switch, "Allow in Incognito" so it\'s blue.\n\nOnce you do, please reopen the workspace.`);
-            allowedIncognitoAccess =  await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
-        }
+    if (!allowedIncognitoAccess) {
+        window.alert(`🟡 Extension requires manual user intervention to allow incognito. 
+        
+When you hit [OK] I'll try to navigate you to the correct page (chrome://extensions/?id=${chrome.runtime.id}).
+
+On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reopen this workspace.`);
+        let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+
+        let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: _windowId });
+        await chrome.tabs.update(activeChromeTab.id, { 
+            url: `chrome://extensions/?id=${chrome.runtime.id}`,
+            active: true,
+            highlighted: true });
+        await chrome.windows.update(activeChromeTab.windowId, { focused: true });
+        await chrome.windows.remove(w.id);
     }
 })();
-
-
-/** used to *not* record pre-requisite screenshots when in the shadowDOM. */
-var shadowDOMScreenshot = 0;
 
 async function countDown(seconds) {
     let expectedScreenIndex = currentStepIndex() + 1;
@@ -109,29 +132,6 @@ async function countDown(seconds) {
     updateStepInView(TestAction.instances[expectedScreenIndex - 1]);
 }
 
-let pendingScreenShotTimeout = null
-async function replaceScreenshot() {
-    if (!pendingScreenShotTimeout) {
-        return;
-    }
-    try {
-        console.log('replacing last screenshot');
-        await captureScreenshotAsDataUrl();
-        let lastAction = TestAction.instances[TestAction.instances.length - 1];
-        // use the lower cost option, just the dataurl don't make into a PNG
-        // that will come later when we create a user action.
-        lastAction.expectedScreenshot = new Screenshot({
-            dataUrl: _lastScreenshot
-        });
-        updateStepInView(TestAction.instances[TestAction.instances.length - 2]);
-    }
-    catch (e) {
-        console.log('error replacing last screenshot', e);
-        // the capture can fail if the app is in the middle of a navigation, in which case don't worry about the
-        // screen, we will get it once it settles.
-    }
-}
-
 /** The index of the first card showing in big step area */
 function currentStepIndex() {
     let index = $('#content .card:first-of-type').attr('data-index');
@@ -149,13 +149,6 @@ function isRecording() {
 function isPlaying() {
     return $('#playButton').hasClass('active');
 }
-
-/** The tab being recorded/played
- * @type {Tab}
- */
-var tab = new Tab();
-
-const player = new Player();
 
 var uiCardsElement = document.getElementById('cards');
 
@@ -391,60 +384,6 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
 
-/**
- * 
- * @param {object} args
- * @param {number=} args.width the width to set the active tab to
- * @param {number=} args.height the height to set the active tab to 
- * @param {string=} args.url the url to go to in the tab, if it is a chrome url
- * @param {Tab=} args.tab the tab to attach to, if not specifed the active tab is used.
- */
-async function attachDebuggerToTab(args) {
-    // what tab should I play in? I am going to take over the active tab, in the window that launched the workspace.
-    let activeChromeTab = args?.tab;
-    if (!activeChromeTab) {
-        [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-    }
-
-    // weird case, when the user closes the window that spawned the workspace - perhaps it should also close the workspace, but I dunno.
-    if (!activeChromeTab || activeChromeTab.incognito !== args.incognito) {
-        let window = await chrome.windows.create({
-            //url: 'about:blank',
-            type: "normal",
-            focused: false, // why do i leave focus in the workspace?, i think because it mimics playback?
-            incognito: args.incognito
-        });
-        windowId = window.id;
-        [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-    }
-
-    let w = await chrome.windows.get(activeChromeTab.windowId);
-    if (w.state !== 'normal') {
-        window.alert(`The window state of the tab you want to record or playback is '${w.state}'. It will be set to 'normal' to continue.`);
-        await chrome.windows.update(activeChromeTab.windowId, { state: 'normal' });
-    }
-
-    if (args?.url) {
-        // this better be a URL that I can attach a debugger to
-        var resolveNavigationPromise;
-        let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
-        chrome.webNavigation.onCommitted.addListener(function navCommit(details) {
-            chrome.webNavigation.onCommitted.removeListener(navCommit);
-            resolveNavigationPromise(details);
-        });
-        await chrome.tabs.update(activeChromeTab.id, { url: args.url });
-        let details = await navPromise; // the above nav is really done.
-    }
-
-    await tab.fromChromeTabId(activeChromeTab.id);
-
-    args?.height && (tab.height = args.height);
-    args?.width && (tab.width = args.width);
-    args?.url && (tab.url = args.url); // don't want where we end up on redirect, want where we started
-
-    await player.attachDebugger({ tab }); // in order to play we _only_ need the debugger attached, the recorder does not need to be injected
-}
-
 $('#step').on('click', '#chartButton', async function () {
     let latencyValues = TestAction.instances.map(a => a.latency);
     let memoryUsedValues = TestAction.instances.map(a => a.memoryUsed);
@@ -521,19 +460,6 @@ $('#playButton').on('click', async function () {
         player.onAfterPlay = updateStepInView;
 
         let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
-        let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-
-        // weird case, when the user closes the window that spawned the workspace - perhaps it should also close the workspace, but I dunno.
-        if (!activeChromeTab) {
-            let window = await chrome.windows.create({
-                url: 'about:blank',
-                type: "normal",
-                focused: false
-            });
-            windowId = window.id;
-            [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: windowId });
-        }
-        let url = false;
 
         // we can resume a failed step, which means we don't drive the action just check the screenshot results of it.
         // this is used when the user fixes a failed step and wants to play from there.
@@ -546,22 +472,24 @@ $('#playButton').on('click', async function () {
         }
 
         if (playFrom === 0) {
-            // if we are playing from the beginning we navigate to about:blank, then to the starting url, then attach the debugger.
-            // https://github.com/zacfilan/brimstone-recorder/issues/87
-            await chrome.tabs.update(activeChromeTab.id, { url: 'about:blank' });
-            url = actions[0].url;
-            playFrom = 1; // don't navigate to the start twice
+            playFrom = 1; // don't navigate to the start twice, the goto is handled when we set up the applicationUnderTestTab
+            if(!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: TestAction.meta.incognito })) {
+                await applicationUnderTestTab.create({ url: actions[0].url, incognito: TestAction.meta.incognito });
+            }
+        }
+        else {
+            if(!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+                throw new Errors.ReuseTestWindow();
+            } 
         }
 
-        await attachDebuggerToTab({
-            tab: activeChromeTab,
-            width: actions[0].tabWidth,
-            height: actions[0].tabHeight,
-            url: url,
-            incognito: TestAction.meta.incognito
-        });
+        applicationUnderTestTab.url = actions[0].url;
+        applicationUnderTestTab.width = actions[0].tabWidth;
+        applicationUnderTestTab.height = actions[0].tabHeight;
 
-        await startPlaying(tab);
+        await player.attachDebugger({ tab: applicationUnderTestTab });
+
+        await startPlaying(applicationUnderTestTab);
 
         playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
 
@@ -637,19 +565,6 @@ async function debuggerOnDetach(source, reason) {
         stopRecording();
         stopPlaying(); // FIXME: refactor for less code
     }
-    // else {
-    //     // the debugger automatically detaches (eventually) when the tab navigates to a new URL. reason = target_closed
-    //     // this can also happen if the user closes the application tab being recorded (for some user reason) in the middle of a recording.
-    //     try {
-    //         await player.attachDebugger({ tab }); // it's the same tab...
-    //     }
-    //     catch (e) {
-    //         stopRecording();
-    //         stopPlaying();
-    //         console.error(e);
-    //         throw new Error("Unable to reattach the debugger.");
-    //     }
-    // }
 };
 
 chrome.debugger.onDetach.addListener(debuggerOnDetach);
@@ -660,11 +575,11 @@ chrome.debugger.onDetach.addListener(debuggerOnDetach);
  */
 async function hideCursor() {
     if (TestAction.meta.hideCursor) {
-        await chrome.tabs.sendMessage(tab.id, { func: 'hideCursor' });
+        await chrome.tabs.sendMessage(applicationUnderTestTab.chromeTab.id, { func: 'hideCursor' });
     }
 }
 
-async function startPlaying(tab) {
+async function startPlaying() {
     player.usedFor = 'playing';
     // only listen for navigations, when we are actively playing, and remove the listener when we are not.
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
@@ -672,7 +587,8 @@ async function startPlaying(tab) {
     chrome.webNavigation.onCompleted.addListener(playingWebNavigationOnCompleteHandler);
 
     await hideCursor();
-
+    // find FOCUS ISSUE in this file
+    await player.mousemove({x:0, y:0});
 }
 
 async function playingWebNavigationOnCompleteHandler(details) {
@@ -682,7 +598,7 @@ async function playingWebNavigationOnCompleteHandler(details) {
             console.debug(`    - ignoring navigation to page url 'about:blank'`);
             return;
         }
-        await startPlaying(tab);
+        await startPlaying();
 
     }
     catch (e) {
@@ -701,7 +617,8 @@ async function startRecorders() {
     // connect to all frames in the the active tab in this window. 
     // the recorder is injected in all pages, all frames, and will respond to onconnect by starting the event handlers.
     // https://developer.chrome.com/docs/extensions/reference/tabs/#method-connect
-    port = chrome.tabs.connect(tab.id, { name: "brimstone-recorder" });
+    console.debug('connect: creating port.')
+    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, { name: "brimstone-recorder" });
 
     // if the active tab navigates away or is closed the port will be disconected
     // FIXME: is this needed?
@@ -725,29 +642,42 @@ async function startRecorders() {
  * tell all the content scripts what frame they are in via chrome.tab.sendMessage
  */
 async function tellRecordersTheirFrameIds() {
-    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tab.id }, response))); // get all frames
+    console.debug('connect: tell each recorder their frame id');
+    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: applicationUnderTestTab.chromeTab.id }, response))); // get all frames
     for (let i = 0; i < frames.length; ++i) {
         let frame = frames[i];
-        await chrome.tabs.sendMessage(tab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
+        await chrome.tabs.sendMessage(applicationUnderTestTab.chromeTab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
     }
 }
 
+// function debugEvent(debugee, method, params) {
+//     console.log("EVENT! ", debugee, method, params);
+// }
+
+/**
+ * 
+ * @param {Tab} tab 
+ */
 async function prepareToRecord(tab) {
     player.usedFor = 'recording';
 
-    console.debug(`begin - preparing to record tab ${tab.id} ${tab.url}`);
-    console.debug(`      -  tab is ${tab.width}x${tab.height}`);
+    console.debug(`connect: begin - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
+    console.debug(`connect:       -  tab is ${tab.width}x${tab.height}`);
 
     // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
 
+    
     await tellRecordersTheirFrameIds();
     await hideCursor();
     await tab.resizeViewport(); // this can be called on a navigation, and the tab needs to be the correct size before the port is established, in case it decides to send us some mousemoves
 
-    console.debug(`end   - preparing to record tab ${tab.id} ${tab.url}`);
+    // chrome.debugger.onEvent.removeListener(debugEvent);
+    // chrome.debugger.onEvent.addListener(debugEvent);
+    
+    console.debug(`connect: end   - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
 }
 
 function stopRecording(tab) {
@@ -766,8 +696,8 @@ function stopRecording(tab) {
 }
 
 async function focusTab() {
-    await chrome.windows.update(tab.windowId, { focused: true });
-    await chrome.tabs.update(tab.id, {
+    await chrome.windows.update(applicationUnderTestTab.chromeWindow.id, { focused: true });
+    await chrome.tabs.update(applicationUnderTestTab.chromeTab.id, {
         highlighted: true,
         active: true
         // url: tab.url // shouldn't need that
@@ -787,8 +717,15 @@ $('#recordButton').on('click', async function () {
         }
 
         let url = '';
-        if (!TestAction.instances.length || currentStepIndex() === 0) {
-            let options = await loadOptions();
+        let options = await loadOptions();
+        let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - nuless the user is showing the last only!)
+        //updateThumbs(); // If I actually changed it I should show that
+
+        // are we doing an incognito recording?
+        TestAction.meta = new TestMetaData();
+        TestAction.meta.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
+
+        if (!(index>0) ) {
             let defaultUrl = options?.url ?? '';
             url = prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
             if (!url) {
@@ -798,49 +735,49 @@ $('#recordButton').on('click', async function () {
                 alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
                 return false;
             }
-            options.url = url;
+            options.url = url; // Cache the last URL recorded so we can reset it in the prompt, next time.
             saveOptions(options); // no need to wait
-            TestAction.meta = new TestMetaData();
-            TestAction.meta.incognito = options.recordIncognito;
-            await attachDebuggerToTab({ url: url, incognito: TestAction.meta.incognito }); // get us there bro
-        }
-        else {
-            // we are recording over some steps, don't do an initial navigate
-            //FIXME: need to reset the lastScreenshot to whatever
-            await attachDebuggerToTab({ incognito: TestAction.meta.incognito });
-        }
 
-        await prepareToRecord(tab);
+            // recording from beginning
+            if(!await applicationUnderTestTab.reuse({ url: url, incognito: TestAction.meta.incognito })) {
+                await applicationUnderTestTab.create({ url: url, incognito: TestAction.meta.incognito });
+            }
 
-        button.addClass('active');
-        setToolbarState();
-
-        // by the time we get here we have set up the 2 starting actions.
-        // and should be polling for the screenshot
-
-        if (!TestAction.instances.length) {
-            startRecorders();
+            await player.attachDebugger({ tab: applicationUnderTestTab });
+            await prepareToRecord(applicationUnderTestTab);
+            button.addClass('active');
+            setToolbarState();
 
             // update the UI: insert the first text card in the ui
             await recordUserAction({
                 type: 'start',
-                url: tab.url
+                url: applicationUnderTestTab.url
             });
+
+            // FOCUS ISSUE. when we create a window (because we need incognito for example) the focus isn't automatically placed on the viewport.
+            // i don't know why this is the case. so the initial screen is recorded without focus. the when we playback
+            // the first action is to move the mouse ontp the viewport so we can interact with it. this gives the viewport focus, before the
+            // mousemove completes. So the expected (no focus) can never match the actual (with focus). 
+            // to work around this i put the mouse on the viewport here to give it focus, in both recording and playback.
+            await player.mousemove({x:0,y:0}); // this is a bit of a hack. on recordig we don't get focus automatically on the viewport when we mustsince the first mousemove onto the viewport affects the screen.
         }
         else {
-            // we are appending to an existing test
-            let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - nuless the user is showing the last only!)
-            TestAction.instances.splice(index + 2); // anything after these 2 is gone.
+            TestAction.instances.splice(index + 2); // anything after the step showing is gone.
 
-            //updateThumbs();
+            // appending to an existing test
+            if(!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+                throw new Errors.ReuseTestWindow();
+            }
+
+            await player.attachDebugger({ tab: applicationUnderTestTab });
+            await prepareToRecord(applicationUnderTestTab);
+            button.addClass('active');
+            setToolbarState();
+
             await countDown(3);
-
-            // rename that
-            startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
-
-            // we assume the app in in the state of the second card, containing the expected state.
-            // when we record it will replace this card.
         }
+
+        startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
@@ -912,7 +849,7 @@ $('#loadButton').on('click', async () => {
         updateStepInView(TestAction.instances[0]);
         for (let i = 1; i < TestAction.instances.length; ++i) {
             let action = TestAction.instances[i];
-            updateThumb(action)
+            updateThumb(action);
         }
         setToolbarState();
     }
@@ -1001,8 +938,8 @@ async function userEventToAction(userEvent) {
     let cardModel = new TestAction(userEvent);
 
     let element = userEvent.boundingClientRect;
-    cardModel.tabHeight = tab.height;
-    cardModel.tabWidth = tab.width;
+    cardModel.tabHeight = applicationUnderTestTab.height;
+    cardModel.tabWidth = applicationUnderTestTab.width;
 
     cardModel.x += frameOffset.left;
     cardModel.y += frameOffset.top;
@@ -1013,21 +950,21 @@ async function userEventToAction(userEvent) {
          * of the overlay in percentages of the aspect-ratio preserved image.
          */
         cardModel.overlay = {
-            height: element.height * 100 / tab.height, // height of target element as a percent of screenshot height
-            width: element.width * 100 / tab.width, // width of target element as a percent screenshot width
+            height: element.height * 100 / applicationUnderTestTab.height, // height of target element as a percent of screenshot height
+            width: element.width * 100 / applicationUnderTestTab.width, // width of target element as a percent screenshot width
 
             /** absolute y coordinate of the TARGET ELEMENT as a percent of screenshot */
-            top: (element.top + frameOffset.top) * 100 / tab.height,
+            top: (element.top + frameOffset.top) * 100 / applicationUnderTestTab.height,
             /** absolute x coordinate of the TARGET ELEMENT as a percent of screenshot */
-            left: (element.left + frameOffset.left) * 100 / tab.width,
+            left: (element.left + frameOffset.left) * 100 / applicationUnderTestTab.width,
 
-            tabHeight: tab.height,
-            tabWidth: tab.width,
+            tabHeight: applicationUnderTestTab.height,
+            tabWidth: applicationUnderTestTab.width,
 
             /** absolute x coordinate of the mouse position as a percent of screenshot */
-            x: cardModel.x * 100 / tab.width,
+            x: cardModel.x * 100 / applicationUnderTestTab.width,
             /** absolute y coordinate of the mouse position as a percent of screenshot */
-            y: cardModel.y * 100 / tab.height
+            y: cardModel.y * 100 / applicationUnderTestTab.height
         };
     }
 
@@ -1150,6 +1087,7 @@ async function recordUserAction(userEvent) {
     wait._view = constants.view.DYNAMIC;
 
     updateStepInView(action); // update the UI
+    return action;
 }
 
 /** 
@@ -1158,11 +1096,11 @@ async function recordUserAction(userEvent) {
 async function onMessageHandler(message, _port) {
     let userEvent = message;
     console.debug(`RX: ${userEvent.type} ${userEvent.sender.href}`, userEvent);
-    let action;
 
     userEvent._view = constants.view.EXPECTED;
     // the last one contains the screenshot the user was looking at in the expected when they recorded this action
     userEvent.index = Math.max(0, TestAction.instances.length - 1); // used by userEventToAction constructor
+    let action;
     switch (userEvent.type) {
         case 'error':
             // remove current expected
@@ -1177,7 +1115,11 @@ async function onMessageHandler(message, _port) {
             break;
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {
+                console.log(`connect: using frameOffset for frameId ${userEvent.sender.frameId}`);
                 _resolvePostMessageResponsePromise(userEvent.args);
+            }
+            else {
+                console.log(`connect: ignoring frameOffset for frameId ${userEvent.sender.frameId}`);
             }
             break;
         case 'save-lastscreenshot':
@@ -1215,7 +1157,7 @@ async function onMessageHandler(message, _port) {
             // if it is allowed to end, then still, we want to grab and reuse the pre-requisite screenshot of the mousemove
 
             // but we CANNOT take a SS here for the start state, because of :hover and :active issues on mouseover and mousedown respectively.
-            recordUserAction(userEvent);
+            action = await recordUserAction(userEvent);
 
             // these need to be simulated because I do double click detection in the recorder itself, which intercepts click.
             // FIXME: why must I simulate these?
@@ -1223,25 +1165,25 @@ async function onMessageHandler(message, _port) {
             // Could recorder passively monitor, and propagate them? i need to record *something*. is it a single click or a double click that I want to record?
             // I am using an old start state anyway...
             if (userEvent.handler?.simulate) {
-                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+                await player[action.type](action); // this can result in a navigation to another page.
             }
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'scroll':
-            recordUserAction(userEvent);
+            await recordUserAction(userEvent);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         // keyevents should work almost the same as mousemove except, i want more/faster visual feedback for the user, which is 
         // why i simulate them. this lets the browser update the screen, even though I don't take a screenshot everytime.
         case 'keys':
             // i just don't know how to record in the shadowDOM very well!!
-            recordUserAction(userEvent);
+            await recordUserAction(userEvent);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'change':
-            //recordUserAction(userEvent);
-            let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+            //await (userEvent);
+            action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
 
             // show the latest screenshot in the expected card and start polling it
             await captureScreenshotAsDataUrl();
@@ -1261,14 +1203,18 @@ async function onMessageHandler(message, _port) {
                 await player[userEvent.type](userEvent); // this can result in a navigation to another page.
             }
             if (userEvent.handler?.record) {
-                recordUserAction(userEvent);
+                await recordUserAction(userEvent);
             }
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'connect':
-            console.debug(`connection established from frame ${userEvent.sender.frameId}`);
+            console.debug(`connect: connection established from frame ${userEvent.sender.frameId} ${userEvent.sender.href}`);
+
+            // FIXME: the recorder didn't know its frameID when it asked to connect, so I can't really
+            // use the 'to' correctly here. I'd ike to sendback the correct frameID right away.
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            await tellRecordersTheirFrameIds(); // the recorder doesn't know it's frameId when it is connected, so tell it (them all)
             break;
         default:
             console.warn(`unexpected userEvent received <${userEvent.type}>`);
@@ -1288,12 +1234,16 @@ async function webNavigationOnCompleteHandler(details) {
             console.debug(`    - ignoring navigation to page url 'about:blank'`);
             return;
         }
-        const { height, width } = tab; // hang onto the original size
-        await tab.fromChromeTabId(details.tabId); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
-        tab.height = height;
-        tab.width = width;
 
-        await prepareToRecord(tab);
+        // a user action during recording caused a navigation.
+        // update the applicationUnderTestTab to reflect the new state of the tab
+        const { height, width } = applicationUnderTestTab; // hang onto the original size
+        let chromeTab = await chrome.tabs.get(details.tabId);
+        await applicationUnderTestTab.fromChromeTab(chromeTab); // since this resets those to the chrome tab sizes, which is wrong because of the banner.
+        applicationUnderTestTab.height = height;
+        applicationUnderTestTab.width = width;
+
+        await prepareToRecord(applicationUnderTestTab);
         startRecorders();
     }
     catch (e) {
@@ -1332,7 +1282,7 @@ async function getFrameOffset(frameId) {
     /** Array of frames in the current tab 
      * https://developer.chrome.com/docs/extensions/reference/webNavigation/#method-getAllFrames 
      */
-    let frames = await (new Promise(resolve => chrome.webNavigation.getAllFrames({ tabId: tab.id }, resolve))); // get all frames
+    let frames = await (new Promise(resolve => chrome.webNavigation.getAllFrames({ tabId: applicationUnderTestTab.chromeTab.id }, resolve))); // get all frames
 
     // find my offset and all my ancestors offsets too
     for (let frame = frames.find(f => f.frameId === frameId); frame.parentFrameId >= 0; frame = frames.find(f => f.frameId === frame.parentFrameId)) {
@@ -1346,7 +1296,7 @@ async function getFrameOffset(frameId) {
         });
 
         // tell this frames parent to broadcast down into his kids (including this frame) their offsets
-        await chrome.tabs.sendMessage(tab.id, { func: 'postMessageOffsetIntoIframes' }, { frameId: frame.parentFrameId });
+        await chrome.tabs.sendMessage(applicationUnderTestTab.chromeTab.id, { func: 'postMessageOffsetIntoIframes' }, { frameId: frame.parentFrameId });
         // it's posted, but that doesn't mean much
 
         let response = await p; // eventually some 'frameOffset' messages come in, and when I see mie (this frame) this promise is resolved with my offset.

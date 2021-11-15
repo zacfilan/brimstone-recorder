@@ -111,6 +111,11 @@ class Recorder {
         /** the active element on the start of a mousemove. used for error recorvery. roll back focus to this element on error. */
         this.activeElement = null;
 
+        /** records if we are over or out of an element. if we timeout and we are out, then we cancel the record. 
+         * this is supposed to be used only to detect when we move off the viewport for some reason, and not record that.
+         */
+        this.mousePhase = null;
+
         this.removeEventListeners();
     }
 
@@ -146,6 +151,13 @@ class Recorder {
      * This should be scheduled whenever the tx queue becomes empty.
      */
     scheduleWaitActionDetection() {
+        // FIXME: this is still insufficient to handle  multiple frames correctly. I originally thought of them as
+        // being in a single queue, but now there are two active queues, main frame for these
+        // and subframes for normal recording events.
+        if(this._frameId) {
+            return; // only do this from the main frame
+        }
+
         clearTimeout(this.waitActionDetectionTimeout);
         this.waitActionDetectionTimeout = null;
         this.waitActionDetectionTimeout = setTimeout(
@@ -180,6 +192,8 @@ class Recorder {
      * https://developer.chrome.com/docs/extensions/reference/runtime/#event-onMessage
      * */
     _runtimeFrameIdSpecificOnMessageHandler(message, sender, sendResponse) {
+        console.debug('connect: _runtimeFrameIdSpecificOnMessageHandler', message, sender);
+
         // the sender will always be the extension, since the chrome extension api
         // doesn't provide for content-script to content-script messaging. (For that
         // I need to rely on windows.postMessage.)
@@ -211,6 +225,7 @@ class Recorder {
         if (port.name !== 'brimstone-recorder') {
             return;
         }
+        console.debug('connect: to extension (workspace).')
         this.reset(); // be paranoid.
 
         this.addEventListeners();
@@ -250,11 +265,11 @@ class Recorder {
      * this window.
      * The iframe will relay this information along with its
      * chrome frameID to the extension via chome.runtime.sendMessage.
-     *  The extension will then know all frame offsets within their
-     *parent.
+     * The extension will then know all frame offsets within their
+     * parent.
      */
     postMessageOffsetIntoIframes() {
-        //console.debug(`TX: frame ${ this._frameId }:${ window.location.href } broadcasts to each child frame their own offset from this frame`);
+        console.debug(`TX: frame ${ this._frameId }:${ window.location.href } broadcasts to each child frame their own offset from this frame`);
         let iframes = document.getElementsByTagName('IFRAME');
         for (let i = 0; i < iframes.length; ++i) {
             let iframe = iframes[i];
@@ -504,7 +519,7 @@ class Recorder {
         clearTimeout(this.pendingMouseMoveTimeout);
         this.pendingMouseMoveTimeout = setTimeout(
             () => {
-                if (!this.mouseMovePending) {
+                if (!this.mouseMovePending || this.mousePhase === 'out') {
                     return;
                 }
 
@@ -531,7 +546,7 @@ class Recorder {
         e.brimstoneClass = e.timeStamp === SYNTHETIC_EVENT_TIMESTAMP ? 'synthetic' : 'user'; // an event simulated by brimstone
         this.event = e;
         let msg;
-        //return Recorder.propagate(e); // for debugging
+        //return this.propagate(e); // for debugging
 
         console.debug(`${e.type} ${e.brimstoneClass} SEEN`, e);
         // This message can't be folded into the swtich below, we receive it for any user action currently being recorded.
@@ -544,22 +559,27 @@ class Recorder {
              * */
             let brimstoneRecorder = e.data.brimstoneRecorder;
             if (!brimstoneRecorder) {
-                return Recorder.propagate(e); // some other non-brimstone postedMessage into this frame. We don't care about it.
+                console.debug('connect: non brimstone message received', e);
+                return this.propagate(e); // some other non-brimstone postedMessage into this frame. We don't care about it.
             }
             switch (brimstoneRecorder.func) {
                 case 'relayFrameOffsetToExtension': // *all* children frames get this message
+                    console.debug('connect: relayFrameOffsetToExtension');
                     this._postMessage({ type: 'frameOffset', func: 'frameOffset', args: brimstoneRecorder.args });
+                    break;
+                default:
+                    console.warn('connect: bad brimstone function', e);
                     break;
             }
             /**
              * I want to eat this event, and have no-one else see it, but 'message' is not cancelable.
              * https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel/message_event
              */
-            return Recorder.cancel(e); // ..so these are pointless
+            return this.cancel(e); // ..so these are pointless
         }
 
         if (e.brimstoneClass === 'synthetic') {
-            return Recorder.propagate(e);
+            return this.propagate(e);
         }
         // else this is a user generated event
 
@@ -578,7 +598,7 @@ class Recorder {
                 // or or a legit untrusted event - in response to something we are simulating. (e.g. the app itself could trigger a click event to do work)
                 //  https://developer.mozilla.org/en-US/docs/Web/API/Event/isTrusted
                 // after we simulate keydown enter either way just let the app deal with it.
-                return Recorder.propagate(e);
+                return this.propagate(e);
             }
         }
 
@@ -586,10 +606,13 @@ class Recorder {
         switch (e.type) {
             case 'mousemove':
                 this.startMouseMove(e);
-                return Recorder.propagate(e);
+                return this.propagate(e);
             case 'mouseover':
+                this.mousePhase = 'over';
+                return this.propagate(e);
             case 'mouseout':
-                return Recorder.propagate(e);
+                this.mousePhase = 'out';
+                return this.propagate(e);
             case 'change':
                 // this is not a direct user input, but it is (indirectly) the only way to identify
                 // when a select value was changed via a user interacting in the shadow DOM (where the record cannot monitor events).
@@ -602,12 +625,12 @@ class Recorder {
                     
                     this.pushMessage(msg); // the change needs to be recorded, although it is a non-ui action
                 }
-                return Recorder.propagate(e);
+                return this.propagate(e);
             case 'mousedown':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError();
-                        return Recorder.cancel(e);
+                        return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove();
@@ -618,11 +641,11 @@ class Recorder {
 
                 this.mouseDown = e; // down right now
                 this.lastMouseDownEvent = e; // and hang onto it after it is not the last event
-                return Recorder.cancel(e); // recall I am going to simulate the whole click or double click, so I don't release to the app
+                return this.cancel(e); // recall I am going to simulate the whole click or double click, so I don't release to the app
             case 'mouseup':
                 this.mouseDown = false;
                 this.lastMouseMoveEvent = e;
-                return Recorder.cancel(e); // going to simulate the whole click or double click, so I don't release this to the app
+                return this.cancel(e); // going to simulate the whole click or double click, so I don't release this to the app
             case 'scroll':
                 clearTimeout(this.waitActionDetectionTimeout);
                 this.waitActionDetectionTimeout = this.pendingMouseMoveTimeout = null;
@@ -642,11 +665,16 @@ class Recorder {
                     },
                     500 // FIXME: make configurable
                 );
-                return Recorder.propagate(e); // not cancellable anyway (i.e cannot preventDefault actions) (wheel event generated)
+                return this.propagate(e); // not cancellable anyway (i.e cannot preventDefault actions) (wheel event generated)
             case 'wheel':
                 if (this.mouseMovePending) {
-                    this.unrecoverableUserError();
-                    return Recorder.cancel(e);
+                    if (this.mouseMoveStartingElement !== e.target) {
+                        this.recoverableUserError();
+                        return this.cancel(e);
+                    }
+                    else {
+                        this.clearPendingMouseMove();
+                    }
                 }
 
                 if (!this.wheel) {
@@ -656,21 +684,21 @@ class Recorder {
                 clearTimeout(this.waitActionDetectionTimeout);
                 this.waitActionDetectionTimeout = this.pendingMouseMoveTimeout = null;
 
-                return Recorder.propagate(e);
+                return this.propagate(e);
             case 'keydown':
             case 'keyup':
                 this._recordScrollAction(); // terminate any pending scroll actions
 
                 this.handleKey(e);
-                return Recorder.cancel(e);
+                return this.cancel(e);
             case 'keypress':
-                return Recorder.cancel(e);
+                return this.cancel(e);
             case 'contextmenu':
             case 'dblclick':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError();
-                        return Recorder.cancel(e);
+                        return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove();
@@ -682,12 +710,12 @@ class Recorder {
 
                 msg = this.buildMsg(e);
                 this.pushMessage(msg); // take screenshot and then simulate
-                return Recorder.cancel(e);
+                return this.cancel(e);
             case 'click':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError();
-                        return Recorder.cancel(e);
+                        return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove();
@@ -725,15 +753,15 @@ class Recorder {
                         //console.error('sanity check fails. got a 2nd single click within 500ms but not marked as 2nd click.')
                     }
                 }
-                return Recorder.cancel(e);
+                return this.cancel(e);
             case 'mouseover': // alow these to bubble so I can see the complex hover stuff like tooltips and menus
                 /** The time that the users mouse entered the current element, used to record hover effects. */
                 this._mouseEnterTime = performance.now();
             case 'mouseout': // allow these to bubble so I can see the complex hover stuff like tooltips and menus
-                return Recorder.propagate(e);
+                return this.propagate(e);
             //}
             default:
-                return Recorder.propagate(e); // why block other events?
+                return this.propagate(e); // why block other events?
         }
     }
 
@@ -914,6 +942,30 @@ class Recorder {
             }
         });
     }
+
+    /**
+     * The RECORDER will handle this event. It will (try to) cancel it. Try to prevent the application from seeing it. Not bubbled etc.
+     * 
+     * @param {Event} e 
+     * @returns 
+     */
+    cancel(e) {
+        console.debug(`EVENT ${e.type} ${e.brimstoneClass} ${e.cancelable ? '*cancelled' : '*un-cancelable'} frameId:${this._frameId} ${window.location.href}`, e);
+    
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        return false;
+    };
+    
+    /**
+     * The APPLICATION will handle event. It will be ignored by the recorder. Allowed to bubble etc.
+     * @param {Event} e 
+     */
+    propagate(e) {
+        console.debug(`EVENT ${e.type} ${e.brimstoneClass} *propagated frameId:${this._frameId} ${window.location.href}`, e);
+    }
+
 } // end class Recorder
 
 Recorder.events = [
@@ -963,19 +1015,6 @@ Recorder.events = [
      * */
     'message'
 ];
-
-Recorder.cancel = function cancel(e) {
-    console.debug(`${e.type} ${e.brimstoneClass} ${e.cancelable ? '*cancelled' : '*un-cancelable'}`, e);
-
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    e.stopPropagation();
-    return false;
-};
-
-Recorder.propagate = function propagate(e) {
-    console.debug(`${e.type} ${e.brimstoneClass} *propagated`, e);
-}
 
 // create the instance
 new Recorder();

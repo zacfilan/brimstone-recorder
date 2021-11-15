@@ -26,10 +26,18 @@
         </tr>
         <tr>
             <td>
-                Auto record incognito
+                Always record incognito
             </td>
             <td>
                 <input type="checkbox" id="recordIncognito"></input>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Close previous test window when creating a new one
+            </td>
+            <td>
+                <input type="checkbox" id="closeOldTestWindowOnCreate"></input>
             </td>
         </tr>
         <tr>
@@ -38,7 +46,8 @@
             </td>
             <!-- 0 to 1 is allowed but high values essentially match everything -->
             <td>
-                Lenient<input type="range" min="0" max="2" step="1" value="1" id="pixelMatchSenstivity" list="sensitivitySettings">
+                Lenient<input type="range" min="0" max="2" step="1" value="1" id="pixelMatchSenstivity"
+                    list="sensitivitySettings">
                 <datalist id="sensitivitySettings">
                     <option>.2</option>
                     <option>.1</option>

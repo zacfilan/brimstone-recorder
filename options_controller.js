@@ -18,6 +18,7 @@ async function save_options() {
     options.recordIncognito = document.getElementById('recordIncognito').checked;
     options.developerMode = document.getElementById('developerMode').checked;
     options.experimentalFeatures = document.getElementById('experimentalFeatures').checked;
+    options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
 
     options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
     options.interKeypressDelay = interkeyPressDelays[parseInt(document.getElementById('typingSpeed').value, 10)];
@@ -43,6 +44,8 @@ async function restore_options() {
     document.getElementById('recordIncognito').checked = options.recordIncognito;
     document.getElementById('developerMode').checked = options.developerMode;
     document.getElementById('experimentalFeatures').checked = options.experimentalFeatures;
+    document.getElementById('closeOldTestWindowOnCreate').checked = options.closeOldTestWindowOnCreate;
+
 
     document.getElementById('pixelMatchSenstivity').value = pixelMatchThreshholds.indexOf(options.pixelMatchThreshhold);
     document.getElementById('typingSpeed').value = interkeyPressDelays.indexOf(options.interKeypressDelay);

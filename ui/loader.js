@@ -1,4 +1,3 @@
-import { loadOptions, saveOptions } from "../options.js";
 import { constants, TestAction, TestMetaData, } from "./card.js";
 import { Screenshot } from "./screenshot.js";
 
