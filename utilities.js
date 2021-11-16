@@ -44,3 +44,14 @@ export async function errorDialog(e) {
     $('#cancelButton').off('click').on('click', () => $('.error-dialog').remove());
     $('#reportButton').off('click').on('click', () => window.open('https://github.com/zacfilan/brimstone-recorder/issues', 'brimstoneRecorderIssues'));
 }
+
+// credit where due https://stackoverflow.com/a/30800715
+export function downloadObjectAsJson(exportObj, exportName){
+    var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2)); // zac likes readable json
+    var downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("download", exportName + ".json");
+    document.body.appendChild(downloadAnchorNode); // required for firefox
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  }

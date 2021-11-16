@@ -220,6 +220,10 @@ button svg {
   height: 100%;
 }
 
+.card .footer button {
+  margin: 0;
+}
+
 @-webkit-keyframes progressBar {
   0% {
     width: 0;

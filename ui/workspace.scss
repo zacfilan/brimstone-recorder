@@ -184,6 +184,9 @@ button {
 
     .footer {
         @extend .row;
+        button {
+            margin: 0;
+        }
     }
 }
 

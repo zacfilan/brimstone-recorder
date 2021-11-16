@@ -3,8 +3,8 @@ import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step, TestMetaData } from "./card.js";
-import { sleep, errorDialog } from "../utilities.js";
-import { enableConsole, disableConsole } from "./console.js";
+import { sleep, errorDialog, downloadObjectAsJson } from "../utilities.js";
+import { disableConsole } from "./console.js";
 import { loadFile, saveFile } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
@@ -25,7 +25,8 @@ keycode2modifier[CTRL_KEYCODE] = 2;
 keycode2modifier[META_KEYCODE] = 4;
 keycode2modifier[SHIFT_KEYCODE] = 8;
 
-window.document.title = 'Brimstone - untitled';
+let testFileName = 'untitled';
+window.document.title = `Brimstone - ${testFileName}`;
 
 /** The testing tab being recorded/played
  * @type {Tab}
@@ -173,6 +174,21 @@ var _lastMouseMove;
  * of playing them back. 
  * 
 */
+
+$('#step').on('click', '#downloadObjectAsJsonButton', function() {
+    // I only want a few properties, so swap out the serializer
+    let orig = TestAction.prototype.toJSON;
+    TestAction.prototype.toJSON = function() {
+        return {
+            index: this.index,
+            memoryUsed: this.memoryUsed,
+            latency: this.latency
+        };
+    };    
+    let name = testFileName.replace(/\.[^/.]+$/,'') + '_metrics';
+    downloadObjectAsJson({ steps: TestAction.instances }, name);
+    TestAction.prototype.toJSON = orig;
+});
 
 $('#ignoreDelta').on('click',
     /** Commit any volatile rectangles or individual pixel deltas. */
@@ -800,7 +816,8 @@ $('#clearButton').on('click', async () => {
     TestAction.meta = new TestMetaData();
 
     setToolbarState();
-    window.document.title = `Brimstone - untitled`;
+    testFileName = 'untitled';
+    window.document.title = `Brimstone - ${testFileName}`;
 
     $('#cards').empty();
     $('#step').empty();
@@ -826,7 +843,8 @@ function postMessage(msg) {
 $('#saveButton').on('click', async () => {
     let file = await saveFile();
     if (file) {
-        window.document.title = `Brimstone - ${file.name}`;
+        testFileName = file.name;
+        window.document.title = `Brimstone - ${testFileName}`;
     }
 });
 
@@ -845,7 +863,8 @@ $('#issuesButton').on('click', () => {
 $('#loadButton').on('click', async () => {
     let file = await loadFile();
     if (file) {
-        window.document.title = `Brimstone - ${file.name}`;
+        testFileName = file.name;
+        window.document.title = `Brimstone - ${testFileName}`;
         updateStepInView(TestAction.instances[0]);
         for (let i = 1; i < TestAction.instances.length; ++i) {
             let action = TestAction.instances[i];
