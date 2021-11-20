@@ -73,8 +73,8 @@ window.addEventListener("error", async function (errorEvent) {
     return false;
 });
 
-/**
- * allow this extension in incognito please. it increases the likelyhood that a test
+/**********************************************************************************************
+ * Main entry point. - allow this extension in incognito please. it increases the likelyhood that a test
  * recorded by person user can be replayed by another, since they will use common localstorage,
  * and probably have less conflicting extensions.
  */
@@ -94,7 +94,8 @@ window.addEventListener("error", async function (errorEvent) {
     // grab the parent window id from the query parameter   
     const urlParams = new URLSearchParams(window.location.search);
     let _windowId = parseInt(urlParams.get('parent'), 10);
-    applicationUnderTestTab.fromWindowId(_windowId); // start with this one
+    await applicationUnderTestTab.fromWindowId(_windowId); // start with this one
+    let activeChromeTab = applicationUnderTestTab.chromeTab;
 
     let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
     if (!allowedIncognitoAccess) {
@@ -105,7 +106,7 @@ When you hit [OK] I'll try to navigate you to the correct page (chrome://extensi
 On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reopen this workspace.`);
         let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
 
-        let [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: _windowId });
+        [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: _windowId });
         await chrome.tabs.update(activeChromeTab.id, { 
             url: `chrome://extensions/?id=${chrome.runtime.id}`,
             active: true,
@@ -674,7 +675,10 @@ async function tellRecordersTheirFrameIds() {
 // }
 
 /**
- * 
+ * Set up navigation listener, which refires this function when a nav completes.
+ * Tell recorders their frameids.
+ * Hide the cursor.
+ * Resize the viewport.
  * @param {Tab} tab 
  */
 async function prepareToRecord(tab) {
@@ -687,15 +691,10 @@ async function prepareToRecord(tab) {
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
-
     
     await tellRecordersTheirFrameIds();
     await hideCursor();
     await tab.resizeViewport(); // this can be called on a navigation, and the tab needs to be the correct size before the port is established, in case it decides to send us some mousemoves
-
-    // chrome.debugger.onEvent.removeListener(debugEvent);
-    // chrome.debugger.onEvent.addListener(debugEvent);
-    
     console.debug(`connect: end   - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
 }
 
@@ -1262,10 +1261,6 @@ async function onMessageHandler(message, _port) {
 async function webNavigationOnCompleteHandler(details) {
     try {
         console.debug(`tab ${details.tabId} navigation completed`, details);
-        if (details.url === 'about:blank') {
-            console.debug(`    - ignoring navigation to page url 'about:blank'`);
-            return;
-        }
 
         // a user action during recording caused a navigation.
         // update the applicationUnderTestTab to reflect the new state of the tab
