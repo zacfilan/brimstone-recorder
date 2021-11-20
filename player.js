@@ -73,6 +73,19 @@ function _changeSelectValue(x, y, value) {
     }
 }
 
+// This is not needed, but it took me forever to figure out how to get these events so I leave it here
+// function handleDebuggerEvents(source, method, params) {
+//     console.log('Debugger EVENT!!', source, method, params);
+// }
+// async function monitorPageEvents() {
+//     await (new Promise(_resolve => chrome.debugger.sendCommand({ tabId: tab.chromeTab.id }, "Page.enable", {}, _resolve)));
+//     if (chrome.runtime.lastError?.message) {
+//         throw new Error(chrome.runtime.lastError.message); // not sure how to handle that.
+//     }
+//     chrome.debugger.onEvent.removeListener(handleDebuggerEvents);
+//     chrome.debugger.onEvent.addListener(handleDebuggerEvents);
+// }
+
 export class Player {
     /** The currently executing step. */
     actionStep;
@@ -352,10 +365,10 @@ export class Player {
         for (let i = 0; i < action.event.length; ++i) {
             let event = action.event[i];
             // convert the wheel events into wheel actions
-            await this[event.type]({ 
+            await this[event.type]({
                 x: event.clientX,
-                y: event.clientY,                
-                event 
+                y: event.clientY,
+                event
             }); // pretend it is a distinct action
         }
 
@@ -370,7 +383,7 @@ export class Player {
         //     x: last.clientX,
         //     y: last.clientY
         // });
-        
+
     }
 
     async keyup(action) {
@@ -682,7 +695,7 @@ export class Player {
             commandParams.timestamp = Player.SYNTHETIC_EVENT_TIMESTAMP;
         }
         // when playing, there is no user input.
-        
+
         for (i = 0; i < 2; ++i) { // at most twice 
             try {
                 return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
@@ -723,6 +736,9 @@ export class Player {
         }
         // else no error 
 
+        // not needed. but left since it took awhile to figure out.
+        //await monitorPageEvents();
+
         // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
         // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
         //await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
@@ -730,7 +746,7 @@ export class Player {
         await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
         await this.tab.resizeViewport();
         console.debug(`debugger attached`);
-    };
+    }
 
     async stopPlaying() {
         /** used to async cancel a playing test */
