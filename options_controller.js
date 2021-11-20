@@ -17,6 +17,7 @@ async function save_options() {
     options.hideCursor = document.getElementById('hideCursor').checked;
     options.recordIncognito = document.getElementById('recordIncognito').checked;
     options.developerMode = document.getElementById('developerMode').checked;
+    options.debugRecorder = document.getElementById('debugRecorder').checked;
     options.experimentalFeatures = document.getElementById('experimentalFeatures').checked;
     options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
 
@@ -43,6 +44,8 @@ async function restore_options() {
     document.getElementById('hideCursor').checked = options.hideCursor;
     document.getElementById('recordIncognito').checked = options.recordIncognito;
     document.getElementById('developerMode').checked = options.developerMode;
+    document.getElementById('debugRecorder').checked = options.debugRecorder;
+
     document.getElementById('experimentalFeatures').checked = options.experimentalFeatures;
     document.getElementById('closeOldTestWindowOnCreate').checked = options.closeOldTestWindowOnCreate;
 

@@ -11,7 +11,7 @@ export class Options {
     /** Used in the png matching algorithm. Pixels are allowed some color variance, to deal with anti-aliasing for example.
      * Lower numbers are more strict.
      */
-    pixelMatchThreshhold = .2; // different screens seem to render a little different...
+    pixelMatchThreshhold = .1; // different screens seem to render a little different...
 
     /** delay in ms between typed characters.
      * simulates slower typing 
@@ -36,11 +36,13 @@ export class Options {
      */
     experimentalFeatures = true;
 
-
     /**
      * Allow provide a way to debug better after deploy
      */
     developerMode = false;
+
+    /** Only monitor the events in the recorder, do not actually record them. */
+    debugRecorder = false;
 };
 
 var options = new Options();

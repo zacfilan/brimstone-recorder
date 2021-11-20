@@ -96,7 +96,7 @@ export class Player {
      * control the speed at which typing multiple back to back characters occurs.
      * used to simuate slower human typers.
      */
-     interKeypressDelay = 0;
+    interKeypressDelay = 0;
 
     constructor() {
         /**
@@ -341,11 +341,36 @@ export class Player {
             type: 'mouseWheel',
             x: action.x,
             y: action.y,
-            deltaX: action.event.deltaX,
-            deltaY: action.event.deltaY,
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
             pointerType: 'mouse',
             modifiers: modifiers
         });
+    }
+
+    async wheels(action) {
+        for (let i = 0; i < action.event.length; ++i) {
+            let event = action.event[i];
+            // convert the wheel events into wheel actions
+            await this[event.type]({ 
+                x: event.clientX,
+                y: event.clientY,                
+                event 
+            }); // pretend it is a distinct action
+        }
+
+        // FIXME: why does the wheel event kill these?
+        // try to get the the last location the mouse is over to register for hover effects
+        // await this.mousemove({
+        //     x:-1,
+        //     y:-1
+        // });
+        // let last = action.event[action.event.length-1];
+        // await this.mousemove({
+        //     x: last.clientX,
+        //     y: last.clientY
+        // });
+        
     }
 
     async keyup(action) {
@@ -457,7 +482,7 @@ export class Player {
             let event = action.event[i];
             await this[event.type]({ event }); // pretend it is a distinct action
             // simulate slower typing
-            if(this.interKeypressDelay) {
+            if (this.interKeypressDelay) {
                 await sleep(this.interKeypressDelay);
             }
         }
@@ -539,13 +564,13 @@ export class Player {
             }
 
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
-            let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } 
+            let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng }
                 = Player.pngDiff(
-                    nextStep.expectedScreenshot.png, 
-                    nextStep.actualScreenshot.png, 
+                    nextStep.expectedScreenshot.png,
+                    nextStep.actualScreenshot.png,
                     nextStep.acceptablePixelDifferences?.png,
                     this.pixelMatchThreshhold
-                    );
+                );
 
             // FIXME: this should be factored into the card I think
             nextStep.numDiffPixels = numDiffPixels;
@@ -653,7 +678,11 @@ export class Player {
     async debuggerSendCommand(method, commandParams) {
         let i = 0;
         var lastException;
-        commandParams.timestamp = Player.SYNTHETIC_EVENT_TIMESTAMP;
+        if (this.usedFor === 'recording') {
+            commandParams.timestamp = Player.SYNTHETIC_EVENT_TIMESTAMP;
+        }
+        // when playing, there is no user input.
+        
         for (i = 0; i < 2; ++i) { // at most twice 
             try {
                 return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
@@ -685,7 +714,7 @@ export class Player {
         console.debug(`schedule attach debugger`);
         this.tab = tab;
 
-        await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id}, "1.3", _resolve)));
+        await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id }, "1.3", _resolve)));
         if (chrome.runtime.lastError?.message) {
             if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
                 throw new Error(chrome.runtime.lastError.message); // not sure how to handle that.
@@ -766,7 +795,7 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThr
                 ignoreMask: maskPng?.data
             }
         );
-        
+
     return {
         numUnusedMaskedPixels,
         numDiffPixels,

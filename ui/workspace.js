@@ -630,12 +630,14 @@ async function playingWebNavigationOnCompleteHandler(details) {
  */
 async function startRecorders() {
     // establish the recording communication channel between the tab being recorded and the brimstone workspace window
-
+    let options = await loadOptions();
     // connect to all frames in the the active tab in this window. 
     // the recorder is injected in all pages, all frames, and will respond to onconnect by starting the event handlers.
     // https://developer.chrome.com/docs/extensions/reference/tabs/#method-connect
     console.debug('connect: creating port.')
-    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, { name: "brimstone-recorder" });
+    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, { 
+        name: ("brimstone-recorder" + (options.debugRecorder ? '-debug' : ''))
+    });
 
     // if the active tab navigates away or is closed the port will be disconected
     // FIXME: is this needed?
@@ -1002,7 +1004,7 @@ async function userEventToAction(userEvent) {
             cardModel.description = 'move mouse to here';
             addExpectedScreenshot(cardModel, _lastSavedScreenshot);
             break;
-        case 'scroll':
+        case 'wheels':
             addExpectedScreenshot(cardModel);
             break;
         case 'keys':
@@ -1181,7 +1183,6 @@ async function onMessageHandler(message, _port) {
 
             // these need to be simulated because I do double click detection in the recorder itself, which intercepts click.
             // FIXME: why must I simulate these?
-
             // Could recorder passively monitor, and propagate them? i need to record *something*. is it a single click or a double click that I want to record?
             // I am using an old start state anyway...
             if (userEvent.handler?.simulate) {
@@ -1190,7 +1191,18 @@ async function onMessageHandler(message, _port) {
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
-        case 'scroll':
+        case 'wheel':
+            let frameId = userEvent?.sender?.frameId;
+            let frameOffset = await getFrameOffset(frameId);
+            userEvent.x += frameOffset.left;
+            userEvent.y += frameOffset.top;
+
+            if (userEvent.handler?.simulate) {
+                await player[userEvent.type](userEvent); // this can result in a navigation to another page.
+            }
+            postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
+            break;
+        case 'wheels':
             await recordUserAction(userEvent);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;

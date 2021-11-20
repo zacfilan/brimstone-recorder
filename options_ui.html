@@ -71,34 +71,42 @@
                 Faster
             </td>
         </tr>
-
-        <tr>
-            <td>
-                Enable developer mode
-            </td>
-            <td>
-                <input type="checkbox" id="developerMode"></input>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                Enable experimental features
-            </td>
-            <td>
-                <input type="checkbox" id="experimentalFeatures"></input>
-            </td>
-        </tr>
-
     </table>
 
-
+    <br>
+    <details>
+        <summary>Developer Options</summary>
+        <table>
+            <tr>
+                <td>
+                    Enable developer mode
+                </td>
+                <td>
+                    <input type="checkbox" id="developerMode"></input>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Debug recorder
+                </td>
+                <td>
+                    <input type="checkbox" id="debugRecorder"></input>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Enable experimental features
+                </td>
+                <td>
+                    <input type="checkbox" id="experimentalFeatures"></input>
+                </td>
+            </tr>
+        </table>
+    </details>
+    <br>
     <br>
 
     <div id="status"></div>
-
-
-
-
     <button id="save">Save</button> <button id="reset">Restore Defaults</button>
 
     <script type="module" src="options_controller.js"></script>
