@@ -33,7 +33,11 @@ class Recorder {
      * */
     reset() {
         /** The chrome extension frameid this instance is running in. */
-        this._frameId = 0;
+        if(this._frameId === undefined) { //  we may reset when recovering from an error, don't lose the frameId
+            this._frameId = 0;
+        }
+        // FIXME: a better solution is to create the recorder instance once, I know it's frameId
+        // else keep the assigned frameId
 
         /** Two way communication with the workspace */
         this._port = false;
@@ -80,10 +84,7 @@ class Recorder {
          * Hold the current/last event observed.
          * @type {Event}*/
         this.event = false
-
-        /** The last message in the tx queue, or if the queue is empty, sent to the extension.  */
-        this.lastMsg = false;
-
+  
         // TIMEOUTS
         this.clearTimeouts();
         /** An identifer for the timeout that will record a 'keys' user action */
@@ -128,8 +129,7 @@ class Recorder {
             return;
         }
         this.waitActionDetectionTimeout = null;
-        this.lastMsg.type = 'wait'; // convert it
-        this.pushMessage(this.lastMsg);
+        this.pushMessage({type: 'wait'});
     }
 
     /**
@@ -149,6 +149,7 @@ class Recorder {
             return; // only do this from the main frame
         }
 
+        // and schedule one for a second from now
         clearTimeout(this.waitActionDetectionTimeout);
         this.waitActionDetectionTimeout = null;
         this.waitActionDetectionTimeout = setTimeout(
@@ -291,7 +292,6 @@ class Recorder {
      */
     pushMessage(msg) {
         this.cancelScheduleWaitActionDetection();
-        this.lastMsg = msg;
         this.messageQueue.push(msg);
         if (this.messageQueue.length === 1) { // was an empty queue...
             this.tx(); //... so tx it right away
@@ -344,10 +344,20 @@ class Recorder {
                     if (msg.args === 'wheels') {
                         this.pendingWheelTimeout = false; // really done
                     }
-                    if (!this.tx() && !this._debugMode) {
-                        this.scheduleWaitActionDetection(); // the queue is empty right now, if it is still empty in 1 sec take a picture
+                    if (   !this.tx() 
+                        && !this._debugMode 
+                        && !this.pendingKeyTimeout
+                        && !this.pendingWheelTimeout
+                        && !this.pendingMouseMoveTimeout) 
+                    {
+                        if(msg.args !== 'wait') {
+                            this.recordWaitAction(); // take one right now
+                        }
+                        else {
+                            this.scheduleWaitActionDetection(); // the queue is empty right now, if it is still empty in 1 sec take a picture
+                        }
                     }
-                    // else we are still transmitting queued messages
+                    // else don't  
                     break;
                 case 'stop':
                     this.exit();
@@ -587,7 +597,17 @@ class Recorder {
             // we are waiting on responses from the extension
             // and we are getting some more user events while we wait.
 
-            // this is expected for events that are queued and simulated, and recorded in aggregate, so let expected ones go to the big recorder switch
+            //if(this.messageQueue[0].type === 'wait' && e.type === 'wheel') {
+                // we are waiting for a screenshot to finish being taken, and the user moved the wheel.
+                // wheel events generate scroll events. scroll events change the screen.
+                // wheel events not presently simulated by the recorder, they are propagated, queued for a later aggregate record action.
+                // since they aren't simulated they don't play nice in the screenshot pipeline.
+                // how do I lock in the pre-req screenshot for the wheel?
+                // cancel screenshot polling while we mousewheel, start polling after we think the mousewheel is done.
+                //return this.cancel(e);
+            //} 
+
+            // this is expected for events that are queued and **simulated**, and recorded in aggregate, so let expected ones go to the big recorder switch
             // for proper accounting.
             // FIXME: can't I replace all these with pending* varables
             if (this.messageQueue[0].type === 'wait' || this.mouseMovePending || this.pendingClick || e.type === 'keydown' || e.type === 'keyup' || e.type === 'wheel' || e.type === 'scroll') {
@@ -723,11 +743,6 @@ class Recorder {
                 this.handleKey(e);
                 return this.cancel(e);
             case 'keydown':
-                // might be holding down a modifier during a mouse operation
-                if (e.repeat) {
-                    return;
-                }
-
                 if (this.mouseMovePending) {
                     this.recoverableUserError('mousemove');
                     return this.cancel(e);

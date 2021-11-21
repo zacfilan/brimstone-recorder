@@ -1004,6 +1004,11 @@ async function userEventToAction(userEvent) {
             addExpectedScreenshot(cardModel, _lastSavedScreenshot);
             break;
         case 'wheels':
+            // rebase the individual wheel events position to their frame offsets
+            cardModel.event.forEach(wheelEvent => {
+                wheelEvent.clientX += frameOffset.left;
+                wheelEvent.clientY += frameOffset.top;
+            });
             addExpectedScreenshot(cardModel);
             break;
         case 'keys':
