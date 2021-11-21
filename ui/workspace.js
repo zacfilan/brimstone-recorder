@@ -1018,6 +1018,11 @@ async function userEventToAction(userEvent) {
                 let event = userEvent.event[i];
 
                 if (event.type === 'keydown') {
+                    let keyName = event.key;
+                    if(i === userEvent.event.length-1) {
+                        keyName += '🠯';
+                    }
+
                     let isModifierKey = keycode2modifier[event.keyCode] || 0;
                     let modifiers = 0;
                     modifiers |= event.altKey ? 1 : 0;
@@ -1029,14 +1034,17 @@ async function userEventToAction(userEvent) {
                     if (chord) {
                         cardModel.description += `<span class='modifier'>+</span>`;
                     }
-                    if (chord || event.key.length > 1) {
-                        cardModel.description += `<span class='modifier'>${event.key}</span>`;
+                    if (chord || event.key.length > 1) { // these are button looking thangs
+                        cardModel.description += `<span class='modifier'>${keyName}</span>`;
                     }
                     else {
-                        cardModel.description += event.key;
+                        cardModel.description += keyName;
                     }
                 }
-                // else keyup, nothing to report
+                else if(i === 0) {
+                    // we are starting on a keyup
+                    cardModel.description += `<span class='modifier'>${event.key}🠭</span>`;
+                }
             }
             addExpectedScreenshot(cardModel);
             break;
