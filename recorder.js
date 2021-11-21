@@ -33,7 +33,7 @@ class Recorder {
      * */
     reset() {
         /** The chrome extension frameid this instance is running in. */
-        if(this._frameId === undefined) { //  we may reset when recovering from an error, don't lose the frameId
+        if (this._frameId === undefined) { //  we may reset when recovering from an error, don't lose the frameId
             this._frameId = 0;
         }
         // FIXME: a better solution is to create the recorder instance once, I know it's frameId
@@ -84,7 +84,7 @@ class Recorder {
          * Hold the current/last event observed.
          * @type {Event}*/
         this.event = false
-  
+
         // TIMEOUTS
         this.clearTimeouts();
         /** An identifer for the timeout that will record a 'keys' user action */
@@ -129,7 +129,7 @@ class Recorder {
             return;
         }
         this.waitActionDetectionTimeout = null;
-        this.pushMessage({type: 'wait'});
+        this.pushMessage({ type: 'wait' });
     }
 
     /**
@@ -344,13 +344,12 @@ class Recorder {
                     if (msg.args === 'wheels') {
                         this.pendingWheelTimeout = false; // really done
                     }
-                    if (   !this.tx() 
-                        && !this._debugMode 
+                    if (!this.tx()
+                        && !this._debugMode
                         && !this.pendingKeyTimeout
                         && !this.pendingWheelTimeout
-                        && !this.pendingMouseMoveTimeout) 
-                    {
-                        if(msg.args !== 'wait') {
+                        && !this.pendingMouseMoveTimeout) {
+                        if (msg.args !== 'wait') {
                             this.recordWaitAction(); // take one right now
                         }
                         else {
@@ -538,7 +537,7 @@ class Recorder {
                 }
                 // else - we endedup back where we started, treat that as not moving.
             },
-            500 // FIXME: make configurable
+            100 // FIXME: make configurable
         );
 
         if (!this.mouseMovePending) {
@@ -598,13 +597,13 @@ class Recorder {
             // and we are getting some more user events while we wait.
 
             //if(this.messageQueue[0].type === 'wait' && e.type === 'wheel') {
-                // we are waiting for a screenshot to finish being taken, and the user moved the wheel.
-                // wheel events generate scroll events. scroll events change the screen.
-                // wheel events not presently simulated by the recorder, they are propagated, queued for a later aggregate record action.
-                // since they aren't simulated they don't play nice in the screenshot pipeline.
-                // how do I lock in the pre-req screenshot for the wheel?
-                // cancel screenshot polling while we mousewheel, start polling after we think the mousewheel is done.
-                //return this.cancel(e);
+            // we are waiting for a screenshot to finish being taken, and the user moved the wheel.
+            // wheel events generate scroll events. scroll events change the screen.
+            // wheel events not presently simulated by the recorder, they are propagated, queued for a later aggregate record action.
+            // since they aren't simulated they don't play nice in the screenshot pipeline.
+            // how do I lock in the pre-req screenshot for the wheel?
+            // cancel screenshot polling while we mousewheel, start polling after we think the mousewheel is done.
+            //return this.cancel(e);
             //} 
 
             // this is expected for events that are queued and **simulated**, and recorded in aggregate, so let expected ones go to the big recorder switch
@@ -722,13 +721,14 @@ class Recorder {
                 });
 
                 clearTimeout(this.pendingWheelTimeout);
-                this.pendingWheelTimeout = setTimeout(() => {
-                    clearTimeout(this.waitActionDetectionTimeout);
-                    clearTimeout(this.pendingMouseMoveTimeout);
-                    this.waitActionDetectionTimeout = this.pendingMouseMoveTimeout = null;
+                this.pendingWheelTimeout = setTimeout(
+                    () => {
+                        clearTimeout(this.waitActionDetectionTimeout);
+                        clearTimeout(this.pendingMouseMoveTimeout);
+                        this.waitActionDetectionTimeout = this.pendingMouseMoveTimeout = null;
 
-                    this._recordWheelAction();
-                },
+                        this._recordWheelAction();
+                    },
                     500 // FIXME: make configurable
                 );
 
@@ -791,32 +791,35 @@ class Recorder {
                 // don't know yet if it is a single click or the first of a double click
                 if (!this.pendingClick) {
                     this.pendingClick = e;
-                    setTimeout(() => {
+                    setTimeout(
+                        () => {
 
-                        if (this.mouseMovePending) {
-                            if (this.mouseMoveStartingElement !== this.pendingClick.target) {
-                                this.recoverableUserError('mousemove'); // don't allow a click until a mousemove completes
+                            if (this.mouseMovePending) {
+                                if (this.mouseMoveStartingElement !== this.pendingClick.target) {
+                                    this.recoverableUserError('mousemove'); // don't allow a click until a mousemove completes
+                                    return;
+                                }
+                                else {
+                                    this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
+                                }
+                            }
+
+                            if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
+                                this.recoverableUserError('wheel');
                                 return;
                             }
-                            else {
-                                this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
+
+                            if (this.pendingKeyTimeout) {
+                                this.recoverableUserError('keys');
+                                return;
                             }
-                        }
-
-                        if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                            this.recoverableUserError('wheel');
-                            return;
-                        }
-
-                        if (this.pendingKeyTimeout) {
-                            this.recoverableUserError('keys');
-                            return;
-                        }
 
 
-                        let msg = this.buildMsg(this.pendingClick);
-                        this.pushMessage(msg); // take screenshot, and then simulate
-                    }, 500);
+                            let msg = this.buildMsg(this.pendingClick);
+                            this.pushMessage(msg); // take screenshot, and then simulate
+                        },
+                        500
+                    );
                 }
                 else {
                     // this is the second single click within 500ms. It should generate a double click.
@@ -904,19 +907,19 @@ class Recorder {
 
         let shift = firstWheelEvent.shiftKey ? "shift+" : '';
         let direction = '';
-        if(firstWheelEvent.shiftKey) {
-            if(firstWheelEvent.deltaY<0) {
+        if (firstWheelEvent.shiftKey) {
+            if (firstWheelEvent.deltaY < 0) {
                 direction = 'scroll left. ';
             }
-            if(firstWheelEvent.deltaY>0) {
+            if (firstWheelEvent.deltaY > 0) {
                 direction = 'scroll right. ';
             }
         }
         else {
-            if(firstWheelEvent.deltaY<0) {
+            if (firstWheelEvent.deltaY < 0) {
                 direction = 'scroll up. ';
             }
-            if(firstWheelEvent.deltaY>0) {
+            if (firstWheelEvent.deltaY > 0) {
                 direction = 'scroll down. ';
             }
         }
