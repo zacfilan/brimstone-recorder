@@ -431,6 +431,7 @@ class Recorder {
 
                 msg.x = msg.event.clientX;
                 msg.y = msg.event.clientY;
+                
                 msg.handler = { simulate: true };
                 break;
             case 'click':
@@ -596,16 +597,6 @@ class Recorder {
             // we are waiting on responses from the extension
             // and we are getting some more user events while we wait.
 
-            //if(this.messageQueue[0].type === 'wait' && e.type === 'wheel') {
-            // we are waiting for a screenshot to finish being taken, and the user moved the wheel.
-            // wheel events generate scroll events. scroll events change the screen.
-            // wheel events not presently simulated by the recorder, they are propagated, queued for a later aggregate record action.
-            // since they aren't simulated they don't play nice in the screenshot pipeline.
-            // how do I lock in the pre-req screenshot for the wheel?
-            // cancel screenshot polling while we mousewheel, start polling after we think the mousewheel is done.
-            //return this.cancel(e);
-            //} 
-
             // this is expected for events that are queued and **simulated**, and recorded in aggregate, so let expected ones go to the big recorder switch
             // for proper accounting.
             // FIXME: can't I replace all these with pending* varables
@@ -689,6 +680,7 @@ class Recorder {
                 this.lastMouseMoveEvent = e;
                 return this.cancel(e); // going to simulate the whole click or double click, so I don't release this to the app
             case 'wheel':
+
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
                         this.recoverableUserError('mousemove'); // don't allow wheel event until mousemove completed
@@ -702,23 +694,8 @@ class Recorder {
                 clearTimeout(this.waitActionDetectionTimeout);
                 this.waitActionDetectionTimeout = this.pendingMouseMoveTimeout = null;
 
-                this.wheelEventQueue.push({
-                    type: e.type,
-                    // this is all that the player needs really
-                    clientX: e.clientX,
-                    clientY: e.clientY,
-
-                    deltaX: e.deltaX,
-                    deltaY: e.deltaY,
-
-                    altKey: e.altKey,
-                    ctrlKey: e.ctrlKey,
-                    metaKey: e.metaKey,
-                    shiftKey: e.shiftKey,
-
-                    // normally the event has a target in it, but I don't need that, just this info from it
-                    boundingClientRect: e.target.getBoundingClientRect()
-                });
+                let msg = this.buildMsg(e);
+                this.wheelEventQueue.push(msg); // FIXME: should be called the wheelActionQueue
 
                 clearTimeout(this.pendingWheelTimeout);
                 this.pendingWheelTimeout = setTimeout(
@@ -732,13 +709,24 @@ class Recorder {
                     500 // FIXME: make configurable
                 );
 
-                // I can either simulate or propagate. neither is perfect.
-                // let msg = this.buildMsg(e);
-                // this.pushMessage(msg);
-                // return this.cancel(e); // simulate it
-
-                return this.propagate(e); // just watch/record them
-
+                // https://w3c.github.io/uievents/#cancelability-of-wheel-events 
+                // In a scrolling sequence I can only cancel the first one. If I "replace" it with a synthetic one
+                // (generated from CDP) then it seems to confuse Chrome and I see all the non-cancelable ones in the sequence.
+                // I don't want to (additionally) simulate those, since the browser is already handling them, and I can't stop it.
+                if(this.wheelEventQueue.length === 1) {
+                    // The first in the sequence
+                    // simulate so we can lock in the pre-requisite ss
+                    msg.handler.saveScreenshot = true;
+                }
+                if(e.cancelable) {
+                    this.pushMessage(msg); // simulate it
+                    return this.cancel(e); // can only cancel the first in the sequence             
+                }
+                else {
+                    // i'm not allowed to cancel it, so...
+                    console.debug('wheel - will propagate since I can not cancel');
+                    return this.propagate(e); // just watch/record them
+                }
             case 'keyup':
                 this.handleKey(e);
                 return this.cancel(e);
@@ -903,7 +891,8 @@ class Recorder {
             return;
         }
 
-        let firstWheelEvent = this.wheelEventQueue[0];
+        let firstWheelAction = this.wheelEventQueue[0];
+        let firstWheelEvent = firstWheelAction.event;
 
         let shift = firstWheelEvent.shiftKey ? "shift+" : '';
         let direction = '';
@@ -928,10 +917,10 @@ class Recorder {
 
         this.pushMessage({
             type: 'wheels',
-            boundingClientRect: firstWheelEvent.boundingClientRect,
+            boundingClientRect: firstWheelAction.boundingClientRect,
             // the element scrolled is under these points on the scrollbar
-            x: firstWheelEvent.clientX,
-            y: firstWheelEvent.clientY,
+            x: firstWheelAction.x,
+            y: firstWheelAction.y,
 
             event: this.wheelEventQueue,
             description
