@@ -363,13 +363,8 @@ export class Player {
 
     async wheels(action) {
         for (let i = 0; i < action.event.length; ++i) {
-            let event = action.event[i];
-            // convert the wheel events into wheel actions
-            await this[event.type]({
-                x: event.clientX,
-                y: event.clientY,
-                event
-            }); // pretend it is a distinct action
+            let wheelAction = action.event[i];
+            await this[wheelAction.type](wheelAction);
         }
 
         // FIXME: why does the wheel event kill these?

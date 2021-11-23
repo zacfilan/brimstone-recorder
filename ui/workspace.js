@@ -41,7 +41,7 @@ async function errorHandler(e) {
     await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
     switch (e.constructor) {
         case Errors.PixelScalingError:
-             window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
+            window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
             // bail
             try {
                 await chrome.windows.remove(applicationUnderTestTab.chromeWindow.id);
@@ -107,10 +107,11 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
         let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
 
         [activeChromeTab] = await chrome.tabs.query({ active: true, windowId: _windowId });
-        await chrome.tabs.update(activeChromeTab.id, { 
+        await chrome.tabs.update(activeChromeTab.id, {
             url: `chrome://extensions/?id=${chrome.runtime.id}`,
             active: true,
-            highlighted: true });
+            highlighted: true
+        });
         await chrome.windows.update(activeChromeTab.windowId, { focused: true });
         await chrome.windows.remove(w.id);
     }
@@ -176,18 +177,18 @@ var _lastMouseMove;
  * 
 */
 
-$('#step').on('click', '#downloadObjectAsJsonButton', function() {
+$('#step').on('click', '#downloadObjectAsJsonButton', function () {
     // I only want a few properties, so swap out the serializer
     let orig = TestAction.prototype.toJSON;
-    TestAction.prototype.toJSON = function() {
+    TestAction.prototype.toJSON = function () {
         return {
             index: this.index,
             memoryUsed: this.memoryUsed,
             latency: this.latency,
-            name: this.name 
+            name: this.name
         };
-    };    
-    let name = testFileName.replace(/\.[^/.]+$/,'') + '_metrics';
+    };
+    let name = testFileName.replace(/\.[^/.]+$/, '') + '_metrics';
     downloadObjectAsJson({ steps: TestAction.instances }, name);
     TestAction.prototype.toJSON = orig;
 });
@@ -491,14 +492,14 @@ $('#playButton').on('click', async function () {
 
         if (playFrom === 0) {
             playFrom = 1; // don't navigate to the start twice, the goto is handled when we set up the applicationUnderTestTab
-            if(!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: TestAction.meta.incognito })) {
+            if (!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: TestAction.meta.incognito })) {
                 await applicationUnderTestTab.create({ url: actions[0].url, incognito: TestAction.meta.incognito });
             }
         }
         else {
-            if(!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+            if (!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
                 throw new Errors.ReuseTestWindow();
-            } 
+            }
         }
 
         applicationUnderTestTab.url = actions[0].url;
@@ -606,7 +607,7 @@ async function startPlaying() {
 
     await hideCursor();
     // find FOCUS ISSUE in this file
-    await player.mousemove({x:0, y:0});
+    await player.mousemove({ x: 0, y: 0 });
 }
 
 async function playingWebNavigationOnCompleteHandler(details) {
@@ -636,7 +637,7 @@ async function startRecorders() {
     // the recorder is injected in all pages, all frames, and will respond to onconnect by starting the event handlers.
     // https://developer.chrome.com/docs/extensions/reference/tabs/#method-connect
     console.debug('connect: creating port.')
-    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, { 
+    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, {
         name: ("brimstone-recorder" + (options.debugRecorder ? '-debug' : ''))
     });
 
@@ -691,7 +692,7 @@ async function prepareToRecord(tab) {
     //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
-    
+
     await tellRecordersTheirFrameIds();
     await hideCursor();
     await tab.resizeViewport(); // this can be called on a navigation, and the tab needs to be the correct size before the port is established, in case it decides to send us some mousemoves
@@ -743,7 +744,7 @@ $('#recordButton').on('click', async function () {
         TestAction.meta = new TestMetaData();
         TestAction.meta.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
 
-        if (!(index>0) ) {
+        if (!(index > 0)) {
             let defaultUrl = options?.url ?? '';
             url = prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
             if (!url) {
@@ -757,7 +758,7 @@ $('#recordButton').on('click', async function () {
             saveOptions(options); // no need to wait
 
             // recording from beginning
-            if(!await applicationUnderTestTab.reuse({ url: url, incognito: TestAction.meta.incognito })) {
+            if (!await applicationUnderTestTab.reuse({ url: url, incognito: TestAction.meta.incognito })) {
                 await applicationUnderTestTab.create({ url: url, incognito: TestAction.meta.incognito });
             }
 
@@ -777,13 +778,13 @@ $('#recordButton').on('click', async function () {
             // the first action is to move the mouse ontp the viewport so we can interact with it. this gives the viewport focus, before the
             // mousemove completes. So the expected (no focus) can never match the actual (with focus). 
             // to work around this i put the mouse on the viewport here to give it focus, in both recording and playback.
-            await player.mousemove({x:0,y:0}); // this is a bit of a hack. on recordig we don't get focus automatically on the viewport when we mustsince the first mousemove onto the viewport affects the screen.
+            await player.mousemove({ x: 0, y: 0 }); // this is a bit of a hack. on recordig we don't get focus automatically on the viewport when we mustsince the first mousemove onto the viewport affects the screen.
         }
         else {
             TestAction.instances.splice(index + 2); // anything after the step showing is gone.
 
             // appending to an existing test
-            if(!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+            if (!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
                 throw new Errors.ReuseTestWindow();
             }
 
@@ -1006,10 +1007,10 @@ async function userEventToAction(userEvent) {
         case 'wheels':
             // rebase the individual wheel events position to their frame offsets
             cardModel.event.forEach(wheelEvent => {
-                wheelEvent.clientX += frameOffset.left;
-                wheelEvent.clientY += frameOffset.top;
+                wheelEvent.x += frameOffset.left;
+                wheelEvent.y += frameOffset.top;
             });
-            addExpectedScreenshot(cardModel);
+            addExpectedScreenshot(cardModel, _lastSavedScreenshot);
             break;
         case 'keys':
             cardModel.description = 'type ';
@@ -1019,7 +1020,7 @@ async function userEventToAction(userEvent) {
 
                 if (event.type === 'keydown') {
                     let keyName = event.key;
-                    if(i === userEvent.event.length-1) {
+                    if (i === userEvent.event.length - 1) {
                         keyName += '🠯';
                     }
 
@@ -1041,7 +1042,7 @@ async function userEventToAction(userEvent) {
                         cardModel.description += keyName;
                     }
                 }
-                else if(i === 0) {
+                else if (i === 0) {
                     // we are starting on a keyup
                     cardModel.description += `<span class='modifier'>${event.key}🠭</span>`;
                 }
@@ -1159,11 +1160,12 @@ async function onMessageHandler(message, _port) {
         case 'save-lastscreenshot':
             _lastSavedScreenshot = _lastScreenshot;
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
-            break
+            break;
         // the user is actively waiting for the screen to change
         case 'wait':
             await captureScreenshotAsDataUrl(); // grab latest image
 
+            // only one time ever
             if (!_lastSavedScreenshot) {
                 _lastSavedScreenshot = _lastScreenshot;
             }
@@ -1204,14 +1206,22 @@ async function onMessageHandler(message, _port) {
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'wheel':
+
             let frameId = userEvent?.sender?.frameId;
             let frameOffset = await getFrameOffset(frameId);
             userEvent.x += frameOffset.left;
             userEvent.y += frameOffset.top;
 
+            if (userEvent.handler?.saveScreenshot) {
+                _lastSavedScreenshot = _lastScreenshot;
+            }
+
+            // in this case the uesrEvent is essentially shaped like an action
+            // by the recorder
             if (userEvent.handler?.simulate) {
                 await player[userEvent.type](userEvent); // this can result in a navigation to another page.
             }
+
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'wheels':
