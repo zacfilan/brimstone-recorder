@@ -3,77 +3,141 @@
 
 <head>
     <title>Brimstone Extension Options</title>
+    <link rel="stylesheet" href="options.css">
 </head>
 
 <body>
-
-    <table>
-        <tr>
-            <td>
-                Seconds to wait for actual screen to match expected screen
-            </td>
-            <td>
-                <input type="number" min="5" max="120" id="matchTimeout"></input>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                Hide cursor for performance
-            </td>
-            <td>
-                <input type="checkbox" id="hideCursor"></input>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                Always record incognito
-            </td>
-            <td>
-                <input type="checkbox" id="recordIncognito"></input>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                Close previous test window when creating a new one
-            </td>
-            <td>
-                <input type="checkbox" id="closeOldTestWindowOnCreate"></input>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                Pixel matching
-            </td>
-            <!-- 0 to 1 is allowed but high values essentially match everything -->
-            <td>
-                Lenient<input type="range" min="0" max="2" step="1" value="1" id="pixelMatchSenstivity"
-                    list="sensitivitySettings">
-                <datalist id="sensitivitySettings">
-                    <option>.2</option>
-                    <option>.1</option>
-                    <option>0</option>
-                </datalist>
-                Strict
-            </td>
-        </tr>
-        <tr>
-            <td>
-                Typing speed
-            </td>
-            <!-- 0 to 1 is allowed but high values essentially match everything -->
-            <td>
-                Slower<input type="range" min="0" max="2" step="1" id="typingSpeed" list="speedSettings">
-                <datalist id="speedSettings">
-                    <option>100</option>
-                    <option>50</option>
-                    <option>0</option>
-                </datalist>
-                Faster
-            </td>
-        </tr>
-    </table>
-
     <br>
+    <details open>
+        <summary>Checking Options</summary>
+        <table>
+            <tr>
+                <td>
+                    Seconds to wait for actual screen to match expected screen
+                </td>
+                <td>
+                    <input type="number" min="5" max="120" id="matchTimeout"></input>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Pixel matching
+                </td>
+                <!-- 0 to 1 is allowed but high values essentially match everything -->
+                <td>
+                    <div class="slider">
+                        <label>Lenient</label><input type="range" min="0" max="2" step="1" value="1"
+                            id="pixelMatchSenstivity" list="sensitivitySettings">
+                        <datalist id="sensitivitySettings">
+                            <option>.2</option>
+                            <option>.1</option>
+                            <option>0</option>
+                        </datalist>
+                        <label>Strict</label>
+                    </div>
+                </td>
+            </tr>
+
+        </table>
+    </details>
+    <details open>
+        <summary>Playback Options</summary>
+        <table>
+            <tr>
+                <td>
+                    Typing speed
+                </td>
+                <!-- 0 to 1 is allowed but high values essentially match everything -->
+                <td>
+                    <div class="slider">
+                        <label>Slower</label>
+                        <input type="range" min="0" max="2" step="1" id="typingSpeed" list="speedSettings">
+                        <datalist id="speedSettings">
+                            <option>100</option>
+                            <option>50</option>
+                            <option>0</option>
+                        </datalist>
+                        <label>Faster</label>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </details>
+    <details open>
+        <summary>General Options</summary>
+        <table>
+            <tr>
+                <td>
+                    Hide cursor for performance
+                </td>
+                <td>
+                    <input type="checkbox" id="hideCursor"></input>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    Close previous test window when creating a new one
+                </td>
+                <td>
+                    <input type="checkbox" id="closeOldTestWindowOnCreate"></input>
+                </td>
+            </tr>
+        </table>
+    </details>
+    <details open>
+        <summary>Recording Options</summary>
+        <table>
+            <tr>
+                <td>
+                    Always record incognito
+                </td>
+                <td>
+                    <input type="checkbox" id="recordIncognito"></input>
+                </td>
+            </tr>
+            <!-- <tr>
+                <td>
+                    Mouse move sequence recording
+                </td>
+                <td>
+                    <div class="slider">
+                        <label>Slower</label>
+                        <input type="range" min="0" max="2" step="1" id="mouseMoveTimeout" list="speedSettings">
+                        <datalist id="speedSettings">
+                            <option>100</option>
+                            <option>50</option>
+                            <option>0</option>
+                        </datalist>
+                        <label>Faster</label>
+                    </div>
+                </td>
+                <td>
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="info-circle" class="svg-inline--fa fa-info-circle fa-w-16" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="currentColor" d="M256 8C119.043 8 8 119.083 8 256c0 136.997 111.043 248 248 248s248-111.003 248-248C504 119.083 392.957 8 256 8zm0 110c23.196 0 42 18.804 42 42s-18.804 42-42 42-42-18.804-42-42 18.804-42 42-42zm56 254c0 6.627-5.373 12-12 12h-88c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h12v-64h-12c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h64c6.627 0 12 5.373 12 12v100h12c6.627 0 12 5.373 12 12v24z"></path></svg>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Mouse wheel sequence recording
+                </td>
+                <td>
+                    <div class="slider">
+                        <label>Slower</label>
+                        <input type="range" min="0" max="2" step="1" id="mouseMoveTimeout" list="speedSettings">
+                        <datalist id="speedSettings">
+                            <option>100</option>
+                            <option>50</option>
+                            <option>0</option>
+                        </datalist>
+                        <label>Faster</label>
+                    </div>
+                </td>
+            </tr> -->
+
+        </table>
+    </details>
+
+
     <details>
         <summary>Developer Options</summary>
         <table>
@@ -103,6 +167,7 @@
             </tr>
         </table>
     </details>
+
     <br>
     <br>
 
