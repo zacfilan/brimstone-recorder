@@ -1,3 +1,7 @@
+/** 
+ * @typedef {import('./options.js').Options} Options 
+ */
+
 // https://stackoverflow.com/questions/35939886/find-first-scrollable-parent
 function getScrollParent(element, includeHidden) {
     var style = getComputedStyle(element);
@@ -28,7 +32,6 @@ const SYNTHETIC_EVENT_TIMESTAMP = 0;
 class Recorder {
     /**
      *  Reset all the stat, of the recorder back to the same as when it was first constructed. 
-     * @param {bool} removeMessageEventListener false by default
      * 
      * */
     reset() {
@@ -111,6 +114,11 @@ class Recorder {
         this._debugMode = false;
 
         this.removeEventListeners();
+
+        /**
+         * @type {Options}
+         */
+        this.options = { debugRecorder: false };
     }
 
     constructor() {
@@ -202,6 +210,9 @@ class Recorder {
                 this.hideCursor();
                 sendResponse();
                 break;
+            case 'loadOptions':
+                this.options = message.args;
+                break;
             default:
                 //console.warn('unknown message', message);
                 sendResponse('unknown');
@@ -212,14 +223,14 @@ class Recorder {
     /**
      * https://developer.chrome.com/docs/extensions/reference/runtime/#event-onConnect
      * */
-    _runtimeOnConnectHandler(port) {
+    async _runtimeOnConnectHandler(port) {
         //the _only_ reason that the workspace connects to this named port is to establish a recording session
         if (!port.name.startsWith('brimstone-recorder')) {
             return;
         }
         console.debug('connect: to extension (workspace).')
         this.reset(); // be paranoid.
-        this._debugMode = port.name.includes('debug');
+        this.options = (await (new Promise(resolve => chrome.storage.local.get('options', resolve)))).options;
 
         this.addEventListeners();
         this._port = port;
@@ -345,7 +356,7 @@ class Recorder {
                         this.pendingWheelTimeout = false; // really done
                     }
                     if (!this.tx()
-                        && !this._debugMode
+                        && !this.options.debugRecorder
                         && !this.pendingKeyTimeout
                         && !this.pendingWheelTimeout
                         && !this.pendingMouseMoveTimeout) {
@@ -431,7 +442,7 @@ class Recorder {
 
                 msg.x = msg.event.clientX;
                 msg.y = msg.event.clientY;
-                
+
                 msg.handler = { simulate: true };
                 break;
             case 'click':
@@ -538,7 +549,7 @@ class Recorder {
                 }
                 // else - we endedup back where we started, treat that as not moving.
             },
-            100 // FIXME: make configurable
+            this.options.mouseMoveTimeout
         );
 
         if (!this.mouseMovePending) {
@@ -706,19 +717,19 @@ class Recorder {
 
                         this._recordWheelAction();
                     },
-                    500 // FIXME: make configurable
+                    this.options.mouseWheelTimeout
                 );
 
                 // https://w3c.github.io/uievents/#cancelability-of-wheel-events 
                 // In a scrolling sequence I can only cancel the first one. If I "replace" it with a synthetic one
                 // (generated from CDP) then it seems to confuse Chrome and I see all the non-cancelable ones in the sequence.
                 // I don't want to (additionally) simulate those, since the browser is already handling them, and I can't stop it.
-                if(this.wheelEventQueue.length === 1) {
+                if (this.wheelEventQueue.length === 1) {
                     // The first in the sequence
                     // simulate so we can lock in the pre-requisite ss
                     msg.handler.saveScreenshot = true;
                 }
-                if(e.cancelable) {
+                if (e.cancelable) {
                     this.pushMessage(msg); // simulate it
                     return this.cancel(e); // can only cancel the first in the sequence             
                 }

@@ -43,6 +43,20 @@ export class Options {
 
     /** Only monitor the events in the recorder, do not actually record them. */
     debugRecorder = false;
+
+    /**
+     * Number of millseconds to wait to terminate a mousewheel sequence.
+     */
+    mouseWheelTimeout = 100;
+
+    /** 
+     * Number of milliseconds to wait to terminiate a mousemove sequence action.
+     * Lower numbers may reduce the number of "please wait until..." alerts the user 
+     * receives since they do not need to wait as long to identify the end of the sequence,
+     * but is more likely to record more (unecessary) mouse move actions. Higher numbers will force the user to wait
+     * longer to avoid the alerts, but is less likely to record unnecessary moousemoves.
+     */
+    mouseMoveTimeout = 100;
 };
 
 var options = new Options();

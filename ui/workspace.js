@@ -637,9 +637,7 @@ async function startRecorders() {
     // the recorder is injected in all pages, all frames, and will respond to onconnect by starting the event handlers.
     // https://developer.chrome.com/docs/extensions/reference/tabs/#method-connect
     console.debug('connect: creating port.')
-    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, {
-        name: ("brimstone-recorder" + (options.debugRecorder ? '-debug' : ''))
-    });
+    port = chrome.tabs.connect(applicationUnderTestTab.chromeTab.id, { name: "brimstone-recorder" });
 
     // if the active tab navigates away or is closed the port will be disconected
     // FIXME: is this needed?

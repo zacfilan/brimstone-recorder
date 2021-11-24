@@ -10,10 +10,18 @@ const pixelMatchThreshholds = [
     .2, .1, 0
 ];
 
+const mouseWheelTimeout = [
+    500, 250, 100
+];
+
+const mouseMoveTimeout = [
+    500, 250, 100
+];
+
 // Saves options to chrome.storage
 async function save_options() {
     options.MAX_VERIFY_TIMEOUT = parseInt(matchTimeout.value, 10);
-   
+
     options.hideCursor = document.getElementById('hideCursor').checked;
     options.recordIncognito = document.getElementById('recordIncognito').checked;
     options.developerMode = document.getElementById('developerMode').checked;
@@ -23,6 +31,9 @@ async function save_options() {
 
     options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
     options.interKeypressDelay = interkeyPressDelays[parseInt(document.getElementById('typingSpeed').value, 10)];
+    options.mouseMoveTimeout = mouseMoveTimeout[parseInt(document.getElementById('mouseMoveTimeout').value, 10)];
+    options.mouseWheelTimeout = mouseWheelTimeout[parseInt(document.getElementById('mouseWheelTimeout').value, 10)];
+    
     await saveOptions(options);
     console.log(options);
 
@@ -52,6 +63,10 @@ async function restore_options() {
 
     document.getElementById('pixelMatchSenstivity').value = pixelMatchThreshholds.indexOf(options.pixelMatchThreshhold);
     document.getElementById('typingSpeed').value = interkeyPressDelays.indexOf(options.interKeypressDelay);
+
+    document.getElementById('mouseMoveTimeout').value = mouseMoveTimeout.indexOf(options.mouseMoveTimeout);
+    document.getElementById('mouseWheelTimeout').value = mouseWheelTimeout.indexOf(options.mouseWheelTimeout);
+
 }
 
 document.addEventListener('DOMContentLoaded', restore_options);
