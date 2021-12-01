@@ -349,7 +349,7 @@ export class TestAction {
             let o = this.overlay;
             let calloutY = o.top + o.height; // position of the text box that contains the description
             let calloutX = Math.max(o.left, 0); // position of the text box that contains the description
-            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'doubleclick' || this.type === 'contextmenu' || this.type === 'wheels' || this.type === 'wait' || this.type === 'mouseover') {
+            if (this.type === 'mousemove' || this.type === 'click' || this.type === 'dblclick' || this.type === 'contextmenu' || this.type === 'wheels' || this.type === 'wait' || this.type === 'mouseover') {
                 html += `
                 <div class='overlay pointer pulse' data-index=${this.index} style='top:${o.y}%;left:${o.x}%'>
                     ${pointer}

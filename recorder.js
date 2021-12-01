@@ -830,7 +830,7 @@ class Recorder {
                 // when a select value was changed via a user interacting in the shadow DOM (where the record cannot monitor events).
                 // in this case, at this point in time the shadow DOM is closed and the value has already changed.
                 if (e.target.tagName === 'SELECT') {
-                    let msg = this.buildMsg(e);
+                    msg = this.buildMsg(e);
                     // when the shadow DOM options closes the mouse can be over some other element, which will get caught by a mouseover event
 
                     this.clearPendingMouseMove(); // would have to be a a fast shadow dom interaction to need to cancel it, but might as well
@@ -881,7 +881,7 @@ class Recorder {
                 clearTimeout(this.waitActionDetectionTimeout);
                 this.waitActionDetectionTimeout = this.pendingMouseMoveTimeout = null;
 
-                let msg = this.buildMsg(e);
+                msg = this.buildMsg(e);
                 this.wheelEventQueue.push(msg); // FIXME: should be called the wheelActionQueue
 
                 clearTimeout(this.pendingWheelTimeout);
@@ -994,7 +994,7 @@ class Recorder {
                             }
 
 
-                            let msg = this.buildMsg(this.pendingClick);
+                            msg = this.buildMsg(this.pendingClick);
                             this.pushMessage(msg); // take screenshot, and then simulate
                         },
                         500
