@@ -273,7 +273,7 @@ class Recorder {
         this.pendingMouseMoveTimeout = false;
 
         /** An identifier for the timeout that will "record" a 'wait' user action */
-        this.waitActionDetectionTimeout = false;
+        this.waitActionDetectionTimeout = null;
 
         /** the active element on the start of a mousemove. used for error recorvery. roll back focus to this element on error. */
         this.activeElement = null;
@@ -305,8 +305,8 @@ class Recorder {
      * wait action and record it.
      */
     recordWaitAction() {
-        if (!this.waitActionDetectionTimeout || this.messageQueue.length) {
-            this.waitActionDetectionTimeout = null;
+        // it was cancelled/completed or something else snuck into the queue
+        if (this.waitActionDetectionTimeout == null || this.messageQueue.length) {
             return;
         }
         this.waitActionDetectionTimeout = null;
@@ -534,7 +534,7 @@ class Recorder {
                         && !this.pendingWheelTimeout
                         && !this.pendingMouseMoveTimeout) {
                         if (msg.args !== 'wait') {
-                            this.recordWaitAction(); // take one right now
+                            this.pushMessage({ type: 'wait' });
                         }
                         else {
                             this.scheduleWaitActionDetection(); // the queue is empty right now, if it is still empty in 1 sec take a picture
@@ -918,6 +918,11 @@ class Recorder {
                 this.handleKey(e);
                 return this.cancel(e);
             case 'keydown':
+                this.mouseDown = false; // FIXME: WTF? cancel mousemove recording in process
+                if (e.repeat) {
+                    return;
+                }
+
                 if (this.mouseMovePending) {
                     this.recoverableUserError('mousemove');
                     return this.cancel(e);

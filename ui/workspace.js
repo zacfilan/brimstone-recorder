@@ -608,7 +608,9 @@ async function startPlaying() {
 
     await hideCursor();
     // find FOCUS ISSUE in this file
-    await player.mousemove({ x: 0, y: 0 });
+    // this screws up playback after a pixel fix.
+    //await player.mousemove({ x: 0, y: 0 });
+    //await player.mousemove({ x: -1, y: -1 });
 }
 
 async function playingWebNavigationOnCompleteHandler(details) {
