@@ -111,6 +111,16 @@ export class Player {
      */
     interKeypressDelay = 0;
 
+    /** 
+     * The last known mouselocation during playback. This is used during a resume
+     * playback operation to put the mouse back to where it was prior to 
+     * rechecking the screenshots. 
+     */
+    // mouseLocation = {
+    //     x: -1,
+    //     y: -1
+    // };
+
     constructor() {
         /**
          * The tab we are playing on.
@@ -157,9 +167,14 @@ export class Player {
             }
 
             console.log(`begin play [${action.index}] : ${action.description}`);
-            // if we are resume(ing) we are picking up from an error state, meaning we already
-            // performed the action, we just need to do the verification again for the first action.
-            if (!resume || i !== startIndex) {
+            // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
+            // performed this action, we just need to put the mouse in the correct spot and
+            // do the screen verification again
+            if(resume && i === startIndex) {
+                // not needed? it is already in the right spot?
+                //await this.mousemove(this.mouseLocation); 
+            }
+            else {
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
             }
             console.log(`end   play [${action.index}] : ${action.description}`);
@@ -334,6 +349,12 @@ export class Player {
             y: action.y,
             pointerType: 'mouse'
         });
+
+        // remember the last known mouse location
+        // this.mouseLocation = {
+        //     x: action.x,
+        //     y: action.y
+        // };
     }
 
     async mouseover(action) {
