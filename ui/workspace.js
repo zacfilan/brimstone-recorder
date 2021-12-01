@@ -185,7 +185,8 @@ $('#step').on('click', '#downloadObjectAsJsonButton', function () {
             index: this.index,
             memoryUsed: this.memoryUsed,
             latency: this.latency,
-            name: this.name
+            name: this.name,
+            css: this.css
         };
     };
     let name = testFileName.replace(/\.[^/.]+$/, '') + '_metrics';

@@ -26,14 +26,14 @@ async function save_options() {
     options.recordIncognito = document.getElementById('recordIncognito').checked;
     options.developerMode = document.getElementById('developerMode').checked;
     options.debugRecorder = document.getElementById('debugRecorder').checked;
-    options.experimentalFeatures = document.getElementById('experimentalFeatures').checked;
+    options.experiment.includeCss = document.getElementById('includeCss').checked;
     options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
 
     options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
     options.interKeypressDelay = interkeyPressDelays[parseInt(document.getElementById('typingSpeed').value, 10)];
     options.mouseMoveTimeout = mouseMoveTimeout[parseInt(document.getElementById('mouseMoveTimeout').value, 10)];
     options.mouseWheelTimeout = mouseWheelTimeout[parseInt(document.getElementById('mouseWheelTimeout').value, 10)];
-    
+
     await saveOptions(options);
     console.log(options);
 
@@ -57,7 +57,7 @@ async function restore_options() {
     document.getElementById('developerMode').checked = options.developerMode;
     document.getElementById('debugRecorder').checked = options.debugRecorder;
 
-    document.getElementById('experimentalFeatures').checked = options.experimentalFeatures;
+    document.getElementById('includeCss').checked = options.experiment.includeCss;
     document.getElementById('closeOldTestWindowOnCreate').checked = options.closeOldTestWindowOnCreate;
 
 
