@@ -32,9 +32,16 @@ export class Options {
     closeOldTestWindowOnCreate = true;
 
     /**
-     * 
+     * Experimental features
      */
-    experimentalFeatures = true;
+    experiment = {
+        /**
+         * Record the CSS of the element acted on in each step.
+         * This is not used by the player, but may be
+         * useful for external code.
+         */
+        includeCss: false
+    };
 
     /**
      * Allow provide a way to debug better after deploy

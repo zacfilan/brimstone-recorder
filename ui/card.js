@@ -212,7 +212,8 @@ export class TestAction {
             deltaX: this.deltaX, // only on wheel actions 
             deltaY: this.deltaY, // only on wheel actions
             name: this.name, // optional
-            shadowDOMAction: this.shadowDOMAction
+            shadowDOMAction: this.shadowDOMAction,
+            css: this.css // experimental for fun
         };
 
         if (this.expectedScreenshot) {

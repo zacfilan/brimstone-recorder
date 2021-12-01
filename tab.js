@@ -59,10 +59,8 @@ export class Tab {
 
             await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
             distance = await this.getViewport(); // get viewport data
-            if (options.experimentalFeatures) {
-                if (distance.devicePixelRatio !== 1) {
-                    throw new Errors.PixelScalingError(); // this must be windows scaling, I cannot reset that.
-                }
+            if (distance.devicePixelRatio !== 1) {
+                throw new Errors.PixelScalingError(); // this must be windows scaling, I cannot reset that.
             }
 
             if (distance.innerHeight != this.height || distance.innerWidth != this.width) {
@@ -124,9 +122,9 @@ export class Tab {
         // I will always try to reuse before create.
         // So the only time I can be leaving windows around
         // is if we go from non-inconito to incognito or vice versa.
-        if(options.closeOldTestWindowOnCreate) {
+        if (options.closeOldTestWindowOnCreate) {
             this.remove();
-        } 
+        }
 
         this.chromeWindow = await chrome.windows.create({
             //url: 'about:blank',
@@ -157,9 +155,9 @@ export class Tab {
     async fromWindowId(id) {
         try {
             this.chromeWindow = await chrome.windows.get(id);  // if it fails we can't connect - ok.
-            return await this.reuse( { incognito: this.chromeWindow.incognito });
+            return await this.reuse({ incognito: this.chromeWindow.incognito });
         }
-        catch(e) {
+        catch (e) {
             return false;
         }
     }
@@ -169,7 +167,7 @@ export class Tab {
         try {
             // make sure it is still there.
             this.chromeWindow = await chrome.windows.get(this.chromeWindow?.id);  // if it fails we can't connect - ok.
-            
+
             if (incognito !== this.chromeWindow.incognito) {
                 throw new Error('wrong mode'); // and create one
             }
@@ -181,7 +179,7 @@ export class Tab {
             }
 
             [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: this.chromeWindow.id });
-            if(url) {
+            if (url) {
                 this.url = url;
                 // this better be a URL that I can attach a debugger to !
                 var resolveNavigationPromise;
@@ -193,7 +191,7 @@ export class Tab {
                 await chrome.tabs.update(this.chromeTab.id, { url: url });
                 await navPromise; // the above nav is really done.
             }
-            
+
             // give these sane defaults.
             this.height = this.chromeTab.height;
             this.width = this.chromeTab.width;

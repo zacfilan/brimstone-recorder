@@ -27,7 +27,8 @@
                 <td>
                     <div class="slider">
                         <label>Lenient</label>
-                        <input type="range" min="0" max="2" step="1" id="pixelMatchSenstivity" list="sensitivitySettings">
+                        <input type="range" min="0" max="2" step="1" id="pixelMatchSenstivity"
+                            list="sensitivitySettings">
                         <datalist id="sensitivitySettings">
                             <option>0</option>
                             <option>1</option>
@@ -130,7 +131,6 @@
                     </div>
                 </td>
             </tr>
-
         </table>
     </details>
 
@@ -154,12 +154,19 @@
                     <input type="checkbox" id="debugRecorder"></input>
                 </td>
             </tr>
+
+        </table>
+    </details>
+
+    <details>
+        <summary>Experiments</summary>
+        <table>
             <tr>
                 <td>
-                    Enable experimental features
+                    Include CSS of element acted on in test
                 </td>
                 <td>
-                    <input type="checkbox" id="experimentalFeatures"></input>
+                    <input type="checkbox" id="includeCss"></input>
                 </td>
             </tr>
         </table>
