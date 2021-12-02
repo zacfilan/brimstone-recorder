@@ -5,7 +5,7 @@ import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step, TestMetaData } from "./card.js";
 import { sleep, errorDialog, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole } from "./console.js";
-import { loadFile, saveFile } from "./loader.js";
+import { loadFileHandles, saveFile, constructNextTest, moreTestsToRun } from "./loader.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
@@ -472,69 +472,76 @@ $('#playButton').on('click', async function () {
         return;
     }
     try {
-        $('#playButton').addClass('active');
-        setToolbarState();
+        let nextTest;
+        do {
+            nextTest = false;
+            $('#playButton').addClass('active');
+            setToolbarState();
 
-        let actions = TestAction.instances;
-        player.onBeforePlay = updateStepInView;
-        player.onAfterPlay = updateStepInView;
+            let actions = TestAction.instances;
+            player.onBeforePlay = updateStepInView;
+            player.onAfterPlay = updateStepInView;
 
-        let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
+            let playFrom = currentStepIndex(); // we will start on the step showing in the workspace.
 
-        // we can resume a failed step, which means we don't drive the action just check the screenshot results of it.
-        // this is used when the user fixes a failed step and wants to play from there.
-        let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
+            // we can resume a failed step, which means we don't drive the action just check the screenshot results of it.
+            // this is used when the user fixes a failed step and wants to play from there.
+            let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
 
-        // common to record then immediately hit play, so do the rewind for the user
-        if (playFrom === TestAction.instances.length - 1) {
-            playFrom = 0;
-            resume = false;
-        }
-
-        if (playFrom === 0) {
-            playFrom = 1; // don't navigate to the start twice, the goto is handled when we set up the applicationUnderTestTab
-            if (!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: TestAction.meta.incognito })) {
-                await applicationUnderTestTab.create({ url: actions[0].url, incognito: TestAction.meta.incognito });
+            // common to record then immediately hit play, so do the rewind for the user
+            if (playFrom === TestAction.instances.length - 1) {
+                playFrom = 0;
+                resume = false;
             }
-        }
-        else {
-            if (!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
-                throw new Errors.ReuseTestWindow();
+
+            if (playFrom === 0) {
+                playFrom = 1; // don't navigate to the start twice, the goto is handled when we set up the applicationUnderTestTab
+                if (!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: TestAction.meta.incognito })) {
+                    await applicationUnderTestTab.create({ url: actions[0].url, incognito: TestAction.meta.incognito });
+                }
             }
-        }
+            else {
+                if (!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+                    throw new Errors.ReuseTestWindow();
+                }
+            }
 
-        applicationUnderTestTab.url = actions[0].url;
-        applicationUnderTestTab.width = actions[0].tabWidth;
-        applicationUnderTestTab.height = actions[0].tabHeight;
+            applicationUnderTestTab.url = actions[0].url;
+            applicationUnderTestTab.width = actions[0].tabWidth;
+            applicationUnderTestTab.height = actions[0].tabHeight;
 
-        await player.attachDebugger({ tab: applicationUnderTestTab });
+            await player.attachDebugger({ tab: applicationUnderTestTab });
 
-        await startPlaying(applicationUnderTestTab);
+            await startPlaying(applicationUnderTestTab);
 
-        playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
+            playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
 
-        $('#playButton').removeClass('active');
-        setToolbarState();
+            $('#playButton').removeClass('active');
+            setToolbarState();
 
-        await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
-        switch (playMatchStatus) {
-            case constants.match.PASS:
-            case constants.match.ALLOW:
-                setInfoBarText('✅ last run passed');
-                alert('✅ Test passed.');
-                break;
-            case constants.match.FAIL:
-                updateStepInView(TestAction.instances[currentStepIndex()]);
-                setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
-                break;
-            case constants.match.CANCEL:
-                updateStepInView(TestAction.instances[currentStepIndex()]);
-                setInfoBarText(`❌ last run canceled after user action ${player.currentAction.index + 1}`);
-                break;
-            default:
-                setInfoBarText(`💀 unknown status reported '${playMatchStatus}'`);
-                break;
-        }
+            await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
+            switch (playMatchStatus) {
+                case constants.match.PASS:
+                case constants.match.ALLOW:
+                    nextTest = await loadNextTest();
+                    if (!nextTest) {
+                        setInfoBarText('✅ last run passed');
+                        alert('✅ Test passed.');
+                    }
+                    break;
+                case constants.match.FAIL:
+                    updateStepInView(TestAction.instances[currentStepIndex()]);
+                    setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
+                    break;
+                case constants.match.CANCEL:
+                    updateStepInView(TestAction.instances[currentStepIndex()]);
+                    setInfoBarText(`❌ last run canceled after user action ${player.currentAction.index + 1}`);
+                    break;
+                default:
+                    setInfoBarText(`💀 unknown status reported '${playMatchStatus}'`);
+                    break;
+            }
+        } while (nextTest);
     }
     catch (e) {
         $('#playButton').removeClass('active');
@@ -813,7 +820,7 @@ async function stopPlaying() {
     setToolbarState();
 }
 
-$('#clearButton').on('click', async () => {
+async function clearTest() {
     // remove the cards
     // FIXME abstract this away in a Test instance
     TestAction.instances = [];
@@ -825,7 +832,9 @@ $('#clearButton').on('click', async () => {
 
     $('#cards').empty();
     $('#step').empty();
-});
+}
+
+$('#clearButton').on('click', clearTest);
 
 /**
  * Send a msg back to the bristone workspace over the recording channel port. 
@@ -864,17 +873,39 @@ $('#issuesButton').on('click', () => {
     });
 });
 
+async function loadNextTest() {
+    if(!moreTestsToRun()) {
+     return false;
+    }
+    await clearTest();
+    let file = await constructNextTest();
+    ++currentTestNumber;
+    let suite = numberOfTestsInSuite>1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})`: '';
+    testFileName = file.name;
+    window.document.title = `Brimstone - ${testFileName}${suite}`;
+    updateStepInView(TestAction.instances[0]);
+    for (let i = 1; i < TestAction.instances.length; ++i) {
+        let action = TestAction.instances[i];
+        updateThumb(action);
+    }
+    setToolbarState();
+    return true;
+}
+
+/** The number of tests loaded. This is used for playing back multiple tests. */
+let numberOfTestsInSuite = 0;
+/** The 1-based index of the current test. */
+let currentTestNumber = 0;
+
 $('#loadButton').on('click', async () => {
-    let file = await loadFile();
-    if (file) {
-        testFileName = file.name;
-        window.document.title = `Brimstone - ${testFileName}`;
-        updateStepInView(TestAction.instances[0]);
-        for (let i = 1; i < TestAction.instances.length; ++i) {
-            let action = TestAction.instances[i];
-            updateThumb(action);
-        }
-        setToolbarState();
+    numberOfTestsInSuite = 0;
+    currentTestNumber = 0;
+    try {
+        numberOfTestsInSuite = await loadFileHandles();
+        await loadNextTest();
+    }
+    catch (e) {
+        console.warn(e);
     }
 });
 

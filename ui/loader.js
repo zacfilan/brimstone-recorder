@@ -12,23 +12,43 @@ export function getScreenshots() {
     return screenshots;
 }
 
-/** show file picker and let user load a test recording. */
-export async function loadFile() {
-    let fileHandle;
+/**
+ * An array of file handles to the zipfiles 
+ */
+let fileHandles = [];
+
+/** show file picker and let user load tests recording. */
+export async function loadFileHandles() {
+    fileHandles = [];
     try {
-        [fileHandle] = await window.showOpenFilePicker({
+        fileHandles = await window.showOpenFilePicker({
             suggestedName: `test.zip`,
             types: [
                 {
-                    description: 'A ZIP archive that can be run by Brimstone',
+                    description: 'ZIP archive(s) that can be run by Brimstone',
                     accept: { 'application/zip': ['.zip'] }
                 }
-            ]
+            ],
+            multiple: true
         });
     }
     catch (e) {
         console.error(e);
-        return;
+    }
+    return fileHandles.length;
+}
+
+export function moreTestsToRun() {
+    return fileHandles?.length;
+}
+
+/**
+ * Take the filehandle of the next zip, construct a Test instance, and make it the current one.
+ */
+export async function constructNextTest() {
+    let fileHandle = fileHandles?.shift();
+    if(!fileHandle) {
+        return false;
     }
 
     const blob = await fileHandle.getFile();
@@ -70,6 +90,7 @@ export async function loadFile() {
 
     hydrateForPlay();
     return blob;
+
 }
 
 var acceptableHydratedPromise = false;
