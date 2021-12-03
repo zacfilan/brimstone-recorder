@@ -26,7 +26,11 @@ async function save_options() {
     options.recordIncognito = document.getElementById('recordIncognito').checked;
     options.developerMode = document.getElementById('developerMode').checked;
     options.debugRecorder = document.getElementById('debugRecorder').checked;
+    // experiements
     options.experiment.includeCss = document.getElementById('includeCss').checked;
+    options.experiment.joinSubTests = document.getElementById('joinSubTests').checked;
+
+    
     options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
 
     options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
@@ -57,7 +61,10 @@ async function restore_options() {
     document.getElementById('developerMode').checked = options.developerMode;
     document.getElementById('debugRecorder').checked = options.debugRecorder;
 
+    // experiements
     document.getElementById('includeCss').checked = options.experiment.includeCss;
+    document.getElementById('joinSubTests').checked = options.experiment.joinSubTests;
+
     document.getElementById('closeOldTestWindowOnCreate').checked = options.closeOldTestWindowOnCreate;
 
 

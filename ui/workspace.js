@@ -2,10 +2,10 @@ import { Player } from "../player.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
-import { TestAction, getCard, constants, Step, TestMetaData } from "./card.js";
+import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep, errorDialog, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole } from "./console.js";
-import { loadFileHandles, saveFile, constructNextTest, moreTestsToRun } from "./loader.js";
+import { Test } from "../test.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
@@ -25,8 +25,12 @@ keycode2modifier[CTRL_KEYCODE] = 2;
 keycode2modifier[META_KEYCODE] = 4;
 keycode2modifier[SHIFT_KEYCODE] = 8;
 
-let testFileName = 'untitled';
-window.document.title = `Brimstone - ${testFileName}`;
+/**
+ * The current test in memory.
+ * @type {Test}
+ */
+Test.current = new Test();
+window.document.title = `Brimstone - ${Test.current.filename}`;
 
 /** The testing tab being recorded/played
  * @type {Tab}
@@ -119,7 +123,7 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
 
 async function countDown(seconds) {
     let expectedScreenIndex = currentStepIndex() + 1;
-    let action = TestAction.instances[expectedScreenIndex];
+    let action = Test.current.steps[expectedScreenIndex];
     action.overlay = {
         height: 100,
         width: 100,
@@ -128,11 +132,11 @@ async function countDown(seconds) {
     };
     for (let i = seconds; i; --i) {
         action.overlay.html = i;
-        updateStepInView(TestAction.instances[expectedScreenIndex - 1]);
+        updateStepInView(Test.current.steps[expectedScreenIndex - 1]);
         await sleep(1000);
     }
     delete action.overlay;
-    updateStepInView(TestAction.instances[expectedScreenIndex - 1]);
+    updateStepInView(Test.current.steps[expectedScreenIndex - 1]);
 }
 
 /** The index of the first card showing in big step area */
@@ -189,8 +193,8 @@ $('#step').on('click', '#downloadObjectAsJsonButton', function () {
             css: this.css
         };
     };
-    let name = testFileName.replace(/\.[^/.]+$/, '') + '_metrics';
-    downloadObjectAsJson({ steps: TestAction.instances }, name);
+    let name = Test.current.filename.replace(/\.[^/.]+$/, '') + '_metrics';
+    downloadObjectAsJson({ steps: Test.current.steps }, name);
     TestAction.prototype.toJSON = orig;
 });
 
@@ -199,29 +203,29 @@ $('#ignoreDelta').on('click',
     async function ignoreDelta(e) {
 
         // add a mask
-        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
+        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         await action.addMask(view);
-        updateStepInView(TestAction.instances[action.index - 1]);
+        updateStepInView(Test.current.steps[action.index - 1]);
     }
 );
 
 $('#undo').on('click', async function () {
     // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
-    const { view, action } = getCard('#content .waiting');
+    const { view, action } = getCard('#content .waiting', Test.current);
     action.acceptablePixelDifferences = new Screenshot();
     await action.pixelDiff();
-    updateStepInView(TestAction.instances[action.index - 1]);
+    updateStepInView(Test.current.steps[action.index - 1]);
     addVolatileRegions();
 });
 
 $("#replace").on('click', async function () {
     // push the actual into the expected and be done with it.
-    const { action, view } = getCard($('#content .card:nth-of-type(2)')[0]);
+    const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
     action.expectedScreenshot.png = action.actualScreenshot.png;
     action.expectedScreenshot.dataUrl = action.actualScreenshot.dataUrl;
     action.acceptablePixelDifferences = new Screenshot();
     await action.pixelDiff();
-    updateStepInView(TestAction.instances[action.index - 1]);
+    updateStepInView(Test.current.steps[action.index - 1]);
     addVolatileRegions();
 });
 
@@ -231,8 +235,8 @@ $('#step').on('mousedown', '.card.edit img', () => false);
 $('#cards').on('click', '.thumb',
     /** When the user clicks on the thumbnail put that step in the main area. */
     async function gotoStepFromThumb(e) {
-        const { action } = getCard(e.currentTarget);
-        let step = new Step({ curr: action });
+        const { action } = getCard(e.currentTarget, Test.current);
+        let step = new Step({ curr: action, test: Test.current });
         setStepContent(step);
     }
 );
@@ -240,7 +244,7 @@ $('#cards').on('click', '.thumb',
 let diffPromise = false;
 
 function addVolatileRegions() {
-    const { view } = getCard($('#content .card.waiting')[0]);
+    const { view } = getCard($('#content .card.waiting')[0], Test.current);
     let screenshot = view.find('.screenshot');
     Rectangle.setContainer(screenshot[0],
         () => {
@@ -254,11 +258,11 @@ function addVolatileRegions() {
 
 $('#step').on('click', '.action .title',
     function (e) {
-        const { view, action } = getCard(e.currentTarget);
+        const { view, action } = getCard(e.currentTarget, Test.current);
         let name = prompt('What would you like to name this step?', action.name || 'User action');
         if (name && name !== 'User action') {
             action.name = name;
-            updateStepInView(TestAction.instances[action.index]);
+            updateStepInView(Test.current.steps[action.index]);
         }
     }
 );
@@ -267,7 +271,7 @@ $('#step').on('click', '.waiting .click-to-change-view',
     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
     async function cycleEditStates(e) {
         // flip the cards
-        const { view, action } = getCard(e.currentTarget);
+        const { view, action } = getCard(e.currentTarget, Test.current);
         let index;
         switch (action._view) {
             case constants.view.EXPECTED:
@@ -280,14 +284,14 @@ $('#step').on('click', '.waiting .click-to-change-view',
                     });
                     if (action.acceptablePixelDifferences) {
                         action._view = constants.view.EDIT;
-                        await action.acceptablePixelDifferences.hydrate();
+                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
                         action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
                     }
                 }
                 else {
-                    await action.actualScreenshot.hydrate();
+                    await action.actualScreenshot.hydrate(Test.current.zip?.folder("screenshots"));
                 }
-                updateStepInView(TestAction.instances[action.index - 1]);
+                updateStepInView(Test.current.steps[action.index - 1]);
                 break;
             case constants.view.ACTUAL:
                 action._view = constants.view.EDIT;
@@ -296,17 +300,17 @@ $('#step').on('click', '.waiting .click-to-change-view',
                         action.acceptablePixelDifferences = new Screenshot();
                     }
                     else {
-                        await action.acceptablePixelDifferences.hydrate();
+                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
                     }
                     await action.pixelDiff();
                 }
-                updateStepInView(TestAction.instances[action.index - 1]);
+                updateStepInView(Test.current.steps[action.index - 1]);
                 /** Add rectangles where we don't care about pixel differences. */
                 addVolatileRegions();
                 break;
             case constants.view.EDIT:
                 action._view = constants.view.EXPECTED;
-                await updateStepInView(TestAction.instances[action.index - 1]);
+                await updateStepInView(Test.current.steps[action.index - 1]);
                 break;
         }
     }
@@ -357,7 +361,7 @@ function setToolbarState() {
             rb.prop('disabled', false);
             document.documentElement.style.setProperty('--action-color', 'blue');
 
-            if (TestAction.instances.length) {
+            if (Test.current.steps.length) {
                 $('#saveButton').prop('disabled', false);
                 $('#clearButton').prop('disabled', false);
 
@@ -367,7 +371,7 @@ function setToolbarState() {
                     $('#first').prop('disabled', false);
                 }
                 $('#playButton').prop('disabled', false);
-                if (index < TestAction.instances.length - 1) {
+                if (index < Test.current.steps.length - 1) {
                     $("#next").prop('disabled', false);
                     $("#last").prop('disabled', false);
                 }
@@ -381,7 +385,7 @@ function setToolbarState() {
     // buttons for editing allowable deltas in the second card.
     let editCard = $('#content .card:nth-of-type(2)');
     if (editCard.length) {
-        const { action } = getCard(editCard);
+        const { action } = getCard(editCard, Test.current);
         if (action?._view === constants.view.EDIT) {
             $('#ignoreDelta').prop('disabled', false);
             $('#undo').prop('disabled', false);
@@ -391,13 +395,13 @@ function setToolbarState() {
 }
 
 $('#first').on('click', function (e) {
-    updateStepInView(TestAction.instances[0]);
+    updateStepInView(Test.current.steps[0]);
 });
 
 $('#previous').on('click', function (e) {
     let index = currentStepIndex();
     if (index > 0) {
-        updateStepInView(TestAction.instances[index - 1]);
+        updateStepInView(Test.current.steps[index - 1]);
     }
 });
 
@@ -405,9 +409,9 @@ $('#previous').on('click', function (e) {
 var playMatchStatus = constants.match.PASS;
 
 $('#step').on('click', '#chartButton', async function () {
-    let latencyValues = TestAction.instances.map(a => a.latency);
-    let memoryUsedValues = TestAction.instances.map(a => a.memoryUsed);
-    let indicies = TestAction.instances.map(a => a.index);
+    let latencyValues = Test.current.steps.map(a => a.latency);
+    let memoryUsedValues = Test.current.steps.map(a => a.memoryUsed);
+    let indicies = Test.current.steps.map(a => a.index);
     let chartDescriptor = JSON.stringify({
         type: 'line',
         data: {
@@ -478,7 +482,7 @@ $('#playButton').on('click', async function () {
             $('#playButton').addClass('active');
             setToolbarState();
 
-            let actions = TestAction.instances;
+            let actions = Test.current.steps;
             player.onBeforePlay = updateStepInView;
             player.onAfterPlay = updateStepInView;
 
@@ -489,19 +493,19 @@ $('#playButton').on('click', async function () {
             let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
 
             // common to record then immediately hit play, so do the rewind for the user
-            if (playFrom === TestAction.instances.length - 1) {
+            if (playFrom === Test.current.steps.length - 1) {
                 playFrom = 0;
                 resume = false;
             }
 
             if (playFrom === 0) {
                 playFrom = 1; // don't navigate to the start twice, the goto is handled when we set up the applicationUnderTestTab
-                if (!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: TestAction.meta.incognito })) {
-                    await applicationUnderTestTab.create({ url: actions[0].url, incognito: TestAction.meta.incognito });
+                if (!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: Test.current.incognito })) {
+                    await applicationUnderTestTab.create({ url: actions[0].url, incognito: Test.current.incognito });
                 }
             }
             else {
-                if (!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+                if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
                     throw new Errors.ReuseTestWindow();
                 }
             }
@@ -514,7 +518,7 @@ $('#playButton').on('click', async function () {
 
             await startPlaying(applicationUnderTestTab);
 
-            playMatchStatus = await player.play(actions, playFrom, resume); // players gotta play...
+            playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
 
             $('#playButton').removeClass('active');
             setToolbarState();
@@ -530,11 +534,11 @@ $('#playButton').on('click', async function () {
                     }
                     break;
                 case constants.match.FAIL:
-                    updateStepInView(TestAction.instances[currentStepIndex()]);
+                    updateStepInView(Test.current.steps[currentStepIndex()]);
                     setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
                     break;
                 case constants.match.CANCEL:
-                    updateStepInView(TestAction.instances[currentStepIndex()]);
+                    updateStepInView(Test.current.steps[currentStepIndex()]);
                     setInfoBarText(`❌ last run canceled after user action ${player.currentAction.index + 1}`);
                     break;
                 default:
@@ -559,13 +563,13 @@ $('#playButton').on('click', async function () {
 
 $('#next').on('click', function (e) {
     let index = currentStepIndex();
-    if (index < TestAction.instances.length - 1) {
-        updateStepInView(TestAction.instances[index + 1]);
+    if (index < Test.current.steps.length - 1) {
+        updateStepInView(Test.current.steps[index + 1]);
     }
 });
 
 $('#last').on('click', function (e) {
-    updateStepInView(TestAction.instances[TestAction.instances.length - 1]);
+    updateStepInView(Test.current.steps[Test.current.steps.length - 1]);
 });
 
 // we have a handler for when the debugger detaches, if there was a command in flight when the debugger deattached
@@ -597,11 +601,10 @@ async function debuggerOnDetach(source, reason) {
 chrome.debugger.onDetach.addListener(debuggerOnDetach);
 
 /**
- * Hide the cursor in all frames.
- * Read value from Options, write into TestAction.meta.
+ * Hide the cursor in all frames. If this test is so specified.
  */
 async function hideCursor() {
-    if (TestAction.meta.hideCursor) {
+    if (Test.current.hideCursor) {
         await chrome.tabs.sendMessage(applicationUnderTestTab.chromeTab.id, { func: 'hideCursor' });
     }
 }
@@ -737,7 +740,7 @@ $('#recordButton').on('click', async function () {
         if (button.hasClass('active')) {
             // before I take the last screenshot the window must have focus again.
             //await focusTab();
-            let last = TestAction.instances[TestAction.instances.length - 1];
+            let last = Test.current.steps[Test.current.steps.length - 1];
             last.addExpectedScreenshot(last.expectedScreenshot.dataUrl); // build the final png
             stopRecording();
             return;
@@ -745,12 +748,11 @@ $('#recordButton').on('click', async function () {
 
         let url = '';
         let options = await loadOptions();
-        let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - nuless the user is showing the last only!)
+        let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - unless the user is showing the last only!)
         //updateThumbs(); // If I actually changed it I should show that
 
-        // are we doing an incognito recording?
-        TestAction.meta = new TestMetaData();
-        TestAction.meta.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
+        // are we doing an incognito recording - this is determined by the option first, or the state of the tab we are going to use
+        Test.current.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
 
         if (!(index > 0)) {
             let defaultUrl = options?.url ?? '';
@@ -766,8 +768,8 @@ $('#recordButton').on('click', async function () {
             saveOptions(options); // no need to wait
 
             // recording from beginning
-            if (!await applicationUnderTestTab.reuse({ url: url, incognito: TestAction.meta.incognito })) {
-                await applicationUnderTestTab.create({ url: url, incognito: TestAction.meta.incognito });
+            if (!await applicationUnderTestTab.reuse({ url: url, incognito: Test.current.incognito })) {
+                await applicationUnderTestTab.create({ url: url, incognito: Test.current.incognito });
             }
 
             await player.attachDebugger({ tab: applicationUnderTestTab });
@@ -789,10 +791,10 @@ $('#recordButton').on('click', async function () {
             await player.mousemove({ x: 0, y: 0 }); // this is a bit of a hack. on recordig we don't get focus automatically on the viewport when we mustsince the first mousemove onto the viewport affects the screen.
         }
         else {
-            TestAction.instances.splice(index + 2); // anything after the step showing is gone.
+            Test.current.steps.splice(index + 2); // anything after the step showing is gone.
 
             // appending to an existing test
-            if (!await applicationUnderTestTab.reuse({ incognito: TestAction.meta.incognito })) {
+            if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
                 throw new Errors.ReuseTestWindow();
             }
 
@@ -823,12 +825,10 @@ async function stopPlaying() {
 async function clearTest() {
     // remove the cards
     // FIXME abstract this away in a Test instance
-    TestAction.instances = [];
-    TestAction.meta = new TestMetaData();
+    Test.current = new Test();
 
     setToolbarState();
-    testFileName = 'untitled';
-    window.document.title = `Brimstone - ${testFileName}`;
+    window.document.title = `Brimstone - ${Test.current.filename}`;
 
     $('#cards').empty();
     $('#step').empty();
@@ -854,10 +854,9 @@ function postMessage(msg) {
 }
 
 $('#saveButton').on('click', async () => {
-    let file = await saveFile();
+    let file = await Test.current.saveFile();
     if (file) {
-        testFileName = file.name;
-        window.document.title = `Brimstone - ${testFileName}`;
+        window.document.title = `Brimstone - ${Test.current.filename}`;
     }
 });
 
@@ -872,37 +871,47 @@ $('#issuesButton').on('click', () => {
         url: 'https://github.com/zacfilan/brimstone-recorder/issues'
     });
 });
-
 async function loadNextTest() {
-    if(!moreTestsToRun()) {
-     return false;
+    let numberOfTestsInSuite = fileHandles.length;
+    if (++currentTestNumber > numberOfTestsInSuite) {
+        return false;
     }
-    await clearTest();
-    let file = await constructNextTest();
-    ++currentTestNumber;
-    let suite = numberOfTestsInSuite>1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})`: '';
-    testFileName = file.name;
-    window.document.title = `Brimstone - ${testFileName}${suite}`;
-    updateStepInView(TestAction.instances[0]);
-    for (let i = 1; i < TestAction.instances.length; ++i) {
-        let action = TestAction.instances[i];
-        updateThumb(action);
+    let options = await loadOptions();
+    let suite = numberOfTestsInSuite > 1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})` : '';
+    let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
+
+    if (options.experiment.joinSubTests) {
+        throw new Error("not implemented yet");
+        //let nextTest = await constructNextTest();
+        //testFileName = 'untitled';
     }
+    else {
+        await clearTest();
+        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber-1]);
+    }
+
+    window.document.title = `Brimstone - ${Test.current.filename}${suite}`;
+    updateStepInView(Test.current.steps[lastStep]);
+    // for (let i = 1; i < Test.current.steps.length; ++i) {
+    //      let action = Test.current.steps[i];
+    //      updateThumb(action);
+    // }
     setToolbarState();
     return true;
 }
 
-/** The number of tests loaded. This is used for playing back multiple tests. */
-let numberOfTestsInSuite = 0;
+/** The filehandles of the tests the user loaded. Used for playing back 1 or more tests. */
+let fileHandles = [];
 /** The 1-based index of the current test. */
 let currentTestNumber = 0;
-
 $('#loadButton').on('click', async () => {
-    numberOfTestsInSuite = 0;
+    fileHandles = [];
     currentTestNumber = 0;
     try {
-        numberOfTestsInSuite = await loadFileHandles();
-        await loadNextTest();
+        fileHandles = await Test.loadFileHandles();
+        if (fileHandles.length) {
+            await loadNextTest();
+        }
     }
     catch (e) {
         console.warn(e);
@@ -911,7 +920,7 @@ $('#loadButton').on('click', async () => {
 
 function updateStepInView(action) {
     // immediately show if there is nothing pending
-    let step = new Step({ curr: action });
+    let step = new Step({ curr: action, test: Test.current });
     setStepContent(step);
 }
 
@@ -990,6 +999,7 @@ async function userEventToAction(userEvent) {
     let frameOffset = await getFrameOffset(frameId);
 
     let cardModel = new TestAction(userEvent);
+    Test.current.updateOrAppendAction(cardModel);
 
     let element = userEvent.boundingClientRect;
     cardModel.tabHeight = applicationUnderTestTab.height;
@@ -1166,17 +1176,17 @@ async function onMessageHandler(message, _port) {
 
     userEvent._view = constants.view.EXPECTED;
     // the last one contains the screenshot the user was looking at in the expected when they recorded this action
-    userEvent.index = Math.max(0, TestAction.instances.length - 1); // used by userEventToAction constructor
+    userEvent.index = Math.max(0, Test.current.steps.length - 1); // used by userEventToAction constructor
     let action;
     switch (userEvent.type) {
         case 'error':
             // remove current expected
-            if (TestAction.instances.length > 2) {
-                TestAction.instances.splice(TestAction.instances.length - 1); // the expected and the mouseove start
+            if (Test.current.steps.length > 2) {
+                Test.current.steps.splice(Test.current.steps.length - 1); // the expected and the mouseove start
 
                 // rename the mouse start step, cause that needs to be re-recorded.
-                TestAction.instances[TestAction.instances.length - 1].type = 'wait';
-                updateStepInView(TestAction.instances[TestAction.instances.length - 2]); // update the UI 
+                Test.current.steps[Test.current.steps.length - 1].type = 'wait';
+                updateStepInView(Test.current.steps[Test.current.steps.length - 2]); // update the UI 
             }
             stopRecording(); // I need to broadcast stop to all the frames
             break;
@@ -1202,7 +1212,7 @@ async function onMessageHandler(message, _port) {
                 _lastSavedScreenshot = _lastScreenshot;
             }
 
-            let lastAction = TestAction.instances[userEvent.index]; // grab current expected action playholder (2nd card)
+            let lastAction = Test.current.steps[userEvent.index]; // grab current expected action playholder (2nd card)
 
             // refresh the expected action placeholder the user sees.
             // use the lower cost option, just the dataurl don't make into a PNG
@@ -1211,7 +1221,7 @@ async function onMessageHandler(message, _port) {
                 dataUrl: _lastScreenshot
             });
             lastAction._view = constants.view.DYNAMIC;
-            updateStepInView(TestAction.instances[TestAction.instances.length - 2]);
+            updateStepInView(Test.current.steps[Test.current.steps.length - 2]);
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;

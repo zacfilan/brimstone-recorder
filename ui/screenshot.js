@@ -1,5 +1,4 @@
 import { Player } from "../player.js";
-import { getScreenshots } from "./loader.js";
 
 /** A container for properties of a screenshot */
 export class Screenshot {
@@ -39,11 +38,11 @@ export class Screenshot {
      * create the dataUrl property by reading the zipfile
      * @returns string
      */
-     async loadDataUrlFromFile() {
+     async loadDataUrlFromZipDir(screenshots) {
         let that = this;
 
         this._dataUrlPromise =
-            getScreenshots().file(this.fileName).async('base64')
+            screenshots.file(this.fileName).async('base64')
                 .then(data => that.dataUrl = ('data:image/png;base64,' + data));
         return this._dataUrlPromise;
     }
@@ -65,9 +64,9 @@ export class Screenshot {
      * 
      * @returns 
      */
-    hydrate() {
+    hydrate(screenshots) {
         if(!this.dataUrl) {
-            return this.loadDataUrlFromFile()
+            return this.loadDataUrlFromZipDir(screenshots)
                 .then( () => this.createPngFromDataUrl());  
         }
         if(!this.png) {

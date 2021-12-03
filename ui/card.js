@@ -62,6 +62,8 @@ const pointer = `
   </path>
 </svg>`;
 
+
+
 export class TestAction {
     /** 
      * @type {object}
@@ -169,15 +171,11 @@ export class TestAction {
     /** did this action happen in the shadownDOM? */
     shadowDOMAction = false;
 
+    /** The test this action is in. */
+    test = null;
+
     constructor(args) {
         Object.assign(this, args);
-
-        // make sure it has a step number
-        if (this.index === undefined) {
-            this.index = TestAction.instances.length;
-        }
-        TestAction.instances[this.index] = this;
-
     }
 
     /**
@@ -398,29 +396,6 @@ export class TestAction {
 }
 
 /**
- * The currently constructed test. 
- * @type {TestAction[]}
- */
-TestAction.instances = [];
-
-export class TestMetaData {
-    /** The version of brimstone-recorder used to record this test. */
-    version = 'v' + chrome.runtime.getManifest().version;
-
-    /** Should we hide the cursor for this test for performance? */
-    hideCursor = true;
-
-    /** Was this test recorded in (and hence should be played back in) incognito? */
-    incognito = true;
-};
-
-/**
- * Metadata about the current set of test actions.
- */
-TestAction.meta = new TestMetaData();
-
-
-/**
  * An action followed by the next expected screen: action, expected screen
  * i.e expected screen, input, expected screen. These are used in the UI mainly.
  * This is really just (some parts) of two consecutive TestActions. It is modelled as so.
@@ -436,9 +411,17 @@ export class Step {
      */
     next;
 
-    constructor(args = {}) {
-        this.curr = args.curr;
-        this.next = args.next || TestAction.instances[this.curr.index + 1];
+    /**
+     * 
+     * @param {object} args
+     * @param {TestAction} args.curr The current test action
+     * @param {TestAction} args.next The next test actions
+     * @param {Test} args.test The containing test 
+     */
+    constructor({curr, next = null, test}) {
+        this.curr = curr;
+        this.test = test;
+        this.next = next || test.steps[this.curr.index + 1];
     }
 
     toHtml({ isRecording }) {
@@ -447,10 +430,10 @@ export class Step {
             tooltip: 'Click to edit.'
         };
         if (isRecording) {
-            title.text = this.curr.name || (this.curr.index === TestAction.instances.length - 1 ? 'Last recorded user action' : 'User action');
+            title.text = this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Last recorded user action' : 'User action');
         }
         else {
-            title.text = this.curr.name || (this.curr.index === TestAction.instances.length - 1 ? 'Final screenshot' : 'User action');
+            title.text = this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Final screenshot' : 'User action');
         }
 
         let html = `
@@ -478,7 +461,7 @@ export class Step {
                 switch (this.next._view) {
                     case constants.view.EXPECTED:
                         title.text += 'Expected result';
-                        if (this.next.index === TestAction.instances.length - 1) {
+                        if (this.next.index === this.test.steps.length - 1) {
                             title.text += ' - final screenshot';
                         }
                         title.text += '.';
@@ -534,9 +517,9 @@ export function getStep(element) {
     return { view, model };
 }
 
-export function getCard(element) {
+export function getCard(element, test) {
     let view = $(element).closest('.card');
     let index = view.attr('data-index');
-    let action = TestAction.instances[index];
+    let action = test.steps[index];
     return { view, action };
 }

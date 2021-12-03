@@ -4,10 +4,10 @@ import { Screenshot } from "./ui/screenshot.js";
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
-import { sleep, errorDialog } from "./utilities.js";
+import { sleep } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
-import { getHydratedForPlayPromise } from "./ui/loader.js";
+import { Test } from "./test.js";
 
 var options;
 
@@ -135,21 +135,21 @@ export class Player {
      * 
      * Returns a deferred boolean that reflects the success of playing all the steps:
      * true if they all played successfully, false if one failed.
-     * @param {TestAction[]} actions the actions to play
+     * @param {Test} test the test to play
      * @param {number} startIndex the index we start playing from
      * @param {boolean} resume if true we do not drive this step, just check it
      * */
-    async play(actions, startIndex = 0, resume = false) {
-        this._actions = actions;
+    async play(test, startIndex = 0, resume = false) {
+        this._actions = test.steps;
         this._stopPlaying = false;
 
         options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
         this.pixelMatchThreshhold = options.pixelMatchThreshhold;
         this.interKeypressDelay = options.interKeypressDelay;
-        let v = await getHydratedForPlayPromise();
+        let v = await test.getHydratedForPlayPromise();
 
-        this._actions = actions;
+        let actions = this._actions;
 
         // start timer
         let start;

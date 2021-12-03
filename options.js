@@ -1,7 +1,7 @@
 /** Various user settable options. */
 export class Options {
     /** The maximum time waite for an expected screenshot to match an actua screenshot during playback, in seconds. */
-    MAX_VERIFY_TIMEOUT = 15; 
+    MAX_VERIFY_TIMEOUT = 15;
 
     /** If true the blinking text cursor (properly caret) will be hidden during recording and during playback.
      * This speeds up playback.
@@ -40,7 +40,13 @@ export class Options {
          * This is not used by the player, but may be
          * useful for external code.
          */
-        includeCss: false
+        includeCss: false,
+        
+        /**
+        * When loading multiple tests, we can treat them as an array of seperate tests, or as one big test.
+        * Which is it?
+        */
+        joinSubTests: false
     };
 
     /**
@@ -64,6 +70,8 @@ export class Options {
      * longer to avoid the alerts, but is less likely to record unnecessary moousemoves.
      */
     mouseMoveTimeout = 100;
+
+
 };
 
 var options = new Options();
@@ -83,5 +91,5 @@ export async function loadOptions() {
  * @returns when complete
  */
 export function saveOptions(options) {
-    return new Promise(resolve =>  chrome.storage.local.set({options}, resolve));
+    return new Promise(resolve => chrome.storage.local.set({ options }, resolve));
 }
