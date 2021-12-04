@@ -2,9 +2,74 @@ html {
     height: 100%;
 }
 
+#menu {
+    font-size: 14px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    &>svg {
+        height: 17px;
+        width: 17px;
+        margin-left: 1em;
+    }
+    background: rgb(33, 33, 33);
+    
+    .option {
+        padding: .5em .6em;
+        position:relative;
+        max-width: 100px;
+        cursor: pointer; 
+        &:hover {
+            background: rgb(75,75,75);
+        }
+        svg {
+            width: 14px;
+            height: 14px;
+            fill: white;
+        }
+    } 
+
+    .options { 
+        position: absolute;
+        left: 0px;
+        top: 100%;
+        background: rgb(50,50,50);
+        z-index: 2;
+        box-shadow: 1px 2px 4px  black;
+        //border-right: 1px solid black; 
+        // border-bottom: 1px solid black;
+        padding: .3em 0;  
+        width: 250px;
+        border-radius: 0 0 4px 4px;
+        display: flex;
+        flex-direction: column; 
+        
+        .option {
+            max-width: unset;
+            &:hover {
+                background: var(--hover-color);
+            }
+            padding: .5em 2em .5em 1em;
+            svg {
+                margin-right: .3em;
+            }
+        }
+        hr {
+            width: 90%;
+            border-bottom: 0;
+        }
+    }
+
+    #navigation {
+        align-self: center;
+    }
+
+}
+ 
 :root {
     --screenshot-timeout: 15s;
     --action-color: red;
+    --hover-color: #1571b3;
 }
 
 body {
@@ -19,8 +84,9 @@ body {
     font-weight: bold;
 }
 
-.themed {
+body {
     background: rgba(0, 0, 0, 0.75);
+    //background: rgb(64, 64,64);
     color: white;
 }
 
@@ -30,12 +96,18 @@ body {
     flex-direction: row;
 }
 
+.col {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+}
+
 button {
     background: unset;
     color: unset;
     border-radius: 3px;
     border: 0;
-    margin: 4px;
+    //margin: 4px;
     font-size: larger;
     height: 31px;
 
@@ -60,11 +132,18 @@ button {
     }
 }
 
-#toolbar {
-    @extend .row;
+#workspace {
+    display: flex;
+    flex-direction: row;
+}
+
+.verticalToolBar { 
+    @extend .col;
+    align-items: center;
     padding: 0px;
-    height: 40px;
+    width: 40px;
     justify-content: space-between;
+    margin-top: 12px;
 
     #recordButton,
     #playButton {
@@ -237,7 +316,7 @@ button {
             max-width:200px; 
             max-height:200px;
             overflow: auto;
-            z-index: 9999999;
+            z-index: 1;
         }
 
         .screenshot {
@@ -294,11 +373,11 @@ button {
             animation: unset;
             animation-fill-mode: unset;
         }
-
+ 
         /** hide that one */
         &.edit.fail .meter {
             visibility: hidden;
-        }
+        } 
 
         /** the text that says "allowed differences..*/
         #allowed-differences {
@@ -316,6 +395,7 @@ button {
 /** only show the meter on the next card when playing back */
 #step {
     height: calc(100% - 172px);
+    width: calc(100% - 40px);
 }
 
 @keyframes opacity2 {
@@ -357,7 +437,7 @@ button {
     width: 100%;
 
     #infobar {
-        background: #1571b3;
+        background: var(--hover-color);
         color: white;
         height: 12px;
         padding: 5px;

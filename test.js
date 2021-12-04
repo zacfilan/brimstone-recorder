@@ -218,12 +218,13 @@ export class Test {
 
 /**
  * An array of file handles to the zipfiles 
+ * @type {FileHandle[]}
  */
 let fileHandles = [];
 
 /**
  * Let the user pick one or more tests to load.
- * @returns {any[]} An array of filehandles
+ * @returns {FileHandle[]} An array of filehandles
  *  
  */
 Test.loadFileHandles = async function loadFileHandles() {
@@ -234,7 +235,10 @@ Test.loadFileHandles = async function loadFileHandles() {
             types: [
                 {
                     description: 'ZIP archive(s) that can be run by Brimstone',
-                    accept: { 'application/zip': ['.zip'] }
+                    accept: { 
+                        'application/zip': ['.zip'],
+                        'application/json': ['.json']
+                     }
                 }
             ],
             multiple: true
@@ -248,6 +252,37 @@ Test.loadFileHandles = async function loadFileHandles() {
 
 /**
  * A global to pass around easily that contains the current test
- * @type {Test}
+ * @type {Playlist}
  */
 Test.current = null;
+
+export class Playlist {
+    /** 
+     * The filename of this playlist
+     */
+    name = '';
+
+    /**
+     * The filenames to play
+     */
+    play = [];
+
+    /**
+     * async constructor
+     * @param {FileHandle} fileHandle 
+     * @returns this
+     */
+    async fromFileHandle(fileHandle) {
+        let blob = await fileHandle.getFile();
+        blob = await blob.text();
+        let pojo = JSON.parse(blob);
+
+        // this.name = pojo.name || 'untitled';
+
+        // for(let i = 0; i < pojo.play.length; ++i) {
+        //     this.play.push(await (new Playlist())
+        // }
+
+        return this;
+    }
+}

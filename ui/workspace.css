@@ -2,9 +2,92 @@ html {
   height: 100%;
 }
 
+#menu {
+  font-size: 14px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  background: #212121;
+}
+
+#menu > svg {
+  height: 17px;
+  width: 17px;
+  margin-left: 1em;
+}
+
+#menu .option {
+  padding: .5em .6em;
+  position: relative;
+  max-width: 100px;
+  cursor: pointer;
+}
+
+#menu .option:hover {
+  background: #4b4b4b;
+}
+
+#menu .option svg {
+  width: 14px;
+  height: 14px;
+  fill: white;
+}
+
+#menu .options {
+  position: absolute;
+  left: 0px;
+  top: 100%;
+  background: #323232;
+  z-index: 2;
+  -webkit-box-shadow: 1px 2px 4px  black;
+          box-shadow: 1px 2px 4px  black;
+  padding: .3em 0;
+  width: 250px;
+  border-radius: 0 0 4px 4px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+}
+
+#menu .options .option {
+  max-width: unset;
+  padding: .5em 2em .5em 1em;
+}
+
+#menu .options .option:hover {
+  background: var(--hover-color);
+}
+
+#menu .options .option svg {
+  margin-right: .3em;
+}
+
+#menu .options hr {
+  width: 90%;
+  border-bottom: 0;
+}
+
+#menu #navigation {
+  -ms-flex-item-align: center;
+      -ms-grid-row-align: center;
+      align-self: center;
+}
+
 :root {
   --screenshot-timeout: 15s;
   --action-color: red;
+  --hover-color: #1571b3;
 }
 
 body {
@@ -22,12 +105,12 @@ body {
   font-weight: bold;
 }
 
-.themed {
+body {
   background: rgba(0, 0, 0, 0.75);
   color: white;
 }
 
-.row, #toolbar, .card .footer {
+.row, .card .footer {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
@@ -40,12 +123,24 @@ body {
           flex-direction: row;
 }
 
+.col, .verticalToolBar {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+}
+
 button {
   background: unset;
   color: unset;
   border-radius: 3px;
   border: 0;
-  margin: 4px;
   font-size: larger;
   height: 31px;
 }
@@ -72,25 +167,39 @@ button svg {
   fill: white;
 }
 
-#toolbar {
+#workspace {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+}
+
+.verticalToolBar {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
   padding: 0px;
-  height: 40px;
+  width: 40px;
   -webkit-box-pack: justify;
       -ms-flex-pack: justify;
           justify-content: space-between;
+  margin-top: 12px;
 }
 
-#toolbar #recordButton,
-#toolbar #playButton {
+.verticalToolBar #recordButton,
+.verticalToolBar #playButton {
   position: relative;
   /** let the recording overlay in this **/
 }
 
-#toolbar #recordButton.active {
+.verticalToolBar #recordButton.active {
   background: red;
 }
 
-#toolbar #playButton.active {
+.verticalToolBar #playButton.active {
   background: green;
 }
 
@@ -290,7 +399,7 @@ button svg {
   max-width: 200px;
   max-height: 200px;
   overflow: auto;
-  z-index: 9999999;
+  z-index: 1;
 }
 
 #content .card.action .action .modifier {
@@ -377,6 +486,7 @@ button svg {
 /** only show the meter on the next card when playing back */
 #step {
   height: calc(100% - 172px);
+  width: calc(100% - 40px);
 }
 
 @-webkit-keyframes opacity2 {
@@ -445,7 +555,7 @@ button svg {
 }
 
 #footer #infobar {
-  background: #1571b3;
+  background: var(--hover-color);
   color: white;
   height: 12px;
   padding: 5px;

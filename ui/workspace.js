@@ -5,10 +5,11 @@ import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep, errorDialog, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole } from "./console.js";
-import { Test } from "../test.js";
+import { Test, Playlist } from "../test.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
+import { MenuController } from "./menu_controller.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
 const version = 'v' + chrome.runtime.getManifest().version;
@@ -39,6 +40,148 @@ var applicationUnderTestTab = new Tab();
 const player = new Player();
 /** used to *not* record pre-requisite screenshots when in the shadowDOM. */
 var shadowDOMScreenshot = 0;
+
+/** Generic thigs the user can do in the UI
+ * 
+ */
+class Actions {
+    about() {
+        chrome.tabs.create({
+            url : 'https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en'
+        });
+    }
+
+    openWiki() {
+        chrome.tabs.create({
+            url: 'https://github.com/zacfilan/brimstone-recorder/wiki'
+        });
+    }
+
+    openIssues() {
+        chrome.tabs.create({
+            url: 'https://github.com/zacfilan/brimstone-recorder/issues'
+        });
+    }
+
+    /** Let the user open a test (zip file) */
+    async openZip() {
+        fileHandles = [];
+        currentTestNumber = 0;
+        try {
+            fileHandles = await Test.loadFileHandles();
+            if (fileHandles.length) {
+                await loadNextTest();
+            }
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    /** Let the user open a test (playlist file) */
+    async openPlaylist() {
+
+    }
+
+    /** Let the user specify a directory underwhich all recordings/tests/playlists will be accessible */
+    async loadLibrary() {
+        let handle = await window.showDirectoryPicker();
+        debugger;
+        let entries = await handle.entries();
+        let values = await handle.values();
+        let keys = await handle.keys();
+        for await (let [key, value] of handle.entries()) {
+            console.log({ key, value });
+            if (value instanceof FileSystemDirectoryHandle) {
+                for await (let [kkey, kvalue] of value.entries()) {
+                    console.log('deep', { kkey, kvalue });
+                }
+            }
+        }
+    }
+
+    /** Give the user quick access to raw JSON */
+    exportJson() {
+        // I only want a few properties, so swap out the serializer
+        // let orig = TestAction.prototype.toJSON;
+        // TestAction.prototype.toJSON = function () {
+        //     return {
+        //         index: this.index,
+        //         memoryUsed: this.memoryUsed,
+        //         latency: this.latency,
+        //         name: this.name,
+        //         css: this.css
+        //     };
+        // };
+        let name = Test.current.filename.replace(/\.[^/.]+$/, '') + '_metrics';
+        downloadObjectAsJson({ steps: Test.current.steps }, name);
+        //TestAction.prototype.toJSON = orig;
+    }
+
+    /** edit pixel differences - Commit any volatile rectangles or individual pixel deltas. */
+    async ignoreDelta(e) {
+        // add a mask
+        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
+        await action.addMask(view);
+        updateStepInView(Test.current.steps[action.index - 1]);
+    }
+
+    /** edit pixel differences - remove the allowed differences, see the differences */
+    async seeDelta() {
+        // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
+        const { view, action } = getCard('#content .waiting', Test.current);
+        action.acceptablePixelDifferences = new Screenshot();
+        await action.pixelDiff();
+        updateStepInView(Test.current.steps[action.index - 1]);
+        addVolatileRegions();
+    }
+
+    /** edit pixel differences - when the recording is wrong */
+    async replaceExpectedWithActual () {
+        // push the actual into the expected and be done with it.
+        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
+        action.expectedScreenshot.png = action.actualScreenshot.png;
+        action.expectedScreenshot.dataUrl = action.actualScreenshot.dataUrl;
+        action.acceptablePixelDifferences = new Screenshot();
+        await action.pixelDiff();
+        updateStepInView(Test.current.steps[action.index - 1]);
+        addVolatileRegions();
+    }
+
+    /** discard the current workspace test */
+    async clearTest() {
+        // remove the cards
+        // FIXME abstract this away in a Test instance
+        Test.current = new Test();
+    
+        setToolbarState();
+        window.document.title = `Brimstone - ${Test.current.filename}`;
+    
+        $('#cards').empty();
+        $('#step').empty();
+    }
+
+    /** save the current test as a zip file */
+    async saveZip() {
+        let file = await Test.current.saveFile();
+        if (file) {
+            window.document.title = `Brimstone - ${Test.current.filename}`;
+        }
+    }
+
+    /** change the name of the currently displayed action */
+    async editActionName(e) {
+        const { view, action } = getCard(e.currentTarget, Test.current);
+        let name = prompt('What would you like to name this step?', action.name || 'User action');
+        if (name && name !== 'User action') {
+            action.name = name;
+            updateStepInView(Test.current.steps[action.index]);
+        }
+    }
+
+}
+const actions = new Actions();
+const menuController = new MenuController(actions);
 
 async function errorHandler(e) {
     let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
@@ -174,60 +317,17 @@ var _lastSavedScreenshot;
  * */
 var _lastMouseMove;
 
-
 /** The parsed test.json object, this will change in memory during use.
  * It represents the recorded user actions, and optionally the result
  * of playing them back. 
  * 
 */
 
-$('#step').on('click', '#downloadObjectAsJsonButton', function () {
-    // I only want a few properties, so swap out the serializer
-    let orig = TestAction.prototype.toJSON;
-    TestAction.prototype.toJSON = function () {
-        return {
-            index: this.index,
-            memoryUsed: this.memoryUsed,
-            latency: this.latency,
-            name: this.name,
-            css: this.css
-        };
-    };
-    let name = Test.current.filename.replace(/\.[^/.]+$/, '') + '_metrics';
-    downloadObjectAsJson({ steps: Test.current.steps }, name);
-    TestAction.prototype.toJSON = orig;
-});
+$('#step').on('click', '#downloadObjectAsJsonButton', actions.exportJson);
 
-$('#ignoreDelta').on('click',
-    /** Commit any volatile rectangles or individual pixel deltas. */
-    async function ignoreDelta(e) {
-
-        // add a mask
-        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
-        await action.addMask(view);
-        updateStepInView(Test.current.steps[action.index - 1]);
-    }
-);
-
-$('#undo').on('click', async function () {
-    // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
-    const { view, action } = getCard('#content .waiting', Test.current);
-    action.acceptablePixelDifferences = new Screenshot();
-    await action.pixelDiff();
-    updateStepInView(Test.current.steps[action.index - 1]);
-    addVolatileRegions();
-});
-
-$("#replace").on('click', async function () {
-    // push the actual into the expected and be done with it.
-    const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
-    action.expectedScreenshot.png = action.actualScreenshot.png;
-    action.expectedScreenshot.dataUrl = action.actualScreenshot.dataUrl;
-    action.acceptablePixelDifferences = new Screenshot();
-    await action.pixelDiff();
-    updateStepInView(Test.current.steps[action.index - 1]);
-    addVolatileRegions();
-});
+$('#step').on('click', '#ignoreDelta', actions.ignoreDelta);
+$('#step').on('click', '#undo', actions.seeDelta);
+$("#step").on('click', '#replace', actions.replaceExpectedWithActual);
 
 // stop the image drag behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
@@ -256,16 +356,8 @@ function addVolatileRegions() {
     // adds to DOM temporarily
 }
 
-$('#step').on('click', '.action .title',
-    function (e) {
-        const { view, action } = getCard(e.currentTarget, Test.current);
-        let name = prompt('What would you like to name this step?', action.name || 'User action');
-        if (name && name !== 'User action') {
-            action.name = name;
-            updateStepInView(Test.current.steps[action.index]);
-        }
-    }
-);
+
+$('#step').on('click', '.action .title', actions.editActionName);
 
 $('#step').on('click', '.waiting .click-to-change-view',
     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
@@ -822,19 +914,7 @@ async function stopPlaying() {
     setToolbarState();
 }
 
-async function clearTest() {
-    // remove the cards
-    // FIXME abstract this away in a Test instance
-    Test.current = new Test();
-
-    setToolbarState();
-    window.document.title = `Brimstone - ${Test.current.filename}`;
-
-    $('#cards').empty();
-    $('#step').empty();
-}
-
-$('#clearButton').on('click', clearTest);
+$('#clearButton').on('click', actions.clearTest);
 
 /**
  * Send a msg back to the bristone workspace over the recording channel port. 
@@ -853,24 +933,12 @@ function postMessage(msg) {
     }
 }
 
-$('#saveButton').on('click', async () => {
-    let file = await Test.current.saveFile();
-    if (file) {
-        window.document.title = `Brimstone - ${Test.current.filename}`;
-    }
-});
+$('#saveButton').on('click', actions.saveZip);
 
-$('#helpButton').on('click', () => {
-    chrome.tabs.create({
-        url: 'https://github.com/zacfilan/brimstone-recorder/wiki'
-    });
-});
+$('#helpButton').on('click', actions.openWiki);
 
-$('#issuesButton').on('click', () => {
-    chrome.tabs.create({
-        url: 'https://github.com/zacfilan/brimstone-recorder/issues'
-    });
-});
+$('#issuesButton').on('click', actions.openIssues);
+
 async function loadNextTest() {
     let numberOfTestsInSuite = fileHandles.length;
     if (++currentTestNumber > numberOfTestsInSuite) {
@@ -886,8 +954,8 @@ async function loadNextTest() {
         //testFileName = 'untitled';
     }
     else {
-        await clearTest();
-        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber-1]);
+        await actions.clearTest();
+        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1]);
     }
 
     window.document.title = `Brimstone - ${Test.current.filename}${suite}`;
@@ -904,19 +972,7 @@ async function loadNextTest() {
 let fileHandles = [];
 /** The 1-based index of the current test. */
 let currentTestNumber = 0;
-$('#loadButton').on('click', async () => {
-    fileHandles = [];
-    currentTestNumber = 0;
-    try {
-        fileHandles = await Test.loadFileHandles();
-        if (fileHandles.length) {
-            await loadNextTest();
-        }
-    }
-    catch (e) {
-        console.warn(e);
-    }
-});
+$('#loadButton').on('click', actions.openZip);
 
 function updateStepInView(action) {
     // immediately show if there is nothing pending
