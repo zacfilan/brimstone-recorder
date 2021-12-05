@@ -2,56 +2,61 @@ html {
     height: 100%;
 }
 
+[disabled] {
+    pointer-events: none;
+    opacity: .3;
+}
+
 #menu {
     font-size: 14px;
     display: flex;
     flex-direction: row;
     align-items: center;
-    &>svg {
+    & > svg {
         height: 17px;
         width: 17px;
         margin-left: 1em;
     }
     background: rgb(33, 33, 33);
-    
+
     .option {
-        padding: .5em .6em;
-        position:relative;
+        padding: 0.5em 0.6em;
+        position: relative;
         max-width: 100px;
-        cursor: pointer; 
+        cursor: pointer;
         &:hover {
-            background: rgb(75,75,75);
+            background: rgb(75, 75, 75);
         }
         svg {
             width: 14px;
             height: 14px;
             fill: white;
         }
-    } 
+    }
 
-    .options { 
+    .options {
         position: absolute;
         left: 0px;
         top: 100%;
-        background: rgb(50,50,50);
+        background: rgb(50, 50, 50);
         z-index: 2;
-        box-shadow: 1px 2px 4px  black;
-        //border-right: 1px solid black; 
+        box-shadow: 1px 2px 4px black;
+        //border-right: 1px solid black;
         // border-bottom: 1px solid black;
-        padding: .3em 0;  
+        padding: 0.3em 0;
         width: 250px;
         border-radius: 0 0 4px 4px;
         display: flex;
-        flex-direction: column; 
-        
+        flex-direction: column;
+
         .option {
             max-width: unset;
             &:hover {
                 background: var(--hover-color);
             }
-            padding: .5em 2em .5em 1em;
+            padding: 0.5em 2em 0.5em 1em;
             svg {
-                margin-right: .3em;
+                margin-right: 0.3em;
             }
         }
         hr {
@@ -60,12 +65,29 @@ html {
         }
     }
 
-    #navigation {
-        align-self: center;
-    }
 
 }
- 
+
+#navigation {
+    align-self: center;
+    position: absolute;
+    left: calc(50% - 105px); 
+    #recordButton,
+    #playButton {
+        position: relative; /** let the recording overlay in this **/
+    }
+    #recordButton.active {
+        background: red;
+    }
+    #playButton.active {
+        background: green;
+    }
+    
+    button:hover {
+        background: rgb(75, 75, 75);
+    }
+}
+
 :root {
     --screenshot-timeout: 15s;
     --action-color: red;
@@ -137,24 +159,13 @@ button {
     flex-direction: row;
 }
 
-.verticalToolBar { 
+.verticalToolBar {
     @extend .col;
     align-items: center;
     padding: 0px;
     width: 40px;
     justify-content: space-between;
     margin-top: 12px;
-
-    #recordButton,
-    #playButton {
-        position: relative; /** let the recording overlay in this **/
-    }
-    #recordButton.active {
-        background: red;
-    }
-    #playButton.active {
-        background: green;
-    }
 }
 
 /* these are the thumbnails */
@@ -186,7 +197,7 @@ button {
     width: 50%;
     display: flex;
     flex-direction: column;
-    margin: 1em;
+    margin-right: 1em;
     border-radius: 0.6em;
     border: 1px solid;
     background: linear-gradient(to right, rgba(116, 116, 191, 0.3), rgba(52, 138, 199, 0.3));
@@ -197,10 +208,10 @@ button {
         img {
             width: 100%;
             &.shadowDOM {
-                opacity: .1;
+                opacity: 0.1;
             }
         }
- 
+
         .overlay {
             position: absolute;
             background: var(--action-color);
@@ -213,7 +224,7 @@ button {
                     color: var(--action-color);
                     height: 18px;
                 }
-            } 
+            }
         }
     }
 
@@ -221,30 +232,36 @@ button {
         height: 200px;
         background: grey;
     }
+    
+    .stepNumber {
+        margin-left: auto; // right align him
+    }
 
     .title {
+        @extend .row;
+
         color: white;
         padding: 1em;
         display: flex;
         align-items: center;
         height: 20px;
 
+        .actions {
+            margin-left: auto;
+        }
+
         svg {
-            height: 20px;
-            width: 20px;
-            path {
-                fill: red;
-            }
-            margin-right: 0.3em;
+            height: 16px;
+            width: 16px;
+            // path {
+            //     fill: red;
+            // }
+            // margin-right: 0.3em;
         }
 
         &:hover {
             cursor: pointer;
             background: rgba(0, 0, 0, 0.3);
-        }
-
-        .stepNumber {
-            margin-left: auto; // right align him
         }
     }
 
@@ -301,7 +318,7 @@ button {
             font-size: 18px;
             background: var(--action-color);
             margin: 3px;
-            border: 1px solid black; 
+            border: 1px solid black;
             border-radius: 6px;
             padding: 5px;
             .modifier {
@@ -313,8 +330,8 @@ button {
                 padding: 0px 3px;
                 font-family: "Courier New", Courier, monospace;
             }
-            max-width:200px; 
-            max-height:200px;
+            max-width: 200px;
+            max-height: 200px;
             overflow: auto;
             z-index: 1;
         }
@@ -330,31 +347,51 @@ button {
             }
 
             .overlay.action:hover {
-                    animation: unset;
+                animation: unset;
             }
-            
+
             .overlay.pointer:hover {
-                animation: unset;        
+                animation: unset;
             }
         }
-        
     }
 
     /***********************/
     /* second card in step */
     /***********************/
     .card.waiting {
-        &.edit .screenshot {
-            cursor: crosshair;
-            position: unset;
+        svg#cycle {
+            margin-right: .3em;
+        }
+        //in the edit state
+        &.edit {
+            .screenshot {
+                cursor: crosshair;
+                position: unset;
+            }
+
+            /** hide that one */
+            &.fail .meter {
+                visibility: hidden;
+            }
+
+            svg#cycle {
+                transform: rotate(-135deg);
+            }
         }
 
-        .screenshot {            
-            .overlay  {
-                display:none;
+        &.actual {
+            svg#cycle {
+                transform: rotate(135deg);
+            }
+        }
+
+        .screenshot {
+            .overlay {
+                display: none;
 
                 &.countdown {
-                    display:block;
+                    display: block;
                     font-size: 20vw;
                     text-align: center;
                 }
@@ -373,11 +410,6 @@ button {
             animation: unset;
             animation-fill-mode: unset;
         }
- 
-        /** hide that one */
-        &.edit.fail .meter {
-            visibility: hidden;
-        } 
 
         /** the text that says "allowed differences..*/
         #allowed-differences {

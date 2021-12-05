@@ -28,32 +28,6 @@ export const constants = {
     }
 };
 
-const chart = `
-<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve">
-<g>
-	<g>
-		<path d="M465.455,74.473c-25.664,0-46.545,20.882-46.545,46.545c0,14.749,7.028,27.76,17.766,36.294L322.498,359.319
-			c-8.502-9.101-20.509-14.883-33.916-14.883c-9.159,0-17.651,2.75-24.86,7.339L178.018,240.36
-			c5.134-7.482,8.164-16.513,8.164-26.251c0-25.664-20.882-46.545-46.545-46.545c-25.664,0-46.545,20.882-46.545,46.545
-			c0,9.664,2.969,18.643,8.032,26.092l-41.951,50.342c-4.042-1.15-8.222-1.961-12.626-1.961C20.882,288.582,0,309.464,0,335.127
-			s20.882,46.545,46.545,46.545s46.545-20.882,46.545-46.545c0-14.425-6.736-27.178-17.073-35.723l38.516-46.219
-			c7.257,4.678,15.845,7.469,25.102,7.469c9.159,0,17.651-2.75,24.86-7.339L250.2,364.731c-5.134,7.482-8.164,16.512-8.164,26.251
-			c0,25.664,20.882,46.545,46.545,46.545c25.664,0,46.545-20.882,46.545-46.545c0-4.514-0.849-8.791-2.052-12.922
-			c0.289-0.367,0.611-0.697,0.848-1.115l119.373-211.197c3.9,1.064,7.925,1.815,12.159,1.815c25.664,0,46.545-20.882,46.545-46.545
-			S491.118,74.473,465.455,74.473z M46.545,363.055c-15.4,0-27.927-12.527-27.927-27.927S31.145,307.2,46.545,307.2
-			s27.927,12.527,27.927,27.927S61.945,363.055,46.545,363.055z M139.636,242.036c-15.4,0-27.927-12.527-27.927-27.927
-			c0-15.4,12.527-27.927,27.927-27.927c15.4,0,27.927,12.527,27.927,27.927C167.564,229.509,155.036,242.036,139.636,242.036z
-			 M288.582,418.909c-15.4,0-27.927-12.527-27.927-27.927s12.527-27.927,27.927-27.927c15.4,0,27.927,12.527,27.927,27.927
-			S303.982,418.909,288.582,418.909z M465.455,148.945c-15.4,0-27.927-12.527-27.927-27.927s12.527-27.927,27.927-27.927
-			s27.927,12.527,27.927,27.927S480.855,148.945,465.455,148.945z"/>
-	</g>
-</g>
-</svg>
-`;
-
-const jsonButtonSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1321.45 1333.33" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd"><path d="M221.37 618.44h757.94V405.15H755.14c-23.5 0-56.32-12.74-71.82-28.24-15.5-15.5-25-43.47-25-66.97V82.89H88.39c-1.99 0-3.49 1-4.49 2-1.5 1-2 2.5-2 4.5v1155.04c0 1.5 1 3.5 2 4.5 1 1.49 3 1.99 4.49 1.99H972.8c2 0 1.89-.99 2.89-1.99 1.5-1 3.61-3 3.61-4.5v-121.09H221.36c-44.96 0-82-36.9-82-81.99V700.44c0-45.1 36.9-82 82-82zm126.51 117.47h75.24v146.61c0 30.79-2.44 54.23-7.33 70.31-4.92 16.03-14.8 29.67-29.65 40.85-14.86 11.12-33.91 16.72-57.05 16.72-24.53 0-43.51-3.71-56.94-11.06-13.5-7.36-23.89-18.1-31.23-32.3-7.35-14.14-11.69-31.67-12.99-52.53l71.5-10.81c.11 11.81 1.07 20.61 2.81 26.33 1.76 5.78 4.75 10.37 9 13.95 2.87 2.33 6.94 3.46 12.25 3.46 8.4 0 14.58-3.46 18.53-10.37 3.9-6.92 5.87-18.6 5.87-35V735.92zm112.77 180.67l71.17-4.97c1.54 12.81 4.69 22.62 9.44 29.28 7.74 10.88 18.74 16.34 33.09 16.34 10.68 0 18.93-2.76 24.68-8.36 5.81-5.58 8.7-12.07 8.7-19.41 0-6.97-2.71-13.26-8.2-18.79-5.47-5.53-18.23-10.68-38.28-15.65-32.89-8.17-56.27-19.1-70.26-32.74-14.12-13.57-21.18-30.92-21.18-52.03 0-13.83 3.61-26.89 10.85-39.21 7.22-12.38 18.07-22.06 32.59-29.09 14.52-7.04 34.4-10.56 59.65-10.56 31 0 54.62 6.41 70.88 19.29 16.28 12.81 25.92 33.24 29.04 61.27l-70.5 4.65c-1.87-12.25-5.81-21.17-11.81-26.7-6.05-5.6-14.35-8.36-24.9-8.36-8.71 0-15.31 2.07-19.73 6.16-4.4 4.09-6.59 9.12-6.59 15.02 0 4.27 1.81 8.11 5.37 11.57 3.45 3.59 11.8 6.85 25.02 9.93 32.75 7.86 56.2 15.84 70.31 23.87 14.18 8.05 24.52 17.98 30.96 29.92 6.44 11.88 9.66 25.2 9.66 39.96 0 17.29-4.3 33.24-12.88 47.89-8.63 14.58-20.61 25.7-36.08 33.24-15.41 7.54-34.85 11.31-58.33 11.31-41.24 0-69.81-8.86-85.68-26.52-15.88-17.65-24.85-40.09-26.96-67.3zm248.74-45.5c0-44.05 11.02-78.36 33.09-102.87 22.09-24.57 52.82-36.82 92.24-36.82 40.38 0 71.5 12.07 93.34 36.13 21.86 24.13 32.77 57.94 32.77 101.37 0 31.54-4.75 57.36-14.3 77.54-9.54 20.18-23.37 35.89-41.4 47.13-18.07 11.24-40.55 16.84-67.48 16.84-27.33 0-49.99-4.83-67.94-14.52-17.92-9.74-32.49-25.07-43.62-46.06-11.13-20.92-16.72-47.19-16.72-78.74zm74.89.19c0 27.21 4.57 46.81 13.68 58.68 9.13 11.88 21.57 17.85 37.26 17.85 16.1 0 28.65-5.84 37.45-17.47 8.87-11.68 13.28-32.54 13.28-62.77 0-25.39-4.63-43.92-13.84-55.61-9.26-11.76-21.75-17.6-37.56-17.6-15.13 0-27.34 5.97-36.49 17.85-9.21 11.88-13.78 31.61-13.78 59.07zm209.08-135.36h69.99l90.98 149.05V735.91h70.83v269.96h-70.83l-90.48-148.24v148.24h-70.49V735.91zm67.71-117.47h178.37c45.1 0 82 37.04 82 82v340.91c0 44.96-37.03 81.99-82 81.99h-178.37v147c0 17.5-6.99 32.99-18.5 44.5-11.5 11.49-27 18.5-44.5 18.5H62.97c-17.5 0-32.99-7-44.5-18.5-11.49-11.5-18.5-27-18.5-44.5V63.49c0-17.5 7-33 18.5-44.5S45.97.49 62.97.49H700.1c1.5-.5 3-.5 4.5-.5 7 0 14 3 19 7.49h1c1 .5 1.5 1 2.5 2l325.46 329.47c5.5 5.5 9.5 13 9.5 21.5 0 2.5-.5 4.5-1 7v250.98zM732.61 303.47V96.99l232.48 235.47H761.6c-7.99 0-14.99-3.5-20.5-8.49-4.99-5-8.49-12.5-8.49-20.5z"/></svg>';
-
 const pointer = `
 <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="arrow-pointer"
   class="svg-inline--fa fa-arrow-pointer" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
@@ -61,8 +35,6 @@ const pointer = `
     d="M318.4 304.5c-3.531 9.344-12.47 15.52-22.45 15.52h-105l45.15 94.82c9.496 19.94 1.031 43.8-18.91 53.31c-19.95 9.504-43.82 1.035-53.32-18.91L117.3 351.3l-75 88.25c-4.641 5.469-11.37 8.453-18.28 8.453c-2.781 0-5.578-.4844-8.281-1.469C6.281 443.1 0 434.1 0 423.1V56.02c0-9.438 5.531-18.03 14.12-21.91C22.75 30.26 32.83 31.77 39.87 37.99l271.1 240C319.4 284.6 321.1 295.1 318.4 304.5z">
   </path>
 </svg>`;
-
-
 
 export class TestAction {
     /** 
@@ -172,6 +144,9 @@ export class TestAction {
     shadowDOMAction = false;
 
     /** The test this action is in. */
+    /**
+     * @type {Test}
+     */
     test = null;
 
     constructor(args) {
@@ -334,7 +309,7 @@ export class TestAction {
         let shadowDesc = this.shadowDOMAction ? '(shadowDOM) ' : ''
         let html = `
     <div class='card ${this.classes()} ${className}' data-index=${this.index}>
-        <div title='${title.tooltip}' class='click-to-change-view title'>${title.text}</div>
+        <div title='${title.tooltip}' class='click-to-change-view title'>${title.text}<div class='actions'>${title.actions||''}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
             <span style="width:100%;"><span class="match-status"></span></span>
@@ -379,13 +354,10 @@ export class TestAction {
             }
             footer += `${this.memoryUsed}MBs in use.`;
         }
-        if (this.latency || this.memoryUsed) {
-            footer += `<button id='chartButton' title='Chart these metrics.'>${chart}</button><button id='downloadObjectAsJsonButton' title='Download JSON metrics.'>${jsonButtonSvg}</button>`;
-        }
         if (!stats) {
             footer = '';
         }
-        footer += `<div class="stepNumber">${this.index + 1}</div>`;
+        footer += `<div class="stepNumber">${this.index + 1}/${this.test.steps.length}</div>`;
         html += `
         </div>
         <div class='footer'>${footer}</div>
@@ -428,7 +400,8 @@ export class Step {
     toHtml({ isRecording }) {
         let title = {
             text: '',
-            tooltip: 'Click to edit.'
+            tooltip: 'Click to edit.',
+            actions: ''
         };
         if (isRecording) {
             title.text = this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Last recorded user action' : 'User action');
@@ -436,6 +409,16 @@ export class Step {
         else {
             title.text = this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Final screenshot' : 'User action');
         }
+        title.actions =  `
+        <div class="actions">
+          <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="pencil-alt" role="img"
+            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-pencil-alt fa-w-16 fa-9x">
+            <path fill="currentColor"
+              d="M491.609 73.625l-53.861-53.839c-26.378-26.379-69.075-26.383-95.46-.001L24.91 335.089.329 484.085c-2.675 16.215 11.368 30.261 27.587 27.587l148.995-24.582 315.326-317.378c26.33-26.331 26.581-68.879-.628-96.087zM200.443 311.557C204.739 315.853 210.37 318 216 318s11.261-2.147 15.557-6.443l119.029-119.03 28.569 28.569L210 391.355V350h-48v-48h-41.356l170.259-169.155 28.569 28.569-119.03 119.029c-8.589 8.592-8.589 22.522.001 31.114zM82.132 458.132l-28.263-28.263 12.14-73.587L84.409 338H126v48h48v41.59l-18.282 18.401-73.586 12.141zm378.985-319.533l-.051.051-.051.051-48.03 48.344-88.03-88.03 48.344-48.03.05-.05.05-.05c9.147-9.146 23.978-9.259 33.236-.001l53.854 53.854c9.878 9.877 9.939 24.549.628 33.861z"
+              class="">
+            </path>
+          </svg>
+        </div>`;
 
         let html = `
         <div id="content">
@@ -445,9 +428,15 @@ export class Step {
         if (this.next) {
             let src;
             let title = {
-                text: '',
-                tooltip: 'Click to cycle through\nexpected, actual, and difference views.'
+                text: `
+                    <svg id='cycle' viewbox="0 0 120 120"">
+                    <circle cx="60"    cy="60"    r="40"   stroke="currentColor" stroke-width="5" fill="none" />
+                    <circle cx="60"    cy="22"  r="20" fill="currentColor" />
+                 </svg>`,
+                tooltip: 'Click to cycle through\nexpected, actual, and difference views.',
+                actions: ''            
             };
+ 
 
             if (this.next._match === constants.match.PLAY) {
                 title.text += 'Wait for actual to match.';
@@ -455,8 +444,7 @@ export class Step {
             else {
 
                 if (this.next._match === constants.match.FAIL) {
-                    title.text += '<svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="exchange" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-exchange fa-w-16 fa-5x"><path fill="currentColor" d="M0 168v-16c0-13.255 10.745-24 24-24h381.97l-30.467-27.728c-9.815-9.289-10.03-24.846-.474-34.402l10.84-10.84c9.373-9.373 24.568-9.373 33.941 0l82.817 82.343c12.497 12.497 12.497 32.758 0 45.255l-82.817 82.343c-9.373 9.373-24.569 9.373-33.941 0l-10.84-10.84c-9.556-9.556-9.341-25.114.474-34.402L405.97 192H24c-13.255 0-24-10.745-24-24zm488 152H106.03l30.467-27.728c9.815-9.289 10.03-24.846.474-34.402l-10.84-10.84c-9.373-9.373-24.568-9.373-33.941 0L9.373 329.373c-12.497 12.497-12.497 32.758 0 45.255l82.817 82.343c9.373 9.373 24.569 9.373 33.941 0l10.84-10.84c9.556-9.556 9.341-25.113-.474-34.402L106.03 384H488c13.255 0 24-10.745 24-24v-16c0-13.255-10.745-24-24-24z" class=""></path></svg>'
-                    title.text += ' failed match. ';
+                    title.text += 'Failed match. ';
                 }
 
                 switch (this.next._view) {
@@ -476,9 +464,8 @@ export class Step {
                         break;
                     case constants.view.EDIT:
                         title.text += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
-                        title.text += `
-                    <div class ="horizontalToolBar">
-                        <button title="Ignore differences" id="ignoreDelta">
+                        title.actions = `
+                        <button title="Accept Unpredictable Pixels" id="ignoreDelta">
                         <svg aria-hidden="true" focusable="false" data-prefix="fal" data-icon="thumbs-up" role="img"
                           xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-thumbs-up fa-w-16 fa-9x">
                           <path fill="currentColor"
@@ -487,7 +474,7 @@ export class Step {
                         </svg>
                       </button>
               
-                      <button title="Undo and startover" id="undo">
+                      <button title="Clear Unpredictable Pixels" id="undo">
                         <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"
                           class="svg-inline--fa fa-undo fa-w-16" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                           <path fill="currentColor"
@@ -510,8 +497,7 @@ export class Step {
                             </g>
                           </g>
                         </svg>
-                      </button>
-                    </div>`;
+                      </button>`;
                         src = this.next.editViewDataUrl ?? '../images/notfound.png';
                         break;
                 }

@@ -45,9 +45,19 @@ var shadowDOMScreenshot = 0;
  * 
  */
 class Actions {
+    async exit() {
+        try {
+            let w = await(new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+            await chrome.windows.remove(w.id);
+        }
+        catch (e) {
+            console.log(e);
+        }
+    }
+
     about() {
         chrome.tabs.create({
-            url : 'https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en'
+            url: 'https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en'
         });
     }
 
@@ -137,7 +147,7 @@ class Actions {
     }
 
     /** edit pixel differences - when the recording is wrong */
-    async replaceExpectedWithActual () {
+    async replaceExpectedWithActual() {
         // push the actual into the expected and be done with it.
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         action.expectedScreenshot.png = action.actualScreenshot.png;
@@ -153,10 +163,10 @@ class Actions {
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
-    
+
         setToolbarState();
         window.document.title = `Brimstone - ${Test.current.filename}`;
-    
+
         $('#cards').empty();
         $('#step').empty();
     }
@@ -170,8 +180,8 @@ class Actions {
     }
 
     /** change the name of the currently displayed action */
-    async editActionName(e) {
-        const { view, action } = getCard(e.currentTarget, Test.current);
+    async editActionName() {
+        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
         let name = prompt('What would you like to name this step?', action.name || 'User action');
         if (name && name !== 'User action') {
             action.name = name;
@@ -179,6 +189,65 @@ class Actions {
         }
     }
 
+    async chartMetrics() {
+        let latencyValues = Test.current.steps.map(a => a.latency);
+        let memoryUsedValues = Test.current.steps.map(a => a.memoryUsed);
+        let indicies = Test.current.steps.map(a => a.index);
+        let chartDescriptor = JSON.stringify({
+            type: 'line',
+            data: {
+                labels: indicies, // x-axis labels
+                datasets: [
+                    {
+                        label: 'Latency (secs.)',
+                        borderColor: 'red',
+                        backgroundColor: 'white',
+                        fill: false,
+                        data: latencyValues,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Memory (MBs)',
+                        borderColor: 'blue',
+                        backgroundColor: 'white',
+                        fill: false,
+                        data: memoryUsedValues,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                stacked: false,
+                title: {
+                    display: true,
+                    text: 'Some stats'
+                },
+                scales: {
+                    yAxes: [
+                        {
+                            id: "y",
+                            type: "linear",
+                            display: true,
+                            position: "left"
+                        },
+                        {
+                            id: "y1",
+                            type: "linear",
+                            display: true,
+                            position: "right",
+                            gridLines: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+        let window = await chrome.windows.create({
+            url: chrome.runtime.getURL(`ui/chart.html?c=${chartDescriptor}`),
+            type: "popup",
+        });
+    }
 }
 const actions = new Actions();
 const menuController = new MenuController(actions);
@@ -323,8 +392,6 @@ var _lastMouseMove;
  * 
 */
 
-$('#step').on('click', '#downloadObjectAsJsonButton', actions.exportJson);
-
 $('#step').on('click', '#ignoreDelta', actions.ignoreDelta);
 $('#step').on('click', '#undo', actions.seeDelta);
 $("#step").on('click', '#replace', actions.replaceExpectedWithActual);
@@ -424,48 +491,54 @@ function setInfoBarText(infobarText) {
 }
 
 function setToolbarState() {
-    $('#toolbar button').prop('disabled', true); // start with all disabled and selectively enable some
+    $('[data-action]').attr('disabled', true);
+    $('#help.options .option').attr('disabled', false);
+    $('[data-action="exit"]').attr('disabled', false);
 
     let rb = $('#recordButton');
     if (rb.hasClass('active')) { // recording?
-        rb.prop('disabled', false);
-        rb.prop('title', 'Brimstone is recording.\nClick to stop.');
+        $('#menu>.option').attr('disabled', true);
+        rb.attr('disabled', false);
+        rb.attr('title', 'Brimstone is recording.\nClick to stop.');
         iconState.Record();
         document.documentElement.style.setProperty('--action-color', 'red');
     }
     else {
         //not recording.
         rb.prop('title', "Click to record.");
-        $('#loadButton').prop('disabled', false); // playing?
         let pb = $('#playButton');
         if ($('#playButton').hasClass('active')) {
-            pb.prop('disabled', false);
+            $('#menu>.option').attr('disabled', true);
+            pb.attr('disabled', false);
             pb.prop('title', 'Brimstone is playing.\nClick to stop.');
             iconState.Play();
             document.documentElement.style.setProperty('--action-color', 'green');
         }
         else {
             pb.prop('title', "Click to play.");
-
             // not playing, not recoding
-            $('#helpButton').prop('disabled', false); // help is always given to those at hogwarts who ask for it.
-            $('#issuesButton').prop('disabled', false);
-            rb.prop('disabled', false);
+            $('[data-action="openZip"]').attr('disabled', false);
+            $('#menu>.option').attr('disabled', false);
+
+            rb.attr('disabled', false);
             document.documentElement.style.setProperty('--action-color', 'blue');
 
             if (Test.current.steps.length) {
-                $('#saveButton').prop('disabled', false);
-                $('#clearButton').prop('disabled', false);
+                $('[data-action="saveZip"]').attr('disabled', false);
+                $('[data-action="clearTest"]').attr('disabled', false);
+                $('[data-action="exportJson"]').attr('disabled', false);
+                $('[data-action="editActionName"]').attr('disabled', false);
+                $('[data-action="chartMetrics"]').attr('disabled', false);
 
                 let index = currentStepIndex();
                 if (index > 0) {
-                    $("#previous").prop('disabled', false);
-                    $('#first').prop('disabled', false);
+                    $("#previous").attr('disabled', false);
+                    $('#first').attr('disabled', false);
                 }
-                $('#playButton').prop('disabled', false);
+                $('#playButton').attr('disabled', false);
                 if (index < Test.current.steps.length - 1) {
-                    $("#next").prop('disabled', false);
-                    $("#last").prop('disabled', false);
+                    $("#next").attr('disabled', false);
+                    $("#last").attr('disabled', false);
                 }
             }
 
@@ -473,17 +546,6 @@ function setToolbarState() {
         }
     }
     setInfoBarText();
-
-    // buttons for editing allowable deltas in the second card.
-    let editCard = $('#content .card:nth-of-type(2)');
-    if (editCard.length) {
-        const { action } = getCard(editCard, Test.current);
-        if (action?._view === constants.view.EDIT) {
-            $('#ignoreDelta').prop('disabled', false);
-            $('#undo').prop('disabled', false);
-            $('#replace').prop('disabled', false);
-        }
-    }
 }
 
 $('#first').on('click', function (e) {
@@ -499,66 +561,6 @@ $('#previous').on('click', function (e) {
 
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
-
-$('#step').on('click', '#chartButton', async function () {
-    let latencyValues = Test.current.steps.map(a => a.latency);
-    let memoryUsedValues = Test.current.steps.map(a => a.memoryUsed);
-    let indicies = Test.current.steps.map(a => a.index);
-    let chartDescriptor = JSON.stringify({
-        type: 'line',
-        data: {
-            labels: indicies, // x-axis labels
-            datasets: [
-                {
-                    label: 'Latency (secs.)',
-                    borderColor: 'red',
-                    backgroundColor: 'white',
-                    fill: false,
-                    data: latencyValues,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Memory (MBs)',
-                    borderColor: 'blue',
-                    backgroundColor: 'white',
-                    fill: false,
-                    data: memoryUsedValues,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            stacked: false,
-            title: {
-                display: true,
-                text: 'Some stats'
-            },
-            scales: {
-                yAxes: [
-                    {
-                        id: "y",
-                        type: "linear",
-                        display: true,
-                        position: "left"
-                    },
-                    {
-                        id: "y1",
-                        type: "linear",
-                        display: true,
-                        position: "right",
-                        gridLines: {
-                            drawOnChartArea: false
-                        }
-                    }
-                ]
-            }
-        }
-    });
-    let window = await chrome.windows.create({
-        url: chrome.runtime.getURL(`ui/chart.html?c=${chartDescriptor}`),
-        type: "popup",
-    });
-});
 
 $('#playButton').on('click', async function () {
     let button = $(this);
@@ -914,8 +916,6 @@ async function stopPlaying() {
     setToolbarState();
 }
 
-$('#clearButton').on('click', actions.clearTest);
-
 /**
  * Send a msg back to the bristone workspace over the recording channel port. 
  * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
@@ -933,11 +933,9 @@ function postMessage(msg) {
     }
 }
 
+$('#loadButton').on('click', actions.openZip);
 $('#saveButton').on('click', actions.saveZip);
-
-$('#helpButton').on('click', actions.openWiki);
-
-$('#issuesButton').on('click', actions.openIssues);
+$('#clearButton').on('click', actions.clearTest);
 
 async function loadNextTest() {
     let numberOfTestsInSuite = fileHandles.length;
@@ -972,7 +970,6 @@ async function loadNextTest() {
 let fileHandles = [];
 /** The 1-based index of the current test. */
 let currentTestNumber = 0;
-$('#loadButton').on('click', actions.openZip);
 
 function updateStepInView(action) {
     // immediately show if there is nothing pending
