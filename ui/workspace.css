@@ -4,7 +4,7 @@ html {
 
 [disabled] {
   pointer-events: none;
-  opacity: .3;
+  opacity: 0.3;
 }
 
 #menu {
@@ -135,7 +135,7 @@ body {
   color: white;
 }
 
-.row, .card .title, .card .footer {
+.row, .card .title, .card .title .text, .card .footer {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
@@ -301,28 +301,36 @@ button svg {
 
 .card .title {
   color: white;
-  padding: 1em;
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
-  -webkit-box-align: center;
-      -ms-flex-align: center;
-          align-items: center;
-  height: 20px;
 }
 
 .card .title .actions {
   margin-left: auto;
+  /* padding: 1em 0; */
 }
 
-.card .title svg {
+.card .title .text {
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  height: 20px;
+  padding: 1em;
+  -webkit-box-flex: 1;
+      -ms-flex-positive: 1;
+          flex-grow: 1;
+}
+
+.card .title .text:hover {
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.card .title .text svg {
   height: 16px;
   width: 16px;
-}
-
-.card .title:hover {
-  cursor: pointer;
-  background: rgba(0, 0, 0, 0.3);
+  margin-right: 0.3em;
 }
 
 .card .meter {
@@ -445,10 +453,6 @@ button svg {
 #content .card.waiting {
   /** show the failed progress bar as red for failed states */
   /** the text that says "allowed differences..*/
-}
-
-#content .card.waiting svg#cycle {
-  margin-right: .3em;
 }
 
 #content .card.waiting.edit {

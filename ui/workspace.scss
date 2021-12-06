@@ -4,7 +4,7 @@ html {
 
 [disabled] {
     pointer-events: none;
-    opacity: .3;
+    opacity: 0.3;
 }
 
 #menu {
@@ -64,14 +64,12 @@ html {
             border-bottom: 0;
         }
     }
-
-
 }
 
 #navigation {
     align-self: center;
     position: absolute;
-    left: calc(50% - 105px); 
+    left: calc(50% - 105px);
     #recordButton,
     #playButton {
         position: relative; /** let the recording overlay in this **/
@@ -82,7 +80,7 @@ html {
     #playButton.active {
         background: green;
     }
-    
+
     button:hover {
         background: rgb(75, 75, 75);
     }
@@ -232,7 +230,7 @@ button {
         height: 200px;
         background: grey;
     }
-    
+
     .stepNumber {
         margin-left: auto; // right align him
     }
@@ -241,27 +239,35 @@ button {
         @extend .row;
 
         color: white;
-        padding: 1em;
         display: flex;
-        align-items: center;
-        height: 20px;
 
         .actions {
             margin-left: auto;
         }
+ 
+        .text {
+            @extend .row;
 
-        svg {
-            height: 16px;
-            width: 16px;
-            // path {
-            //     fill: red;
-            // }
-            // margin-right: 0.3em;
-        }
+            align-items: center;
 
-        &:hover {
-            cursor: pointer;
-            background: rgba(0, 0, 0, 0.3);
+            height: 20px;
+            padding: 1em;
+            &:hover {
+                background: rgba(0, 0, 0, 0.3);
+                cursor: pointer;
+            }
+
+            flex-grow: 1;
+            svg {
+                height: 16px;
+                width: 16px;
+                margin-right: 0.3em;
+
+                // path {
+                //     fill: red;
+                // }
+                // margin-right: 0.3em;
+            }
         }
     }
 
@@ -360,9 +366,6 @@ button {
     /* second card in step */
     /***********************/
     .card.waiting {
-        svg#cycle {
-            margin-right: .3em;
-        }
         //in the edit state
         &.edit {
             .screenshot {

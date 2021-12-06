@@ -57,10 +57,50 @@ export class Test {
     updateOrAppendAction(action) {
         // make sure it has a step number
         if (action.index === undefined) {
-            action.index = this.steps.length;
+            action.setIndex(this.steps.length);
         }
         this.steps[action.index] = action;
         action.test = this; // each action knows what test it is in
+    }
+
+    /** 
+     * Delete the specified action from the test. This changes the indexes of all subsequent actions, but that isn't
+     * persisted until a save. 
+     * @param {TestAction} action */
+    deleteAction(action) {
+        let removeIndex = action.index;
+        for(let i = action.index + 1 ; i < this.steps.length; ++i) {
+            let action = this.steps[i];
+            action.setIndex(i - 1);
+        }
+        this.steps.splice(removeIndex, 1);
+    }
+
+    /**
+     * Delete all the actions before the passed in one.
+     * The passed in one becomes index .
+     * @param {TestAction} action 
+     */
+     deleteActionsBefore(action) {
+        this.steps.splice(0, action.index+1);
+        for(let i = 0; i < this.steps.length; ++i) {
+            let action = this.steps[i];
+            action.setIndex(i);
+        }
+    }
+
+    /**
+     * Delete all the actions after the passed in one.
+     * The passed in one becomes one before the last.
+     * Update the last to just contain the expected screenshot.
+     * @param {TestAction} action 
+     */
+     deleteActionsAfter(action) {
+        this.steps.splice(action.index+1);
+        for(let i = 0; i < this.steps.length; ++i) {
+            let action = this.steps[i];
+            action.setIndex(i);
+        }
     }
 
     /**

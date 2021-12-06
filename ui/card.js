@@ -309,7 +309,7 @@ export class TestAction {
         let shadowDesc = this.shadowDOMAction ? '(shadowDOM) ' : ''
         let html = `
     <div class='card ${this.classes()} ${className}' data-index=${this.index}>
-        <div title='${title.tooltip}' class='click-to-change-view title'>${title.text}<div class='actions'>${title.actions||''}</div></div>
+        <div title='${title.tooltip}' class='click-to-change-view title'><div class='text'>${title.text}</div><div class='actions'>${title.actions || ''}</div></div>
         <div class="meter">
             <span style="width:100%;"><span class="progress"></span></span>
             <span style="width:100%;"><span class="match-status"></span></span>
@@ -366,6 +366,18 @@ export class TestAction {
         return html;
     }
 
+    setIndex(to) {
+        this.index = to; // reset the indicies
+        if (this.expectedScreenshot?.fileName) {
+            this.expectedScreenshot.fileName = this.expectedScreenshot.fileName.replace(/\d+/, to);
+        }
+        if (this.acceptablePixelDifferences?.fileName) {
+            this.acceptablePixelDifferences.fileName = this.acceptablePixelDifferences.fileName.replace(/\d+/, to);
+        }
+        if (this.actualScreenshot?.fileName) {
+            this.actualScreenshot.fileName = this.actualScreenshot.fileName.replace(/\d+/, to);
+        }
+    }
 }
 
 /**
@@ -391,7 +403,7 @@ export class Step {
      * @param {TestAction} args.next The next test actions
      * @param {Test} args.test The containing test 
      */
-    constructor({curr, next = null, test}) {
+    constructor({ curr, next = null, test }) {
         this.curr = curr;
         this.test = test;
         this.next = next || test.steps[this.curr.index + 1];
@@ -399,25 +411,33 @@ export class Step {
 
     toHtml({ isRecording }) {
         let title = {
-            text: '',
-            tooltip: 'Click to edit.',
-            actions: ''
-        };
-        if (isRecording) {
-            title.text = this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Last recorded user action' : 'User action');
-        }
-        else {
-            title.text = this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Final screenshot' : 'User action');
-        }
-        title.actions =  `
-        <div class="actions">
-          <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="pencil-alt" role="img"
+            text: `
+            <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="pencil-alt" role="img"
             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-pencil-alt fa-w-16 fa-9x">
             <path fill="currentColor"
               d="M491.609 73.625l-53.861-53.839c-26.378-26.379-69.075-26.383-95.46-.001L24.91 335.089.329 484.085c-2.675 16.215 11.368 30.261 27.587 27.587l148.995-24.582 315.326-317.378c26.33-26.331 26.581-68.879-.628-96.087zM200.443 311.557C204.739 315.853 210.37 318 216 318s11.261-2.147 15.557-6.443l119.029-119.03 28.569 28.569L210 391.355V350h-48v-48h-41.356l170.259-169.155 28.569 28.569-119.03 119.029c-8.589 8.592-8.589 22.522.001 31.114zM82.132 458.132l-28.263-28.263 12.14-73.587L84.409 338H126v48h48v41.59l-18.282 18.401-73.586 12.141zm378.985-319.533l-.051.051-.051.051-48.03 48.344-88.03-88.03 48.344-48.03.05-.05.05-.05c9.147-9.146 23.978-9.259 33.236-.001l53.854 53.854c9.878 9.877 9.939 24.549.628 33.861z"
               class="">
             </path>
-          </svg>
+          </svg>`,
+            tooltip: 'Click to edit.',
+            actions: ''
+        };
+        if (isRecording) {
+            title.text += this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Last recorded user action' : 'User action');
+        }
+        else {
+            title.text += this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Final screenshot' : 'User action');
+        }
+        title.actions = `
+        <div class="actions">
+          <button title="Delete this action" data-action="deleteAction">
+            <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="trash"
+              class="svg-inline--fa fa-trash fa-w-14" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
+              <path fill="currentColor"
+                d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z">
+              </path>
+            </svg>
+          </button>
         </div>`;
 
         let html = `
@@ -434,9 +454,9 @@ export class Step {
                     <circle cx="60"    cy="22"  r="20" fill="currentColor" />
                  </svg>`,
                 tooltip: 'Click to cycle through\nexpected, actual, and difference views.',
-                actions: ''            
+                actions: ''
             };
- 
+
 
             if (this.next._match === constants.match.PLAY) {
                 title.text += 'Wait for actual to match.';

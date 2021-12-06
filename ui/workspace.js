@@ -248,6 +248,28 @@ class Actions {
             type: "popup",
         });
     }
+
+    /** Delete the currently displayed user action */
+    deleteAction() {
+        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
+        Test.current.deleteAction(action);
+        updateStepInView(Test.current.steps[action.index]);
+    }
+
+    /** Delete all actions before this one. This one becomes index 0. */
+    deleteActionsBefore() {
+        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
+        Test.current.deleteActionsBefore(action);
+        updateStepInView(Test.current.steps[0]);
+    }
+
+    /** Delete all actions after this one. We keep one past this since it is the ending action.*/
+    deleteActionsAfter() {
+        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
+        Test.current.deleteActionsAfter(action);
+        updateStepInView(Test.current.steps[action.index]);
+    }
+
 }
 const actions = new Actions();
 const menuController = new MenuController(actions);
@@ -393,8 +415,15 @@ var _lastMouseMove;
 */
 
 $('#step').on('click', '#ignoreDelta', actions.ignoreDelta);
-$('#step').on('click', '#undo', actions.seeDelta);
+$('#step').on('click', '#undo', (e) => {
+    e.stopPropagation();
+    actions.seeDelta();
+});
 $("#step").on('click', '#replace', actions.replaceExpectedWithActual);
+$('#step').on('click', '[data-action="deleteAction"]', (e) => {
+    e.stopPropagation();
+    actions.deleteAction();
+});
 
 // stop the image drag behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
@@ -492,7 +521,7 @@ function setInfoBarText(infobarText) {
 
 function setToolbarState() {
     $('[data-action]').attr('disabled', true);
-    $('#help.options .option').attr('disabled', false);
+    $('.help.option [data-action]').attr('disabled', false);
     $('[data-action="exit"]').attr('disabled', false);
 
     let rb = $('#recordButton');
@@ -527,8 +556,10 @@ function setToolbarState() {
                 $('[data-action="saveZip"]').attr('disabled', false);
                 $('[data-action="clearTest"]').attr('disabled', false);
                 $('[data-action="exportJson"]').attr('disabled', false);
-                $('[data-action="editActionName"]').attr('disabled', false);
                 $('[data-action="chartMetrics"]').attr('disabled', false);
+
+                $('.edit.option [data-action]').attr('disabled', false); // everything under edit
+                $('[data-action="deleteAction"]').attr('disabled', false); // delete action icon on card 
 
                 let index = currentStepIndex();
                 if (index > 0) {
