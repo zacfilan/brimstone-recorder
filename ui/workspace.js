@@ -975,7 +975,7 @@ async function loadNextTest() {
     }
     let options = await loadOptions();
     let suite = numberOfTestsInSuite > 1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})` : '';
-    let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
+    //let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
 
     if (options.experiment.joinSubTests) {
         throw new Error("not implemented yet");
@@ -988,7 +988,7 @@ async function loadNextTest() {
     }
 
     window.document.title = `Brimstone - ${Test.current.filename}${suite}`;
-    updateStepInView(Test.current.steps[lastStep]);
+    updateStepInView(Test.current.steps[0]);
     // for (let i = 1; i < Test.current.steps.length; ++i) {
     //      let action = Test.current.steps[i];
     //      updateThumb(action);
