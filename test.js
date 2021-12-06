@@ -82,7 +82,7 @@ export class Test {
      * @param {TestAction} action 
      */
      deleteActionsBefore(action) {
-        this.steps.splice(0, action.index+1);
+        this.steps.splice(0, action.index);
         for(let i = 0; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i);
@@ -96,7 +96,7 @@ export class Test {
      * @param {TestAction} action 
      */
      deleteActionsAfter(action) {
-        this.steps.splice(action.index+1);
+        this.steps.splice(action.index+2);
         for(let i = 0; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i);
@@ -292,7 +292,7 @@ Test.loadFileHandles = async function loadFileHandles() {
 
 /**
  * A global to pass around easily that contains the current test
- * @type {Playlist}
+ * @type {Test}
  */
 Test.current = null;
 
