@@ -47,7 +47,7 @@ var shadowDOMScreenshot = 0;
 class Actions {
     async exit() {
         try {
-            let w = await(new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+            let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
             await chrome.windows.remove(w.id);
         }
         catch (e) {
@@ -414,12 +414,21 @@ var _lastMouseMove;
  * 
 */
 
-$('#step').on('click', '#ignoreDelta', actions.ignoreDelta);
-$('#step').on('click', '#undo', (e) => {
+$('#step').on('click', '#ignoreDelta', async (e) => {
     e.stopPropagation();
-    actions.seeDelta();
+    await actions.ignoreDelta();
 });
-$("#step").on('click', '#replace', actions.replaceExpectedWithActual);
+
+$('#step').on('click', '#undo', async (e) => {
+    e.stopPropagation();
+    await actions.seeDelta();
+});
+
+$("#step").on('click', '#replace', async (e) => {
+    e.stopPropagation();
+    await actions.replaceExpectedWithActual();
+});
+
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
     e.stopPropagation();
     actions.deleteAction();
@@ -882,9 +891,6 @@ $('#recordButton').on('click', async function () {
         if (!(index > 0)) {
             let defaultUrl = options?.url ?? '';
             url = prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
-            if (!url) {
-                return false;
-            }
             if (url.startsWith('chrome')) {
                 alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
                 return false;
@@ -903,10 +909,17 @@ $('#recordButton').on('click', async function () {
             setToolbarState();
 
             // update the UI: insert the first text card in the ui
-            await recordUserAction({
-                type: 'start',
-                url: applicationUnderTestTab.url
-            });
+            if (url) {
+                await recordUserAction({
+                    type: 'start',
+                    url: applicationUnderTestTab.url
+                });
+            }
+            else {
+                await recordUserAction({
+                    type: 'wait'
+                });
+            }
 
             // FOCUS ISSUE. when we create a window (because we need incognito for example) the focus isn't automatically placed on the viewport.
             // i don't know why this is the case. so the initial screen is recorded without focus. the when we playback
