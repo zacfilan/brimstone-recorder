@@ -1,4 +1,4 @@
-import { TestAction, constants} from "./ui/card.js";
+import { TestAction, constants } from "./ui/card.js";
 import { Screenshot } from "./ui/screenshot.js";
 
 /**
@@ -69,7 +69,7 @@ export class Test {
      * @param {TestAction} action */
     deleteAction(action) {
         let removeIndex = action.index;
-        for(let i = action.index + 1 ; i < this.steps.length; ++i) {
+        for (let i = action.index + 1; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i - 1);
         }
@@ -81,9 +81,9 @@ export class Test {
      * The passed in one becomes index .
      * @param {TestAction} action 
      */
-     deleteActionsBefore(action) {
+    deleteActionsBefore(action) {
         this.steps.splice(0, action.index);
-        for(let i = 0; i < this.steps.length; ++i) {
+        for (let i = 0; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i);
         }
@@ -95,9 +95,9 @@ export class Test {
      * Update the last to just contain the expected screenshot.
      * @param {TestAction} action 
      */
-     deleteActionsAfter(action) {
-        this.steps.splice(action.index+2);
-        for(let i = 0; i < this.steps.length; ++i) {
+    deleteActionsAfter(action) {
+        this.steps.splice(action.index + 2);
+        for (let i = 0; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i);
         }
@@ -275,10 +275,10 @@ Test.loadFileHandles = async function loadFileHandles() {
             types: [
                 {
                     description: 'ZIP archive(s) that can be run by Brimstone',
-                    accept: { 
+                    accept: {
                         'application/zip': ['.zip'],
                         'application/json': ['.json']
-                     }
+                    }
                 }
             ],
             multiple: true
@@ -297,15 +297,31 @@ Test.loadFileHandles = async function loadFileHandles() {
 Test.current = null;
 
 export class Playlist {
-    /** 
-     * The filename of this playlist
-     */
-    name = '';
+    /** json identifier for this filetype */
+    type = 'brimstone playlist';
+
+    /** @type {string} */
+    description;
+
+    /** @type {string} */
+    author;
 
     /**
-     * The filenames to play
+     * @type {FieSystemFileHandle[]}
      */
     play = [];
+
+    /**@type {FileSystemDirectoryHandle} */
+    _directoryHandle;
+
+    toJSON() {
+        return {
+            type: this.type,
+            description: this.description,
+            author: this.author,
+            play: this.play.map(p => ({ name: p.name }))
+        };
+    }
 
     /**
      * async constructor
@@ -313,16 +329,24 @@ export class Playlist {
      * @returns this
      */
     async fromFileHandle(fileHandle) {
+        let directoryEntries = {};
+        for await (let [key, value] of Playlist.directoryHandle.entries()) {
+            directoryEntries[key] = value;
+        }
+
         let blob = await fileHandle.getFile();
         blob = await blob.text();
         let pojo = JSON.parse(blob);
 
-        // this.name = pojo.name || 'untitled';
-
-        // for(let i = 0; i < pojo.play.length; ++i) {
-        //     this.play.push(await (new Playlist())
-        // }
+        this.description = pojo.description;
+        this.author = pojo.author;
+        this.play = pojo.play.map( fh => directoryEntries[fh.name] );
 
         return this;
     }
 }
+
+/**
+ * @type {FileSystemDirectoryHandle}
+ */
+Playlist.directoryHandle;

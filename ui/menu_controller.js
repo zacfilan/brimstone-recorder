@@ -5,7 +5,7 @@ export class MenuController {
 
     /** close the menu */
     close() {
-        $('#menu .options').hide();
+        $('#menu .options').removeClass('open');
     }
 
     constructor(actions) {
@@ -22,12 +22,12 @@ export class MenuController {
         /** open or close a menu */
         $('#menu > .option').on('click', (e) => {
             if (!this.opened) {
-                $(e.target).find(" > .options").show();
+                $(e.target).find(" > .options").addClass('open');
                 this.opened = true;
             }
             else {
                 this.opened = false;
-                $('#menu .options').hide();
+                $('#menu .options').removeClass('open');
             }
         });
 
@@ -36,11 +36,11 @@ export class MenuController {
             (e) => { // mousein
                 if (this.opened) {
                     this.close();
-                    $(e.target).find(" > .options").show();
+                    $(e.target).find(" > .options").addClass('open');
                 }
             },
             (e) => { // mouseout
-                $(e.target).find(" > .options").hide();
+                $(e.target).find(" > .options").removeClass('open');
             }
         );
     }

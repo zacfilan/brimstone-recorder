@@ -73,12 +73,28 @@ class Actions {
         });
     }
 
-    /** Let the user open a test (zip file) */
+    /** Let the user open a test (zip or plalistfile) */
     async openZip() {
         fileHandles = [];
         currentTestNumber = 0;
         try {
-            fileHandles = await Test.loadFileHandles();
+            let tempFileHandles = await Test.loadFileHandles();
+            for (const fileHandle of tempFileHandles) {
+                if (fileHandle.name.endsWith('.json')) {
+                    if (!Playlist.directoryHandle) {
+                        window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
+                        if (!await this.loadLibrary()) {
+                            fileHandles = [];
+                            return;
+                        }
+                    }
+                    let playlist = await (new Playlist()).fromFileHandle(fileHandle);
+                    fileHandles.push(...playlist.play);
+                }
+                else {
+                    fileHandles.push(fileHandle);
+                }
+            }
             if (fileHandles.length) {
                 await loadNextTest();
             }
@@ -88,25 +104,14 @@ class Actions {
         }
     }
 
-    /** Let the user open a test (playlist file) */
-    async openPlaylist() {
-
-    }
-
     /** Let the user specify a directory underwhich all recordings/tests/playlists will be accessible */
     async loadLibrary() {
-        let handle = await window.showDirectoryPicker();
-        debugger;
-        let entries = await handle.entries();
-        let values = await handle.values();
-        let keys = await handle.keys();
-        for await (let [key, value] of handle.entries()) {
-            console.log({ key, value });
-            if (value instanceof FileSystemDirectoryHandle) {
-                for await (let [kkey, kvalue] of value.entries()) {
-                    console.log('deep', { kkey, kvalue });
-                }
-            }
+        try {
+            Playlist.directoryHandle = await window.showDirectoryPicker();
+            return true;
+        }
+        catch (e) {
+            return false;
         }
     }
 
@@ -556,6 +561,7 @@ function setToolbarState() {
             pb.prop('title', "Click to play.");
             // not playing, not recoding
             $('[data-action="openZip"]').attr('disabled', false);
+            $('[data-action="loadLibrary"]').attr('disabled', false);
             $('#menu>.option').attr('disabled', false);
 
             rb.attr('disabled', false);
@@ -977,7 +983,7 @@ function postMessage(msg) {
     }
 }
 
-$('#loadButton').on('click', actions.openZip);
+$('#loadButton').on('click', actions.openZip.bind(actions));
 $('#saveButton').on('click', actions.saveZip);
 $('#clearButton').on('click', actions.clearTest);
 
@@ -1228,7 +1234,7 @@ async function userEventToAction(userEvent) {
             // the auto screenshot updating mechanism (don't know we are in the shadow DOM), so it keeps clicking away while the user interacts with the shadow dom.
             // (hence the _lastScreenshot contains the state where the shadowDOM options are open and the user has clicked the new one, which is not the correct pre-requisite)
             // it only knows when the action is done by getting the change event. 
-            // so there is no pre-requisite starting state for a change operation, it's not a directly observable UI action.
+            // so there is no pre-requisite starting state for await change operation, it's not a directly observable UI action.
             // +1 shadowDOMScreenshot
 
             // furthur, during record, after the change event occurs, the shadowDOM is closed and the mouse may be somewhere new, without an observed mousemove.

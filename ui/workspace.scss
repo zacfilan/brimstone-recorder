@@ -46,7 +46,10 @@ html {
         padding: 0.3em 0;
         width: 250px;
         border-radius: 0 0 4px 4px;
-        display: flex;
+        display:none;
+        &.open{
+            display: flex;
+        }
         flex-direction: column;
 
         .option {

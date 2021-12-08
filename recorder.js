@@ -253,8 +253,11 @@ class Recorder {
         this.lastMouseMoveEvent = false;
         /** What element did we start the mousemove on/from */
         this.mouseMoveStartingElement = false;
-        /** there is a mouse move action still being recorded */
+
+        /** there is a mouse move action still being recorded, this isn't cleared until after the mousemove has been recorded. */
         this.mouseMovePending = false;
+        /** An identifier for the timeout that will record a 'mousemove' user action */
+        this.pendingMouseMoveTimeout = false;
 
         /**
          * Hold the current/last event observed.
@@ -299,6 +302,13 @@ class Recorder {
 
         chrome.runtime.onMessage.addListener(this._runtimeFrameIdSpecificOnMessageHandler.bind(this)); // extension sends message to one or all frames
         chrome.runtime.onConnect.addListener(this._runtimeOnConnectHandler.bind(this)); // extension will connect the port when it is time to start recording
+        
+        /** the css for a keyboard mouse cursor */
+        this.keyboardCursor = `url(${chrome.runtime.getURL('images/keyboard.png')}) 15 0, not-allowed`;
+        /** the css for a mousemove cursor */
+        this.mousemoveCursor = `url(${chrome.runtime.getURL('images/mouse.png')}) 15 15, wait`;
+        /** the css for a mouse wheel cursor */
+        this.mousewheelCursor = `url(${chrome.runtime.getURL('images/scrolling.png')}) 15 2, auto`;
     }
 
     /** The user has waited long enough that we should consider that an active
@@ -347,18 +357,6 @@ class Recorder {
         this.waitActionDetectionTimeout = null;
     }
 
-    hideCursor() {
-        if (document.getElementById('brimstone-recorder-css')) {
-            return;
-        }
-
-        var styleSheet = document.createElement("style");
-        styleSheet.type = "text/css";
-        styleSheet.innerText = 'body {caret-color: transparent;}';
-        styleSheet.id = 'brimstone-recorder-css';
-        document.head.appendChild(styleSheet);
-    }
-
     /**
      * Chrome-extension API: For single one time messages . This can respond if need be.
      * These can be targeted by frameId from the extension, or broadcast to all frames.
@@ -380,7 +378,8 @@ class Recorder {
                 sendResponse();
                 break;
             case 'hideCursor':
-                this.hideCursor();
+                this.injectCssNode();
+                this.hideCaret();
                 sendResponse();
                 break;
             case 'loadOptions':
@@ -524,9 +523,11 @@ class Recorder {
                     }
                     if (msg.args === 'mousemove') {
                         this.mouseMovePending = false; // now we are really done
+                        this.revertCursorCss();
                     }
                     if (msg.args === 'wheels') {
                         this.pendingWheelTimeout = false; // really done
+                        this.revertCursorCss();
                     }
                     if (!this.tx()
                         && !this.options.debugRecorder
@@ -552,10 +553,12 @@ class Recorder {
     exit() {
         this.reset();
         this.removeEventListeners(); // message too
+        this.clearCss();
     }
 
     /** Clear any pending record detecting timeouts */
     clearTimeouts() {
+        this.clearCss();
         // FIXME: i really should only have only pending thing at a timee...
         clearTimeout(this.pendingKeyTimeout);
         clearTimeout(this.pendingWheelTimeout);
@@ -627,7 +630,7 @@ class Recorder {
                 ['clientX', 'clientY'].forEach(p =>
                     msg.event[p] = e[p]);
                 msg.handler = { simulate: true };
-                if(this.options?.experiment?.includeCss) {
+                if (this.options?.experiment?.includeCss) {
                     msg.css = TopLevelObject.DOMPresentationUtils.cssPath(e.target);
                 }
                 break;
@@ -706,9 +709,48 @@ class Recorder {
         this.mouseMovePending = false;
         clearTimeout(this.pendingMouseMoveTimeout);
         this.pendingMouseMoveTimeout = null;
+        this.revertCursorCss();
+    }
+
+    /** Remove css I injected */
+    clearCss() {
+        let css = document.getElementById('brimstone-recorder-css');
+        if(css) {
+            css.innerText = '';
+        }
+    }
+
+    /** The caret is the blinky "cursor" in a text input. In contrast the "cursor" is the mouse cursor. */
+    hideCaret() {
+        let css = document.getElementById('brimstone-recorder-css');
+        css.innerText = 'body {caret-color: transparent;}';
+    }
+
+    /** the mousecursor */
+    revertCursorCss() {
+        let css = document.getElementById('brimstone-recorder-css');
+        css.innerText = 'body {caret-color: transparent;}';
+    }
+
+    /** the mousecursor */
+    setCursorCssTo(v) {
+        let css = document.getElementById('brimstone-recorder-css');
+        css.innerText = `body {caret-color: transparent;} * {cursor: ${v} !important;}`;
+    }
+    
+    injectCssNode() {
+        if (document.getElementById('brimstone-recorder-css')) {
+            return;
+        }
+
+        var styleSheet = document.createElement("style");
+        styleSheet.type = "text/css";
+        styleSheet.id = 'brimstone-recorder-css';
+        document.head.appendChild(styleSheet);
     }
 
     startMouseMove(e) {
+        this.setCursorCssTo(this.mousemoveCursor);
         this.lastMouseMoveEvent = e;
         clearTimeout(this.pendingMouseMoveTimeout);
         this.pendingMouseMoveTimeout = setTimeout(
@@ -804,18 +846,18 @@ class Recorder {
             case 'mousemove':
                 if (this.pendingWheelTimeout) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        this.recoverableUserError('wheel'); // don't allow movemouse until the present wheel event is recorded
-                        return this.cancel(e);
+                        // this.recoverableUserError('wheel'); // don't allow movemouse until the present wheel event is recorded
+                        // return this.cancel(e);
                     }
                     else {
                         return this.propagate(e); // unless it is on the same element (fatfinger) then ignore this event
                     }
                 }
 
-                if (this.pendingKeyTimeout) { // don't movemouse until the present keys sequence is recorded
-                    this.recoverableUserError('keys');
-                    return this.cancel(e);
-                }
+                // if (this.pendingKeyTimeout) { // don't movemouse until the present keys sequence is recorded
+                //     this.recoverableUserError('keys');
+                //     return this.cancel(e);
+                // }
 
                 this.startMouseMove(e);
                 return this.propagate(e);
@@ -841,23 +883,23 @@ class Recorder {
             case 'mousedown':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        this.recoverableUserError('mousemove'); // don't click until the mousemove completes
-                        return this.cancel(e);
+                        // this.recoverableUserError('mousemove'); // don't click until the mousemove completes
+                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove(); // unless it is on the same element (fatfinger)
                     }
                 }
 
-                if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                    this.recoverableUserError('wheel');
-                    return this.cancel(e);
-                }
+                // if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
+                //     this.recoverableUserError('wheel');
+                //     return this.cancel(e);
+                // }
 
-                if (this.pendingKeyTimeout) {
-                    this.recoverableUserError('keys');
-                    return this.cancel(e);
-                }
+                // if (this.pendingKeyTimeout) {
+                //     this.recoverableUserError('keys');
+                //     return this.cancel(e);
+                // }
 
                 this.mouseDown = e; // down right now
                 this.lastMouseDownEvent = e; // and hang onto it after it is not the last event
@@ -870,8 +912,8 @@ class Recorder {
 
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        this.recoverableUserError('mousemove'); // don't allow wheel event until mousemove completed
-                        return this.cancel(e);
+                        // this.recoverableUserError('mousemove'); // don't allow wheel event until mousemove completed
+                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
@@ -904,6 +946,7 @@ class Recorder {
                     // The first in the sequence
                     // simulate so we can lock in the pre-requisite ss
                     msg.handler.saveScreenshot = true;
+                    this.setCursorCssTo(this.mousewheelCursor);
                 }
                 if (e.cancelable) {
                     this.pushMessage(msg); // simulate it
@@ -923,15 +966,15 @@ class Recorder {
                     return;
                 }
 
-                if (this.mouseMovePending) {
-                    this.recoverableUserError('mousemove');
-                    return this.cancel(e);
-                }
+                // if (this.mouseMovePending) {
+                //     this.recoverableUserError('mousemove');
+                //     return this.cancel(e);
+                // }
 
-                if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                    this.recoverableUserError('wheel');
-                    return this.cancel(e);
-                }
+                // if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
+                //     this.recoverableUserError('wheel');
+                //     return this.cancel(e);
+                // }
 
                 this.handleKey(e);
                 return this.cancel(e);
@@ -941,8 +984,8 @@ class Recorder {
             case 'dblclick':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        this.recoverableUserError();
-                        return this.cancel(e);
+                        // this.recoverableUserError();
+                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove();
@@ -956,8 +999,8 @@ class Recorder {
 
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        this.recoverableUserError('mousemove');// don't allow a click until a mousemove completes
-                        return this.cancel(e);
+                        // this.recoverableUserError('mousemove');// don't allow a click until a mousemove completes
+                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
@@ -975,23 +1018,23 @@ class Recorder {
 
                             if (this.mouseMovePending) {
                                 if (this.mouseMoveStartingElement !== this.pendingClick.target) {
-                                    this.recoverableUserError('mousemove'); // don't allow a click until a mousemove completes
-                                    return;
+                                    // this.recoverableUserError('mousemove'); // don't allow a click until a mousemove completes
+                                    // return;
                                 }
                                 else {
                                     this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
                                 }
                             }
 
-                            if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                                this.recoverableUserError('wheel');
-                                return;
-                            }
+                            // if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
+                            //     this.recoverableUserError('wheel');
+                            //     return;
+                            // }
 
-                            if (this.pendingKeyTimeout) {
-                                this.recoverableUserError('keys');
-                                return;
-                            }
+                            // if (this.pendingKeyTimeout) {
+                            //     this.recoverableUserError('keys');
+                            //     return;
+                            // }
 
 
                             msg = this.buildMsg(this.pendingClick);
@@ -1036,6 +1079,7 @@ class Recorder {
      * record it now.
      */
     recordKeySequence() {
+        this.revertCursorCss();
         if (!this.keyEventQueue.length) {
             return;
         }
@@ -1059,9 +1103,6 @@ class Recorder {
                 metaKey: e.metaKey,
                 shiftKey: e.shiftKey
             }))
-            // handler: {
-            //     record: true, // no simulate, because we already did on each individual
-            // }
         });
         this.keyEventQueue = []; // FIXME: is this correct?!
     }
@@ -1139,6 +1180,9 @@ class Recorder {
         }
         let record = false;
         this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
+        if(this.keyEventQueue.length == 1) {
+            this.setCursorCssTo(this.keyboardCursor);
+        }
         this._scheduleRecordKeySequence();
 
         let rect = e.target.getBoundingClientRect();

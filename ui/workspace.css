@@ -56,13 +56,17 @@ html {
   padding: 0.3em 0;
   width: 250px;
   border-radius: 0 0 4px 4px;
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
+  display: none;
   -webkit-box-orient: vertical;
   -webkit-box-direction: normal;
       -ms-flex-direction: column;
           flex-direction: column;
+}
+
+#menu .options.open {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
 }
 
 #menu .options .option {
@@ -308,7 +312,6 @@ button svg {
 
 .card .title .actions {
   margin-left: auto;
-  /* padding: 1em 0; */
 }
 
 .card .title .text {

@@ -1,7 +1,7 @@
 {
   "name": "Brimstone",
   "description": "Record and play Brimstone pixel-perfect webpage automation tests",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js"
@@ -39,6 +39,12 @@
       ],
       "run_at": "document_start",
       "match_about_blank": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["images/*"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
