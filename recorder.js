@@ -304,7 +304,7 @@ class Recorder {
         chrome.runtime.onConnect.addListener(this._runtimeOnConnectHandler.bind(this)); // extension will connect the port when it is time to start recording
         
         /** the css for a keyboard mouse cursor */
-        this.keyboardCursor = `url(${chrome.runtime.getURL('images/keyboard.png')}) 15 0, not-allowed`;
+        this.keyboardCursor = `url(${chrome.runtime.getURL('images/keyboard.png')}) 0 0, not-allowed`;
         /** the css for a mousemove cursor */
         this.mousemoveCursor = `url(${chrome.runtime.getURL('images/mouse.png')}) 15 15, wait`;
         /** the css for a mouse wheel cursor */
