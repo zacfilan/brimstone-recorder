@@ -67,11 +67,12 @@ class Actions {
     }
 
     async about() {
-        await focusOrCreateTab('https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en');
+        await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/wiki');
+        //await focusOrCreateTab('https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en');
     }
 
     async openWiki() {
-        await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/wiki');
+        await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/wiki/User-Guide');
     }
 
     async openIssues() {
