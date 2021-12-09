@@ -1,7 +1,7 @@
 {
   "name": "Brimstone",
   "description": "Record and play Brimstone pixel-perfect webpage automation tests",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js"

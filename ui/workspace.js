@@ -41,6 +41,17 @@ const player = new Player();
 /** used to *not* record pre-requisite screenshots when in the shadowDOM. */
 var shadowDOMScreenshot = 0;
 
+async function focusOrCreateTab(url) {
+    let [tab] = await chrome.tabs.query({url});
+    if(!tab) {
+        tab = await chrome.tabs.create({url});
+    }
+    else {
+        await chrome.tabs.update(tab.id, {active: true});
+    }
+    await chrome.windows.update(tab.windowId, { focused: true });   
+} 
+
 /** Generic thigs the user can do in the UI
  * 
  */
@@ -55,22 +66,16 @@ class Actions {
         }
     }
 
-    about() {
-        chrome.tabs.create({
-            url: 'https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en'
-        });
+    async about() {
+        await focusOrCreateTab('https://chrome.google.com/webstore/detail/brimstone/kjelahkpdbdmajbknafeighkihkcjacd?hl=en');
     }
 
-    openWiki() {
-        chrome.tabs.create({
-            url: 'https://github.com/zacfilan/brimstone-recorder/wiki'
-        });
+    async openWiki() {
+        await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/wiki');
     }
 
-    openIssues() {
-        chrome.tabs.create({
-            url: 'https://github.com/zacfilan/brimstone-recorder/issues'
-        });
+    async openIssues() {
+        await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/issues');
     }
 
     /** Let the user open a test (zip or plalistfile) */
