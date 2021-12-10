@@ -644,19 +644,21 @@ $('#playButton').on('click', async function () {
                 resume = false;
             }
 
-            if (playFrom === 0) {
-                playFrom = 1; // don't navigate to the start twice, the goto is handled when we set up the applicationUnderTestTab
-                if (!await applicationUnderTestTab.reuse({ url: actions[0].url, incognito: Test.current.incognito })) {
-                    await applicationUnderTestTab.create({ url: actions[0].url, incognito: Test.current.incognito });
+            if (playFrom) {
+                // we are on the first step of some test in the suite. 
+                if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
+                    await applicationUnderTestTab.create({ incognito: Test.current.incognito });   // if not create
                 }
             }
             else {
-                if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
-                    throw new Errors.ReuseTestWindow();
+                // we are rsuming play in the middle of some test in the suite. The applicationUnderTestTab needs to already 
+                // be up (and in the right state) to resume 
+                if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
+                    throw new Errors.ReuseTestWindow(); // if you can't then there is no way to resume
                 }
             }
 
-            applicationUnderTestTab.url = actions[0].url;
+            applicationUnderTestTab.url = actions[0].url; // this might be undefined! 
             applicationUnderTestTab.width = actions[0].tabWidth;
             applicationUnderTestTab.height = actions[0].tabHeight;
 
@@ -923,7 +925,7 @@ $('#recordButton').on('click', async function () {
             // update the UI: insert the first text card in the ui
             if (url) {
                 await recordUserAction({
-                    type: 'start',
+                    type: 'goto',
                     url: applicationUnderTestTab.url
                 });
             }
@@ -1223,7 +1225,7 @@ async function userEventToAction(userEvent) {
             cardModel.description = 'double click';
             addExpectedScreenshot(cardModel);
             break;
-        case 'start': {
+        case 'goto': {
             cardModel.description = `goto ${cardModel.url}`;
             cardModel.overlay = {
                 height: 0,

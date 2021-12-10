@@ -180,7 +180,7 @@ export class TestAction {
             description: this.description,
             memoryUsed: this.memoryUsed,
             latency: this.latency,
-            url: this.url, // only on start actions
+            url: this.url, // only on goto actions
             hoverTime: this.hoverTime,
             deltaX: this.deltaX, // only on wheel actions 
             deltaY: this.deltaY, // only on wheel actions

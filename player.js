@@ -215,8 +215,8 @@ export class Player {
         return next._match; // should be pass!
     }
 
-    async start(action) {
-        console.debug("player: start");
+    async goto(action) {
+        console.debug("player: goto");
         // If we just recorded it and want to play it back, we can reuse the window we recorded it from
         // We can reuse the tab we launched the UI from.
         await chrome.tabs.update(this.tab.chromeTab.id, {

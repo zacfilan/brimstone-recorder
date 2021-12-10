@@ -185,12 +185,18 @@ export class Test {
             Object.assign(testPojo, testPojo.meta);
             delete testPojo.meta;
         }
+
         this.hideCursor = testPojo.hideCursor;
         this.incognito = testPojo.incognito;
         this.filename = fileHandle.name;
 
         let screenshotPromises = [];
         for (let i = 0; i < actions.length; ++i) {
+            // convert old tests
+            if(actions[i].type === 'start') {
+                actions[i].type = 'goto';
+            }
+   
             let action = new TestAction(actions[i]);
             this.updateOrAppendAction(action);
             let screenshotPromise;
