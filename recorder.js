@@ -750,7 +750,6 @@ class Recorder {
     }
 
     startMouseMove(e) {
-        this.setCursorCssTo(this.mousemoveCursor);
         this.lastMouseMoveEvent = e;
         clearTimeout(this.pendingMouseMoveTimeout);
         this.pendingMouseMoveTimeout = setTimeout(
@@ -854,11 +853,6 @@ class Recorder {
                     }
                 }
 
-                // if (this.pendingKeyTimeout) { // don't movemouse until the present keys sequence is recorded
-                //     this.recoverableUserError('keys');
-                //     return this.cancel(e);
-                // }
-
                 this.startMouseMove(e);
                 return this.propagate(e);
             case 'mouseover':
@@ -866,6 +860,10 @@ class Recorder {
                 return this.propagate(e);
             case 'mouseout':
                 this.mousePhase = 'out';
+                if (this.mouseMoveStartingElement === e.target) {
+                    this.setCursorCssTo(this.mousemoveCursor);
+                }
+
                 return this.propagate(e);
             case 'change':
                 // this is not a direct user input, but it is (indirectly) the only way to identify
