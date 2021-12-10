@@ -366,6 +366,10 @@ export class TestAction {
         return html;
     }
 
+    /** 
+     * Update the id of this action. The id is currently also the index in the array.
+     * This will update screenshot filenames too.
+     */
     setIndex(to) {
         this.index = to; // reset the indicies
         if (this.expectedScreenshot?.fileName) {
@@ -560,6 +564,12 @@ export function getStep(element) {
     return { view, model };
 }
 
+/**
+ * 
+ * @param {*} element 
+ * @param {Test} test 
+ * @returns 
+ */
 export function getCard(element, test) {
     let view = $(element).closest('.card');
     let index = view.attr('data-index');

@@ -558,7 +558,7 @@ class Recorder {
 
     /** Clear any pending record detecting timeouts */
     clearTimeouts() {
-        this.clearCss();
+        this.revertCursorCss(); 
         // FIXME: i really should only have only pending thing at a timee...
         clearTimeout(this.pendingKeyTimeout);
         clearTimeout(this.pendingWheelTimeout);
@@ -723,19 +723,22 @@ class Recorder {
     /** The caret is the blinky "cursor" in a text input. In contrast the "cursor" is the mouse cursor. */
     hideCaret() {
         let css = document.getElementById('brimstone-recorder-css');
-        css.innerText = 'body {caret-color: transparent;}';
+        css.innerText += 'body {caret-color: transparent;}';
     }
 
     /** the mousecursor */
     revertCursorCss() {
         let css = document.getElementById('brimstone-recorder-css');
-        css.innerText = 'body {caret-color: transparent;}';
+        if(css) {
+            css.innerText = css.innerText.replace(/\*[^\}]+\}/, '');
+        }
     }
 
     /** the mousecursor */
     setCursorCssTo(v) {
         let css = document.getElementById('brimstone-recorder-css');
-        css.innerText = `body {caret-color: transparent;} * {cursor: ${v} !important;}`;
+        this.revertCursorCss();
+        css.innerText += `* {cursor: ${v} !important;}`;
     }
     
     injectCssNode() {
@@ -755,6 +758,7 @@ class Recorder {
         this.pendingMouseMoveTimeout = setTimeout(
             () => {
                 if (!this.mouseMovePending || this.mousePhase === 'out') {
+                    this.clearPendingMouseMove();
                     return;
                 }
 
@@ -857,14 +861,11 @@ class Recorder {
                 return this.propagate(e);
             case 'mouseover':
                 this.mousePhase = 'over';
+                this.setCursorCssTo(this.mousemoveCursor);
                 return this.propagate(e);
             case 'mouseout':
                 this.mousePhase = 'out';
-                if (this.mouseMoveStartingElement === e.target) {
-                    this.setCursorCssTo(this.mousemoveCursor);
-                }
-
-                return this.propagate(e);
+                  return this.propagate(e);
             case 'change':
                 // this is not a direct user input, but it is (indirectly) the only way to identify
                 // when a select value was changed via a user interacting in the shadow DOM (where the record cannot monitor events).

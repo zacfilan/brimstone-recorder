@@ -178,6 +178,12 @@ export class Player {
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
             }
             console.log(`end   play [${action.index}] : ${action.description}`);
+            
+            // grep for FOCUS ISSUE for details
+            if(i === startIndex && action.type === 'goto') {
+                await this.mousemove({ x: 0, y: 0 });
+                await this.mousemove({ x: -1, y: -1 });
+            }
 
             start = performance.now();
             if (!next.expectedScreenshot || next.shadowDOMAction) { // i don't record an image for shandowdom 
@@ -217,13 +223,20 @@ export class Player {
 
     async goto(action) {
         console.debug("player: goto");
-        // If we just recorded it and want to play it back, we can reuse the window we recorded it from
-        // We can reuse the tab we launched the UI from.
+ 
+        // I want the navigation done before I exit here
+        var resolveNavigationPromise;
+        let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
+        chrome.webNavigation.onCommitted.addListener(function playerGotoNavCommit(details) {
+            chrome.webNavigation.onCommitted.removeListener(playerGotoNavCommit);
+            resolveNavigationPromise(details);
+        });
         await chrome.tabs.update(this.tab.chromeTab.id, {
             highlighted: true,
             active: true,
             url: action.url
         });
+        await navPromise; // the above nav is really done.
     }
 
     async keypress(action) {
@@ -721,6 +734,8 @@ export class Player {
                 if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
                     console.log(`warn got exception while running debugger cmd ${method}:`, commandParams, e);
                     await this.attachDebugger({ tab: this.tab });
+                    await this.tab.resizeViewport();
+
                     if (this.usedFor === 'playing') {
                         await sleep(2000);
                     }
@@ -760,7 +775,6 @@ export class Player {
         //await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
 
         await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
-        await this.tab.resizeViewport();
         console.debug(`debugger attached`);
     }
 

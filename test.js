@@ -38,6 +38,11 @@ export class Test {
          * Used to tell if the images are all hydrated or not
          */
         this.acceptableHydratedPromise = false;
+
+        /**
+         * Allow actions added to the test to overwrite old actions
+         */
+        this.updateOrAppendIndex = 0;
     }
 
     /**
@@ -56,8 +61,8 @@ export class Test {
      */
     updateOrAppendAction(action) {
         // make sure it has a step number
-        if (action.index === undefined) {
-            action.setIndex(this.steps.length);
+        if (action.index === undefined) { // when recording actions they come in without an index
+            action.setIndex(this.updateOrAppendIndex++);
         }
         this.steps[action.index] = action;
         action.test = this; // each action knows what test it is in
@@ -83,12 +88,15 @@ export class Test {
      */
     deleteActionsBefore(action) {
         this.steps.splice(0, action.index);
+        this.reindex();
+    }
+
+    reindex() {
         for (let i = 0; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i);
         }
     }
-
     /**
      * Delete all the actions after the passed in one.
      * The passed in one becomes one before the last.
@@ -97,10 +105,17 @@ export class Test {
      */
     deleteActionsAfter(action) {
         this.steps.splice(action.index + 2);
-        for (let i = 0; i < this.steps.length; ++i) {
-            let action = this.steps[i];
-            action.setIndex(i);
-        }
+        this.reindex();
+
+    }
+
+    /**
+     *  insert the action at the index specified in the action
+     *  @param {TestAction} newAction The action to insert
+     */
+    insertAction(newAction) {
+        this.steps.splice(newAction.index, 0, newAction);
+        this.reindex();
     }
 
     /**

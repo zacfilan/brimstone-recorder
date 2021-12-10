@@ -33,6 +33,20 @@ keycode2modifier[SHIFT_KEYCODE] = 8;
 Test.current = new Test();
 window.document.title = `Brimstone - ${Test.current.filename}`;
 
+let brimstone = {
+    window: {
+        alert: (msg) => {
+            return window.alert('🙋! ' + msg);
+        },
+        confirm: (msg) => {
+            return window.confirm('🙋？' + msg);
+        },
+        prompt: (msg) => {
+            return window.prompt('🙋' + msg);
+        }
+    }
+}
+
 /** The testing tab being recorded/played
  * @type {Tab}
  */
@@ -42,15 +56,15 @@ const player = new Player();
 var shadowDOMScreenshot = 0;
 
 async function focusOrCreateTab(url) {
-    let [tab] = await chrome.tabs.query({url});
-    if(!tab) {
-        tab = await chrome.tabs.create({url});
+    let [tab] = await chrome.tabs.query({ url });
+    if (!tab) {
+        tab = await chrome.tabs.create({ url });
     }
     else {
-        await chrome.tabs.update(tab.id, {active: true});
+        await chrome.tabs.update(tab.id, { active: true });
     }
-    await chrome.windows.update(tab.windowId, { focused: true });   
-} 
+    await chrome.windows.update(tab.windowId, { focused: true });
+}
 
 /** Generic thigs the user can do in the UI
  * 
@@ -88,7 +102,7 @@ class Actions {
             for (const fileHandle of tempFileHandles) {
                 if (fileHandle.name.endsWith('.json')) {
                     if (!Playlist.directoryHandle) {
-                        window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
+                        brimstone.window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
                         if (!await this.loadLibrary()) {
                             fileHandles = [];
                             return;
@@ -281,6 +295,18 @@ class Actions {
         updateStepInView(Test.current.steps[action.index]);
     }
 
+    /**
+     * Insert a blank action before the current one. This along with recording over actions,
+     * allows the user to insert newly recorded actions.
+     */
+    insertActionBefore() {
+        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
+        let newAction = new TestAction();
+        newAction.setIndex(action.index);
+        Test.current.insertAction(newAction);
+        updateStepInView(Test.current.steps[action.index]);
+    }
+
 }
 const actions = new Actions();
 const menuController = new MenuController(actions);
@@ -290,7 +316,7 @@ async function errorHandler(e) {
     await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
     switch (e.constructor) {
         case Errors.PixelScalingError:
-            window.alert(`🛑 Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
+            brimstone.window.alert(`Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
             // bail
             try {
                 await chrome.windows.remove(applicationUnderTestTab.chromeWindow.id);
@@ -303,7 +329,7 @@ async function errorHandler(e) {
             break;
         case Errors.ReuseTestWindow:
             //let replay = window.confirm(`🛑 You are trying to record new steps and insert them into an existing test, but there is no current Chrome test window that matches your current test requirements.\n\nI can replay your test to the current step. After which you should be able to insert newly recorded steps.\n\nWould you like to do this?`);
-            window.alert(`🛑 You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
+            brimstone.window.alert(`You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
             break;
         default:
             errorDialog(e);
@@ -348,7 +374,7 @@ window.addEventListener("error", async function (errorEvent) {
 
     let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
     if (!allowedIncognitoAccess) {
-        window.alert(`🟡 Extension requires manual user intervention to allow incognito. 
+        brimstone.window.alert(`Extension requires manual user intervention to allow incognito. 
         
 When you hit [OK] I'll try to navigate you to the correct page (chrome://extensions/?id=${chrome.runtime.id}).
 
@@ -366,22 +392,14 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
     }
 })();
 
-async function countDown(seconds) {
-    let expectedScreenIndex = currentStepIndex() + 1;
-    let action = Test.current.steps[expectedScreenIndex];
-    action.overlay = {
-        height: 100,
-        width: 100,
-        top: 0,
-        left: 0
-    };
+async function countDown(seconds, action) {
     for (let i = seconds; i; --i) {
         action.overlay.html = i;
-        updateStepInView(Test.current.steps[expectedScreenIndex - 1]);
+        updateStepInView(Test.current.steps[action.index - 1]);
         await sleep(1000);
     }
     delete action.overlay;
-    updateStepInView(Test.current.steps[expectedScreenIndex - 1]);
+    updateStepInView(Test.current.steps[action.index - 1]);
 }
 
 /** The index of the first card showing in big step area */
@@ -644,27 +662,28 @@ $('#playButton').on('click', async function () {
                 resume = false;
             }
 
-            if (playFrom) {
+            if (playFrom === 0) {
                 // we are on the first step of some test in the suite. 
                 if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
-                    await applicationUnderTestTab.create({ incognito: Test.current.incognito });   // if not create
+                    await applicationUnderTestTab.create({ url: "about:blank", incognito: Test.current.incognito });   // if not create
                 }
             }
             else {
-                // we are rsuming play in the middle of some test in the suite. The applicationUnderTestTab needs to already 
+                // we are resuming play in the middle of some test in the suite. The applicationUnderTestTab needs to already 
                 // be up (and in the right state) to resume 
                 if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
                     throw new Errors.ReuseTestWindow(); // if you can't then there is no way to resume
                 }
             }
 
-            applicationUnderTestTab.url = actions[0].url; // this might be undefined! 
             applicationUnderTestTab.width = actions[0].tabWidth;
             applicationUnderTestTab.height = actions[0].tabHeight;
 
             await player.attachDebugger({ tab: applicationUnderTestTab });
-
-            await startPlaying(applicationUnderTestTab);
+            if (applicationUnderTestTab.url !== 'about:blank') {
+                await applicationUnderTestTab.resizeViewport();
+            }
+            await startPlaying();
 
             playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
 
@@ -699,7 +718,7 @@ $('#playButton').on('click', async function () {
         $('#playButton').removeClass('active');
         setToolbarState();
         if (e === 'debugger_already_attached') {
-            window.alert("You must close the existing debugger(s) first.");
+            brimstone.window.alert("You must close the existing debugger(s) first.");
         }
         else {
             setInfoBarText('💀 aborted! ' + e?.message ?? '');
@@ -765,10 +784,6 @@ async function startPlaying() {
     chrome.webNavigation.onCompleted.addListener(playingWebNavigationOnCompleteHandler);
 
     await hideCursor();
-    // find FOCUS ISSUE in this file
-    // this screws up playback after a pixel fix.
-    //await player.mousemove({ x: 0, y: 0 });
-    //await player.mousemove({ x: -1, y: -1 });
 }
 
 async function playingWebNavigationOnCompleteHandler(details) {
@@ -878,7 +893,6 @@ async function focusTab() {
     await chrome.tabs.update(applicationUnderTestTab.chromeTab.id, {
         highlighted: true,
         active: true
-        // url: tab.url // shouldn't need that
     });
 }
 
@@ -902,9 +916,16 @@ $('#recordButton').on('click', async function () {
         // are we doing an incognito recording - this is determined by the option first, or the state of the tab we are going to use
         Test.current.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
 
-        if (!(index > 0)) {
+        // How does user specify that they want to do a splice recording, or a competely fresh recording?
+        // A completely fresh recrding will prompt for the URL, a splice will not.
+        // If it is a fresh recording there must be nothing loaded, else it is a splice.
+        if (!Test.current.steps.length) {
+            Test.current.updateOrAppendIndex = 0;
             let defaultUrl = options?.url ?? '';
-            url = prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
+            url = brimstone.window.prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
+            if (!url) {
+                return; // they bailed
+            }
             if (url.startsWith('chrome')) {
                 alert('Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.')
                 return false;
@@ -912,53 +933,78 @@ $('#recordButton').on('click', async function () {
             options.url = url; // Cache the last URL recorded so we can reset it in the prompt, next time.
             saveOptions(options); // no need to wait
 
+            let created = false;
             // recording from beginning
             if (!await applicationUnderTestTab.reuse({ url: url, incognito: Test.current.incognito })) {
                 await applicationUnderTestTab.create({ url: url, incognito: Test.current.incognito });
+                created = true;
             }
 
             await player.attachDebugger({ tab: applicationUnderTestTab });
+            await applicationUnderTestTab.resizeViewport();
+
             await prepareToRecord(applicationUnderTestTab);
             button.addClass('active');
             setToolbarState();
 
             // update the UI: insert the first text card in the ui
-            if (url) {
-                await recordUserAction({
-                    type: 'goto',
-                    url: applicationUnderTestTab.url
-                });
-            }
-            else {
-                await recordUserAction({
-                    type: 'wait'
-                });
-            }
+            await recordUserAction({
+                type: 'goto',
+                url: applicationUnderTestTab.url
+            });
 
-            // FOCUS ISSUE. when we create a window (because we need incognito for example) the focus isn't automatically placed on the viewport.
-            // i don't know why this is the case. so the initial screen is recorded without focus. the when we playback
-            // the first action is to move the mouse ontp the viewport so we can interact with it. this gives the viewport focus, before the
-            // mousemove completes. So the expected (no focus) can never match the actual (with focus). 
-            // to work around this i put the mouse on the viewport here to give it focus, in both recording and playback.
-            await player.mousemove({ x: 0, y: 0 }); // this is a bit of a hack. on recordig we don't get focus automatically on the viewport when we mustsince the first mousemove onto the viewport affects the screen.
+            // FOCUS ISSUE. when we create a window (because we need to record incognito for example), 
+            // and then navigate the active tab, the focus/active tabs styles aren't automatically placed 
+            // on the document.activeElement. i don't know why this is the case. 
+            // so the initial screen is recorded without "focus". 
+            // 
+            // to work around this i do this preamble on record (when first action is goto) and play when first action is goto. 
+            await player.mousemove({ x: 0, y: 0 });
+            await player.mousemove({ x: -1, y: -1 });
         }
         else {
-            Test.current.steps.splice(index + 2); // anything after the step showing is gone.
+            // we are going to record over some steps in the existing test
+            let action = Test.current.steps[index + 1];
+            let old = {
+                overlay: action.overlay,
+                type: action.type,
+                description: action.description
+            };
+            action.overlay = {
+                height: 100,
+                width: 100,
+                top: 0,
+                left: 0,
+                html: '&nbsp;'
+            };
 
-            // appending to an existing test
+            updateStepInView(Test.current.steps[index]);
+            await sleep(10); // update the ui please
+
+            // allow recording over the current steps (not insert, but overwriting them)
+            if (!brimstone.window.confirm(`Recording from here will overwrite existing actions, starting with action ${index + 2}, until you stop.`)) {
+                action.overlay = old.overlay;
+                updateStepInView(Test.current.steps[index]);
+                return;
+            }
+            Test.current.updateOrAppendIndex = index + 1;
+
+            // overwriting actions in an existing test
             if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
                 throw new Errors.ReuseTestWindow();
             }
 
             await player.attachDebugger({ tab: applicationUnderTestTab });
+            await applicationUnderTestTab.resizeViewport();
+
             await prepareToRecord(applicationUnderTestTab);
             button.addClass('active');
             setToolbarState();
 
-            await countDown(3);
+            await countDown(3, action);
         }
 
-        startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
+        await startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
@@ -1447,7 +1493,7 @@ async function webNavigationOnCompleteHandler(details) {
         applicationUnderTestTab.width = width;
 
         await prepareToRecord(applicationUnderTestTab);
-        startRecorders();
+        await startRecorders();
     }
     catch (e) {
         // this can be some intermediate redirect page(s) that the user doesn't actually interact with

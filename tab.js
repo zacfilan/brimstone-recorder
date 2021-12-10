@@ -127,7 +127,6 @@ export class Tab {
         }
 
         this.chromeWindow = await chrome.windows.create({
-            //url: 'about:blank',
             type: "normal",
             focused: false, // keep focus off omni bar when we open a new incognito window
             incognito: incognito
@@ -177,6 +176,7 @@ export class Tab {
                 window.alert(`The window state of the tab you want to record or playback is '${this.chromeWindow.state}'. It will be set to 'normal' to continue.`);
                 await chrome.windows.update(this.chromeWindow.id, { state: 'normal' });
             }
+            await chrome.windows.update(this.chromeWindow.id, { focused: true });
 
             [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: this.chromeWindow.id });
             if (url) {

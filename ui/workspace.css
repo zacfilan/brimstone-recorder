@@ -489,6 +489,7 @@ button svg {
   display: block;
   font-size: 20vw;
   text-align: center;
+  background: red;
 }
 
 #content .card.waiting.play .meter,
