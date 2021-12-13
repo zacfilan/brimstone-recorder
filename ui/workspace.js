@@ -35,14 +35,14 @@ window.document.title = `Brimstone - ${Test.current.filename}`;
 
 let brimstone = {
     window: {
-        alert: (msg) => {
-            return window.alert('🙋! ' + msg);
+        alert: (...args) => {
+            return window.alert('🙋! ' + args[0], ...args.slice(1));
         },
-        confirm: (msg) => {
-            return window.confirm('🙋？' + msg);
+        confirm: (...args) => {
+            return window.confirm('🙋？' + args[0], ...args.slice(1));
         },
-        prompt: (msg) => {
-            return window.prompt('🙋' + msg);
+        prompt: (...args) => {
+            return window.prompt('🙋' + args[0], ...args.slice(1));
         }
     }
 }
@@ -931,8 +931,7 @@ $('#recordButton').on('click', async function () {
                 return false;
             }
             options.url = url; // Cache the last URL recorded so we can reset it in the prompt, next time.
-            saveOptions(options); // no need to wait
-
+            await saveOptions(options); 
             let created = false;
             // recording from beginning
             if (!await applicationUnderTestTab.reuse({ url: url, incognito: Test.current.incognito })) {
@@ -966,9 +965,7 @@ $('#recordButton').on('click', async function () {
             // we are going to record over some steps in the existing test
             let action = Test.current.steps[index + 1];
             let old = {
-                overlay: action.overlay,
-                type: action.type,
-                description: action.description
+                overlay: action.overlay
             };
             action.overlay = {
                 height: 100,

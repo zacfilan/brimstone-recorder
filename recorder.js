@@ -251,10 +251,16 @@ class Recorder {
         // MOUSE MOVE
         /** the last mousemove event seen */
         this.lastMouseMoveEvent = false;
-        /** What element did we start the mousemove on/from */
-        this.mouseMoveStartingElement = false;
+        /** 
+         * Sticky state. What element did we start the mousemove on/from?
+         * It is possible that the mousemove element is null, 
+         * this means we started the mousemove off the application.
+         * e.g. the first mousemove onto the app.
+         */
+        this.mouseMoveStartingElement = null;
 
-        /** there is a mouse move action still being recorded, this isn't cleared until after the mousemove has been recorded. */
+        /** there is a mouse move action still being recorded, 
+         * this isn't cleared until after the mousemove has been recorded. */
         this.mouseMovePending = false;
         /** An identifier for the timeout that will record a 'mousemove' user action */
         this.pendingMouseMoveTimeout = false;
@@ -302,7 +308,6 @@ class Recorder {
 
         chrome.runtime.onMessage.addListener(this._runtimeFrameIdSpecificOnMessageHandler.bind(this)); // extension sends message to one or all frames
         chrome.runtime.onConnect.addListener(this._runtimeOnConnectHandler.bind(this)); // extension will connect the port when it is time to start recording
-        
         /** the css for a keyboard mouse cursor */
         this.keyboardCursor = `url(${chrome.runtime.getURL('images/keyboard.png')}) 0 0, not-allowed`;
         /** the css for a mousemove cursor */
@@ -558,7 +563,7 @@ class Recorder {
 
     /** Clear any pending record detecting timeouts */
     clearTimeouts() {
-        this.revertCursorCss(); 
+        this.revertCursorCss();
         // FIXME: i really should only have only pending thing at a timee...
         clearTimeout(this.pendingKeyTimeout);
         clearTimeout(this.pendingWheelTimeout);
@@ -715,7 +720,7 @@ class Recorder {
     /** Remove css I injected */
     clearCss() {
         let css = document.getElementById('brimstone-recorder-css');
-        if(css) {
+        if (css) {
             css.innerText = '';
         }
     }
@@ -729,7 +734,7 @@ class Recorder {
     /** the mousecursor */
     revertCursorCss() {
         let css = document.getElementById('brimstone-recorder-css');
-        if(css) {
+        if (css) {
             css.innerText = css.innerText.replace(/\*[^\}]+\}/, '');
         }
     }
@@ -740,7 +745,7 @@ class Recorder {
         this.revertCursorCss();
         css.innerText += `* {cursor: ${v} !important;}`;
     }
-    
+
     injectCssNode() {
         if (document.getElementById('brimstone-recorder-css')) {
             return;
@@ -753,31 +758,55 @@ class Recorder {
     }
 
     startMouseMove(e) {
+        // user is moving the mouse  ...
         this.lastMouseMoveEvent = e;
+
+        if (this.mouseMoveStartingElement === this.lastMouseMoveEvent.target) {
+            // ... and is currently (back) in the starting mousemove element
+            return; // just ignore it
+        }
+        // ... else not (back) in the starting mousemove element
+
+        if (!this.mouseMovePending) {
+            // no mousemove action is being recorded, so start one.
+            this.mouseMovePending = true; // a mouse move action has started
+            this.setCursorCssTo(this.mousemoveCursor);
+            this.pushMessage({ type: 'save-lastscreenshot' });
+        }
+        // else there is already a mousemove operation being record
+
+        // (re)set wait for the user to stop moving the mouse
         clearTimeout(this.pendingMouseMoveTimeout);
         this.pendingMouseMoveTimeout = setTimeout(
             () => {
-                if (!this.mouseMovePending || this.mousePhase === 'out') {
+                if (this.mousePhase === 'out') {
+                    // user moused off the app
+                    this.mouseMoveStartingElement = null;
+                    this.clearPendingMouseMove();
+                    return;
+                }
+                if (!this.mouseMovePending) {
+                    // this mousemove action recording was canceled (e.g. fatfinger after mousedown)
+                    this.mouseMoveStartingElement = this.lastMouseMoveEvent.target; // where we will be starting from next time
                     this.clearPendingMouseMove();
                     return;
                 }
 
-                this.clearPendingMouseMove();
-
-                if (this.mouseMoveStartingElement !== this.lastMouseMoveEvent.target) {
-                    let msg = this.buildMsg(this.lastMouseMoveEvent);
-                    this.pushMessage(msg);
+                if (this.mouseMoveStartingElement === this.lastMouseMoveEvent.target) {
+                    // the mouse move ended on the same element it started on, ignore it
+                    this.clearPendingMouseMove();
+                    return;
                 }
-                // else - we endedup back where we started, treat that as not moving.
+
+                // really record this mousemove action
+                let msg = this.buildMsg(this.lastMouseMoveEvent);
+                this.pushMessage(msg);
+                this.mouseMoveStartingElement = this.lastMouseMoveEvent.target; // where we will be starting from next time
             },
             this.options.mouseMoveTimeout
         );
 
-        if (!this.mouseMovePending) {
-            this.mouseMovePending = true; // a mouse move action has started
-            this.mouseMoveStartingElement = e.target;
-            this.pushMessage({ type: 'save-lastscreenshot' });
-        }
+
     }
 
     /** Central callback for all bound event handlers */
@@ -861,11 +890,10 @@ class Recorder {
                 return this.propagate(e);
             case 'mouseover':
                 this.mousePhase = 'over';
-                this.setCursorCssTo(this.mousemoveCursor);
                 return this.propagate(e);
             case 'mouseout':
                 this.mousePhase = 'out';
-                  return this.propagate(e);
+                return this.propagate(e);
             case 'change':
                 // this is not a direct user input, but it is (indirectly) the only way to identify
                 // when a select value was changed via a user interacting in the shadow DOM (where the record cannot monitor events).
@@ -1179,7 +1207,7 @@ class Recorder {
         }
         let record = false;
         this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
-        if(this.keyEventQueue.length == 1) {
+        if (this.keyEventQueue.length == 1) {
             this.setCursorCssTo(this.keyboardCursor);
         }
         this._scheduleRecordKeySequence();
