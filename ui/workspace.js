@@ -70,6 +70,11 @@ async function focusOrCreateTab(url) {
  * 
  */
 class Actions {
+    /** try to record without specifying a URL */
+    async recordActiveTab() {
+        await recordSomething(true);
+    }
+
     async exit() {
         try {
             let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
@@ -591,6 +596,7 @@ function setToolbarState() {
             // not playing, not recoding
             $('[data-action="openZip"]').attr('disabled', false);
             $('[data-action="loadLibrary"]').attr('disabled', false);
+            $('[data-action="recordActiveTab"]').attr('disabled', false);
             $('#menu>.option').attr('disabled', false);
 
             rb.attr('disabled', false);
@@ -901,9 +907,14 @@ async function focusTab() {
     });
 }
 
-$('#recordButton').on('click', async function () {
+/**
+ * Let's record something!
+ * @param {boolean} attachActiveTab Splice record or URL record
+ * @returns 
+ */
+async function recordSomething(attachActiveTab) {
     try {
-        let button = $(this);
+        let button = $('#recordButton');
         if (button.hasClass('active')) {
             // before I take the last screenshot the window must have focus again.
             //await focusTab();
@@ -921,10 +932,17 @@ $('#recordButton').on('click', async function () {
         // are we doing an incognito recording - this is determined by the option first, or the state of the tab we are going to use
         Test.current.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
 
+
         // How does user specify that they want to do a splice recording, or a competely fresh recording?
         // A completely fresh recrding will prompt for the URL, a splice will not.
-        // If it is a fresh recording there must be nothing loaded, else it is a splice.
-        if (!Test.current.steps.length) {
+        // If the attachActiveTab is true we splice record, else it is a fresh (new URL) recording.
+        if (!attachActiveTab) {
+            if (Test.current.steps.length) {
+                if (!brimstone.window.confirm('Discard the current test?')) {
+                    return;
+                }
+                actions.clearTest();
+            }
             Test.current.updateOrAppendIndex = 0;
             let defaultUrl = options?.url ?? '';
             url = brimstone.window.prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
@@ -936,7 +954,7 @@ $('#recordButton').on('click', async function () {
                 return false;
             }
             options.url = url; // Cache the last URL recorded so we can reset it in the prompt, next time.
-            await saveOptions(options); 
+            await saveOptions(options);
             let created = false;
             // recording from beginning
             if (!await applicationUnderTestTab.reuse({ url: url, incognito: Test.current.incognito })) {
@@ -968,42 +986,73 @@ $('#recordButton').on('click', async function () {
         }
         else {
             // we are going to record over some steps in the existing test
-            let action = Test.current.steps[index + 1];
-            let old = {
-                overlay: action.overlay
-            };
-            action.overlay = {
-                height: 100,
-                width: 100,
-                top: 0,
-                left: 0,
-                html: '&nbsp;'
-            };
+            if (Test.current.steps.length) {
+                let action = Test.current.steps[index + 1];
+                let old = {
+                    overlay: action.overlay
+                };
+                action.overlay = {
+                    height: 100,
+                    width: 100,
+                    top: 0,
+                    left: 0,
+                    html: '&nbsp;'
+                };
 
-            updateStepInView(Test.current.steps[index]);
-            await sleep(10); // update the ui please
-
-            // allow recording over the current steps (not insert, but overwriting them)
-            if (!brimstone.window.confirm(`Recording from here will overwrite existing actions, starting with action ${index + 2}, until you stop.`)) {
-                action.overlay = old.overlay;
                 updateStepInView(Test.current.steps[index]);
-                return;
+                await sleep(10); // update the ui please
+
+                // allow recording over the current steps (not insert, but overwriting them)
+                if (!brimstone.window.confirm(`Recording from here will overwrite existing actions, starting with action ${index + 2}, until you stop.`)) {
+                    action.overlay = old.overlay;
+                    updateStepInView(Test.current.steps[index]);
+                    return;
+                }
+                Test.current.updateOrAppendIndex = index + 1;
+
+                // overwriting actions in an existing test
+                if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
+                    throw new Errors.ReuseTestWindow();
+                }
+
+                await player.attachDebugger({ tab: applicationUnderTestTab });
+                await applicationUnderTestTab.resizeViewport();
+
+                await prepareToRecord(applicationUnderTestTab);
+                button.addClass('active');
+                setToolbarState();
+                await countDown(3, action);
             }
-            Test.current.updateOrAppendIndex = index + 1;
+            else {
+                Test.current.updateOrAppendIndex = 0;
 
-            // overwriting actions in an existing test
-            if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
-                throw new Errors.ReuseTestWindow();
+                // overwriting actions in an existing test
+                if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
+                    throw new Errors.ReuseTestWindow();
+                }
+                // there is nothing in the current test, so I should add something
+                await player.attachDebugger({ tab: applicationUnderTestTab });
+                await applicationUnderTestTab.resizeViewport();
+
+                await prepareToRecord(applicationUnderTestTab);
+                button.addClass('active');
+                setToolbarState();
+
+                // update the UI: insert the first text card in the ui
+                await recordUserAction({
+                    type: 'wait',
+                    url: applicationUnderTestTab.url
+                });
+
+                // FOCUS ISSUE. when we create a window (because we need to record incognito for example), 
+                // and then navigate the active tab, the focus/active tabs styles aren't automatically placed 
+                // on the document.activeElement. i don't know why this is the case. 
+                // so the initial screen is recorded without "focus". 
+                // 
+                // to work around this i do this preamble on record (when first action is goto) and play when first action is goto. 
+                await player.mousemove({ x: 0, y: 0 });
+                await player.mousemove({ x: -1, y: -1 });
             }
-
-            await player.attachDebugger({ tab: applicationUnderTestTab });
-            await applicationUnderTestTab.resizeViewport();
-
-            await prepareToRecord(applicationUnderTestTab);
-            button.addClass('active');
-            setToolbarState();
-
-            await countDown(3, action);
         }
 
         await startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
@@ -1015,7 +1064,9 @@ $('#recordButton').on('click', async function () {
         stopRecording();
         throw e;
     }
-});
+}
+
+$('#recordButton').on('click', (e) => recordSomething(false) );
 
 async function stopPlaying() {
     $('#playButton').removeClass('active');
