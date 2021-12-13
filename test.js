@@ -61,9 +61,10 @@ export class Test {
      */
     updateOrAppendAction(action) {
         // make sure it has a step number
-        if (action.index === undefined) { // when recording actions they come in without an index
-            action.setIndex(this.updateOrAppendIndex++);
+        if (action.index === undefined) { // when recording actions they (may!) come in without an index, so use the running one.
+            action.setIndex(this.updateOrAppendIndex);
         }
+        this.updateOrAppendIndex = action.index + 1;
         this.steps[action.index] = action;
         action.test = this; // each action knows what test it is in
     }

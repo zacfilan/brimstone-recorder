@@ -527,8 +527,7 @@ class Recorder {
                         this.pendingClick = false; // now we are done that
                     }
                     if (msg.args === 'mousemove') {
-                        this.mouseMovePending = false; // now we are really done
-                        this.revertCursorCss();
+                        this.clearPendingMouseMove(); // we are really done that
                     }
                     if (msg.args === 'wheels') {
                         this.pendingWheelTimeout = false; // really done
