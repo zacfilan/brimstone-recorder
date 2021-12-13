@@ -153,6 +153,11 @@ class Actions {
         //TestAction.prototype.toJSON = orig;
     }
 
+    /** retpeat the last added rectangle(s) */
+    async stampDelta() {
+
+    }
+
     /** edit pixel differences - Commit any volatile rectangles or individual pixel deltas. */
     async ignoreDelta(e) {
         // add a mask
