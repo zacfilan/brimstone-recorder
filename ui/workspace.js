@@ -70,6 +70,11 @@ async function focusOrCreateTab(url) {
  * 
  */
 class Actions {
+    /** open the actions for this extension */
+    async openOptions() {
+        await focusOrCreateTab(chrome.runtime.getURL('options_ui.html'));
+    }
+    
     /** try to record without specifying a URL */
     async recordActiveTab() {
         await recordSomething(true);
@@ -570,6 +575,7 @@ function setInfoBarText(infobarText) {
 function setToolbarState() {
     $('[data-action]').attr('disabled', true);
     $('.help.option [data-action]').attr('disabled', false);
+    $('[data-action="openOptions"]').attr('disabled', false);
     $('[data-action="exit"]').attr('disabled', false);
 
     let rb = $('#recordButton');
@@ -629,6 +635,7 @@ function setToolbarState() {
     setInfoBarText();
 }
 
+$('[data-action="openOptions"]').on('click', actions.openOptions);
 $('#first').on('click', function (e) {
     updateStepInView(Test.current.steps[0]);
 });

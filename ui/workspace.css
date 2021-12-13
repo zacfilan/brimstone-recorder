@@ -7,7 +7,7 @@ html {
   opacity: 0.3;
 }
 
-#menu {
+#topbar {
   font-size: 14px;
   display: -webkit-box;
   display: -ms-flexbox;
@@ -19,33 +19,49 @@ html {
   -webkit-box-align: center;
       -ms-flex-align: center;
           align-items: center;
+  -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+          justify-content: space-between;
   background: #212121;
 }
 
-#menu > svg {
+#topbar #menus {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+#topbar #menus > svg {
   height: 17px;
   width: 17px;
   margin-left: 1em;
 }
 
-#menu .option {
+#topbar #menus .option {
   padding: 0.5em 0.6em;
   position: relative;
   max-width: 100px;
   cursor: pointer;
 }
 
-#menu .option:hover {
+#topbar #menus .option:hover {
   background: #4b4b4b;
 }
 
-#menu .option svg {
+#topbar #menus .option svg {
   width: 14px;
   height: 14px;
   fill: white;
 }
 
-#menu .options {
+#topbar #menus .options {
   position: absolute;
   left: 0px;
   top: 100%;
@@ -63,53 +79,50 @@ html {
           flex-direction: column;
 }
 
-#menu .options.open {
+#topbar #menus .options.open {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
 }
 
-#menu .options .option {
+#topbar #menus .options .option {
   max-width: unset;
   padding: 0.5em 2em 0.5em 1em;
 }
 
-#menu .options .option:hover {
+#topbar #menus .options .option:hover {
   background: var(--hover-color);
 }
 
-#menu .options .option svg {
+#topbar #menus .options .option svg {
   margin-right: 0.3em;
 }
 
-#menu .options hr {
+#topbar #menus .options hr {
   width: 90%;
   border-bottom: 0;
 }
 
-#navigation {
-  -ms-flex-item-align: center;
-      -ms-grid-row-align: center;
-      align-self: center;
+#topbar #navigation {
   position: absolute;
   left: calc(50% - 105px);
 }
 
-#navigation #recordButton,
-#navigation #playButton {
+#topbar #navigation #recordButton,
+#topbar #navigation #playButton {
   position: relative;
   /** let the recording overlay in this **/
 }
 
-#navigation #recordButton.active {
+#topbar #navigation #recordButton.active {
   background: red;
 }
 
-#navigation #playButton.active {
+#topbar #navigation #playButton.active {
   background: green;
 }
 
-#navigation button:hover {
+#topbar button:hover {
   background: #4b4b4b;
 }
 

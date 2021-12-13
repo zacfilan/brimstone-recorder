@@ -5,7 +5,7 @@ export class MenuController {
 
     /** close the menu */
     close() {
-        $('#menu .options').removeClass('open');
+        $('#menus .options').removeClass('open');
     }
 
     constructor(actions) {
@@ -13,26 +13,26 @@ export class MenuController {
         this.close();
 
         /** click on an actionable menu item */
-        $('#menu .options .option').on('click', (e) => {
+        $('#menus .options .option').on('click', (e) => {
             let action = $(e.target).closest('.option').attr('data-action');
             this.close();
             this.actions[action](); // execute the action
         });
 
         /** open or close a menu */
-        $('#menu > .option').on('click', (e) => {
+        $('#menus > .option').on('click', (e) => {
             if (!this.opened) {
                 $(e.target).find(" > .options").addClass('open');
                 this.opened = true;
             }
             else {
                 this.opened = false;
-                $('#menu .options').removeClass('open');
+                $('#menus .options').removeClass('open');
             }
         });
 
         /** mousein/out on menu title */
-        $('#menu > .option').hover(
+        $('#menus > .option').hover(
             (e) => { // mousein
                 if (this.opened) {
                     this.close();

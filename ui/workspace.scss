@@ -7,83 +7,92 @@ html {
     opacity: 0.3;
 }
 
-#menu {
+#topbar {
+    //padding: 0 .5em;;
     font-size: 14px;
     display: flex;
     flex-direction: row;
     align-items: center;
-    & > svg {
-        height: 17px;
-        width: 17px;
-        margin-left: 1em;
-    }
+    justify-content: space-between;
     background: rgb(33, 33, 33);
 
-    .option {
-        padding: 0.5em 0.6em;
-        position: relative;
-        max-width: 100px;
-        cursor: pointer;
-        &:hover {
-            background: rgb(75, 75, 75);
+    #menus {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        & > svg {
+            height: 17px;
+            width: 17px;
+            margin-left: 1em;
         }
-        svg {
-            width: 14px;
-            height: 14px;
-            fill: white;
-        }
-    }
-
-    .options {
-        position: absolute;
-        left: 0px;
-        top: 100%;
-        background: rgb(50, 50, 50);
-        z-index: 2;
-        box-shadow: 1px 2px 4px black;
-        //border-right: 1px solid black;
-        // border-bottom: 1px solid black;
-        padding: 0.3em 0;
-        width: 250px;
-        border-radius: 0 0 4px 4px;
-        display:none;
-        &.open{
-            display: flex;
-        }
-        flex-direction: column;
 
         .option {
-            max-width: unset;
+            padding: 0.5em 0.6em;
+            position: relative;
+            max-width: 100px;
+            cursor: pointer;
             &:hover {
-                background: var(--hover-color);
+                background: rgb(75, 75, 75);
             }
-            padding: 0.5em 2em 0.5em 1em;
             svg {
-                margin-right: 0.3em;
+                width: 14px;
+                height: 14px;
+                fill: white;
             }
         }
-        hr {
-            width: 90%;
-            border-bottom: 0;
+
+        .options {
+            position: absolute;
+            left: 0px;
+            top: 100%;
+            background: rgb(50, 50, 50);
+            z-index: 2;
+            box-shadow: 1px 2px 4px black;
+            //border-right: 1px solid black;
+            // border-bottom: 1px solid black;
+            padding: 0.3em 0;
+            width: 250px;
+            border-radius: 0 0 4px 4px;
+            display: none;
+            &.open {
+                display: flex;
+            }
+            flex-direction: column;
+
+            .option {
+                max-width: unset;
+                &:hover {
+                    background: var(--hover-color);
+                }
+                padding: 0.5em 2em 0.5em 1em;
+                svg {
+                    margin-right: 0.3em;
+                }
+            }
+            hr {
+                width: 90%;
+                border-bottom: 0;
+            }
         }
     }
-}
 
-#navigation {
-    align-self: center;
-    position: absolute;
-    left: calc(50% - 105px);
-    #recordButton,
-    #playButton {
-        position: relative; /** let the recording overlay in this **/
-    }
-    #recordButton.active {
-        background: red;
-    }
-    #playButton.active {
-        background: green;
-    }
+    #navigation {
+        // align-self: center;
+        position: absolute;
+        left: calc(50% - 105px);
+        #recordButton,
+        #playButton {
+            position: relative; /** let the recording overlay in this **/
+        }
+        #recordButton.active {
+            background: red;
+        }
+        #playButton.active {
+            background: green;
+        }
 
+
+    }
     button:hover {
         background: rgb(75, 75, 75);
     }
@@ -247,7 +256,7 @@ button {
         .actions {
             margin-left: auto;
         }
- 
+
         .text {
             @extend .row;
 
