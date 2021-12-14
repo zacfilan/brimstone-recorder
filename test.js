@@ -184,7 +184,7 @@ export class Test {
     /**
     * async constructor from a filehandle of the zip
     */
-    async fromFileHandle(fileHandle) {
+    async fromFileHandle(fileHandle, progressCallback) {
         if (!fileHandle) {
             return this;
         }
@@ -209,10 +209,10 @@ export class Test {
         let screenshotPromises = [];
         for (let i = 0; i < actions.length; ++i) {
             // convert old tests
-            if(actions[i].type === 'start') {
+            if (actions[i].type === 'start') {
                 actions[i].type = 'goto';
             }
-   
+
             let action = new TestAction(actions[i]);
             this.updateOrAppendAction(action);
             let screenshotPromise;
@@ -241,7 +241,7 @@ export class Test {
             await Promise.all(screenshotPromises); // FIXME: in truth I don't need to wait for all of these. I only need the if the user looks at them, or during play.
         }
 
-        this.hydrateForPlay();
+        this.hydrateForPlay(progressCallback);
         return this;
     }
 
@@ -254,27 +254,23 @@ export class Test {
      * this sets a promise that can be sampled with getHydratedForPlayPromise()
      * @param {Test} test The test we need to hydrate
      */
-    hydrateForPlay() {
-        let screenshotPromises = [];
-        let screenshotPromise;
-        let screenshots = this.zip.folder("screenshots");
-        for (let i = 0; i < this.steps.length; ++i) {
-            let action = this.steps[i];
-            if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
-                if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
-                    screenshotPromise = action.acceptablePixelDifferences.hydrate(screenshots);
-                    screenshotPromises.push(screenshotPromise);
+    async hydrateForPlay(progressCallback) {
+        this.acceptableHydratedPromise = new Promise(async(resolve) => {
+            let screenshots = this.zip.folder("screenshots");
+            for (let i = 0; i < this.steps.length; ++i) {
+                let action = this.steps[i];
+                if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
+                    if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
+                        await action.acceptablePixelDifferences.hydrate(screenshots);
+                    }
                 }
+                if (action.expectedScreenshot && !action.expectedScreenshot.png) {
+                    await action.expectedScreenshot.createPngFromDataUrl();
+                }
+                progressCallback && progressCallback(`${i+1}/${this.steps.length}`);
             }
-            if (action.expectedScreenshot && !action.expectedScreenshot.png) {
-                screenshotPromise = action.expectedScreenshot.createPngFromDataUrl();
-                screenshotPromises.push(screenshotPromise);
-            }
-        }
-        console.log(`loader: hydrated ${screenshotPromises.length} acceptable screenshot promises`);
-        if (screenshotPromises.length > 0) {
-            this.acceptableHydratedPromise = Promise.all(screenshotPromises);
-        }
+            resolve(true);
+        });
     }
 }
 
@@ -362,7 +358,7 @@ export class Playlist {
 
         this.description = pojo.description;
         this.author = pojo.author;
-        this.play = pojo.play.map( fh => directoryEntries[fh.name] );
+        this.play = pojo.play.map(fh => directoryEntries[fh.name]);
 
         return this;
     }

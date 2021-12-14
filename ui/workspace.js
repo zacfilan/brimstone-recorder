@@ -1117,7 +1117,10 @@ async function loadNextTest() {
     }
     else {
         await actions.clearTest();
-        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1]);
+        let ib = $('#infobar');
+        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1], (progress) => {
+            ib.html(`${version} ${progress} images processed`);
+        });
     }
 
     window.document.title = `Brimstone - ${Test.current.filename}${suite}`;
