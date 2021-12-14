@@ -697,4 +697,19 @@ button svg {
   width: 14px;
   margin-right: 0.5em;
 }
+
+progress {
+  -webkit-appearance: none;
+}
+
+progress::-webkit-progress-bar {
+  border-radius: 1em;
+  padding: 1px;
+  background-color: white;
+}
+
+progress::-webkit-progress-value {
+  background-color: green;
+  border-radius: 1em;
+}
 /*# sourceMappingURL=workspace.css.map */

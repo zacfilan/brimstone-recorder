@@ -1118,8 +1118,8 @@ async function loadNextTest() {
     else {
         await actions.clearTest();
         let ib = $('#infobar');
-        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1], (progress) => {
-            ib.html(`${version} ${progress} images processed`);
+        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1], (value, max) => {
+            ib.html(`${version} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress> `);
         });
     }
 

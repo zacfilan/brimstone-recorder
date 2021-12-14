@@ -257,7 +257,12 @@ export class Test {
     async hydrateForPlay(progressCallback) {
         this.acceptableHydratedPromise = new Promise(async(resolve) => {
             let screenshots = this.zip.folder("screenshots");
-            for (let i = 0; i < this.steps.length; ++i) {
+            let i = 0;
+            let id = setInterval(() => {
+                progressCallback && progressCallback(i+1, this.steps.length);
+            },
+            1000);
+            for (i = 0; i < this.steps.length; ++i) {
                 let action = this.steps[i];
                 if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
                     if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
@@ -267,8 +272,9 @@ export class Test {
                 if (action.expectedScreenshot && !action.expectedScreenshot.png) {
                     await action.expectedScreenshot.createPngFromDataUrl();
                 }
-                progressCallback && progressCallback(`${i+1}/${this.steps.length}`);
             }
+            clearInterval(id);
+            progressCallback && progressCallback(this.steps.length, this.steps.length);
             resolve(true);
         });
     }

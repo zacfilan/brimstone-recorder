@@ -553,3 +553,22 @@ button {
         }
     }
 }
+
+// it seems that a progress bar is kind of stupid, and I might
+// as well just build html/css progress bar from scratch.
+// this is what I did for the .meter and .progress class above.
+// but i got this far with <progress> so i am going to strap it in.
+progress {
+    -webkit-appearance: none;
+    
+    &::-webkit-progress-bar {
+        border-radius: 1em;
+        padding: 1px;
+        background-color: white;
+    }
+    &::-webkit-progress-value {
+        background-color: green;
+        border-radius: 1em;
+   }
+}
+
