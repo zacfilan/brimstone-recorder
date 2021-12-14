@@ -700,12 +700,14 @@ button svg {
 
 progress {
   -webkit-appearance: none;
+  width: 25%;
 }
 
 progress::-webkit-progress-bar {
   border-radius: 1em;
   padding: 1px;
   background-color: white;
+  width: 100%;
 }
 
 progress::-webkit-progress-value {

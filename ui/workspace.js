@@ -1396,7 +1396,6 @@ async function onMessageHandler(message, _port) {
 
     userEvent._view = constants.view.EXPECTED;
     // the last one contains the screenshot the user was looking at in the expected when they recorded this action
-    userEvent.index = Math.max(0, Test.current.steps.length - 1); // used by userEventToAction constructor
     let action;
     switch (userEvent.type) {
         case 'error':
@@ -1432,7 +1431,8 @@ async function onMessageHandler(message, _port) {
                 _lastSavedScreenshot = _lastScreenshot;
             }
 
-            let lastAction = Test.current.steps[userEvent.index]; // grab current expected action playholder (2nd card)
+            let ci = currentStepIndex();
+            let lastAction = Test.current.steps[ci + 1];
 
             // refresh the expected action placeholder the user sees.
             // use the lower cost option, just the dataurl don't make into a PNG
@@ -1441,7 +1441,7 @@ async function onMessageHandler(message, _port) {
                 dataUrl: _lastScreenshot
             });
             lastAction._view = constants.view.DYNAMIC;
-            updateStepInView(Test.current.steps[Test.current.steps.length - 2]);
+            updateStepInView(Test.current.steps[ci]);
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;

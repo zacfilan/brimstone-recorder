@@ -560,11 +560,13 @@ button {
 // but i got this far with <progress> so i am going to strap it in.
 progress {
     -webkit-appearance: none;
+    width: 25%;
     
     &::-webkit-progress-bar {
         border-radius: 1em;
         padding: 1px;
         background-color: white;
+        width: 100%;
     }
     &::-webkit-progress-value {
         background-color: green;
