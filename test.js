@@ -253,6 +253,9 @@ export class Test {
                 screenshotPromise = action.expectedScreenshot.loadDataUrlFromZipDir(screenshots);
                 screenshotPromises.push(screenshotPromise); // needed to see any image during loading
             }
+            else {
+                action.expectedScreenshot = undefined; // whack any bad data
+            }
 
             // create the container for the other screenshots to be hydrated, 
             // thus, if these props exist on the action, they def have a fileName
@@ -261,10 +264,16 @@ export class Test {
                 action._match = constants.match.ALLOW;
                 action.acceptablePixelDifferences = new Screenshot(action.acceptablePixelDifferences);
             }
+            else {
+                action.acceptablePixelDifferences = undefined; // whack any bad data
+            }
             if (action.actualScreenshot?.fileName) {
                 action._match = constants.match.FAIL; // if it failed, do I really care to know there are allowed differences too?
                 // if you have an actual one to load it means that the last time this was run it failed.
                 action.actualScreenshot = new Screenshot(action.actualScreenshot);
+            }
+            else {
+                action.actualScreenshot = undefined; // whack any bad data
             }
         }
         if (screenshotPromises.length) {

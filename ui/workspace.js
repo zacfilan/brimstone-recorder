@@ -151,22 +151,8 @@ class Actions {
         }
     }
 
-    /** Give the user quick access to raw JSON */
-    exportJson() {
-        // I only want a few properties, so swap out the serializer
-        // let orig = TestAction.prototype.toJSON;
-        // TestAction.prototype.toJSON = function () {
-        //     return {
-        //         index: this.index,
-        //         memoryUsed: this.memoryUsed,
-        //         latency: this.latency,
-        //         name: this.name,
-        //         css: this.css
-        //     };
-        // };
-        let name = Test.current.filename.replace(/\.[^/.]+$/, '') + '_metrics';
-        downloadObjectAsJson({ steps: Test.current.steps }, name);
-        //TestAction.prototype.toJSON = orig;
+    downloadLastRunJson() {
+        downloadObjectAsJson( playedRecordings, 'last_run_metrics');
     }
 
     /** retpeat the last added rectangle(s) */
@@ -614,7 +600,7 @@ function setToolbarState() {
             if (Test.current.steps.length) {
                 $('[data-action="saveZip"]').attr('disabled', false);
                 $('[data-action="clearTest"]').attr('disabled', false);
-                $('[data-action="exportJson"]').attr('disabled', false);
+                $('[data-action="downloadLastRunJson"]').attr('disabled', false);
                 $('[data-action="chartMetrics"]').attr('disabled', false);
 
                 $('.edit.option [data-action]').attr('disabled', false); // everything under edit
@@ -653,6 +639,12 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
 
+/**
+ * All the recordings (zips) that were played in the last atomic play. This means that it
+ * gets reset each time you play.
+ */
+var playedRecordings; 
+
 $('#playButton').on('click', async function () {
     let button = $(this);
     if (button.hasClass('active')) {
@@ -662,6 +654,11 @@ $('#playButton').on('click', async function () {
     }
     try {
         let nextTest;
+        playedRecordings = {
+            totalNumberOfActions: 0,
+            recordings: []
+        };
+        
         do {
             nextTest = false;
             $('#playButton').addClass('active');
@@ -716,6 +713,17 @@ $('#playButton').on('click', async function () {
             switch (playMatchStatus) {
                 case constants.match.PASS:
                 case constants.match.ALLOW:
+                    playedRecordings.totalNumberOfActions += Test.current.steps.length;
+                    playedRecordings.recordings.push({
+                        filename: Test.current.filename,
+                        steps: Test.current.steps.map(testAction => ({
+                            index: testAction.index,
+                            memoryUsed: testAction.memoryUsed,
+                            latency: testAction.latency,
+                            name: testAction.name,
+                            css: testAction.css
+                        }))
+                    });
                     nextTest = await loadNextTest();
                     if (!nextTest) {
                         setInfoBarText('✅ last run passed');
@@ -1039,7 +1047,7 @@ async function recordSomething(attachActiveTab) {
                     throw new Errors.ReuseTestWindow();
                 }
                 // there is nothing in the current test, so I should add something
-                if(applicationUnderTestTab.chromeTab.url.startsWith('chrome:')) {
+                if (applicationUnderTestTab.chromeTab.url.startsWith('chrome:')) {
                     await brimstone.window.alert("We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue.");
                     return;
                 }
