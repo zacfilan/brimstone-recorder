@@ -35,14 +35,20 @@ window.document.title = `Brimstone - ${Test.current.filename}`;
 
 let brimstone = {
     window: {
-        alert: (...args) => {
-            return window.alert('🙋! ' + args[0], ...args.slice(1));
+        alert: async (...args) => {
+            let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+            await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
+            return window.alert('🙋❗ ' + args[0], ...args.slice(1));
         },
-        confirm: (...args) => {
-            return window.confirm('🙋？' + args[0], ...args.slice(1));
+        confirm: async (...args) => {
+            let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+            await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
+            return window.confirm('🙋❓ ' + args[0], ...args.slice(1));
         },
-        prompt: (...args) => {
-            return window.prompt('🙋' + args[0], ...args.slice(1));
+        prompt: async (...args) => {
+            let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+            await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert   
+            return window.prompt('🙋 ' + args[0], ...args.slice(1));
         }
     }
 }
@@ -77,7 +83,7 @@ class Actions {
 
     /** try to record without specifying a URL */
     async recordActiveTab() {
-        await recordSomething(true);
+        await recordSomething(true); // this can start a new recording of the the active tab (no initial goto url)
     }
 
     async exit() {
@@ -112,7 +118,7 @@ class Actions {
             for (const fileHandle of tempFileHandles) {
                 if (fileHandle.name.endsWith('.json')) {
                     if (!Playlist.directoryHandle) {
-                        brimstone.window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
+                        await brimstone.window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
                         if (!await this.loadLibrary()) {
                             fileHandles = [];
                             return;
@@ -327,11 +333,9 @@ const actions = new Actions();
 const menuController = new MenuController(actions);
 
 async function errorHandler(e) {
-    let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
-    await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
     switch (e.constructor) {
         case Errors.PixelScalingError:
-            brimstone.window.alert(`Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
+            await brimstone.window.alert(`Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
             // bail
             try {
                 await chrome.windows.remove(applicationUnderTestTab.chromeWindow.id);
@@ -343,8 +347,7 @@ async function errorHandler(e) {
 
             break;
         case Errors.ReuseTestWindow:
-            //let replay = window.confirm(`🛑 You are trying to record new steps and insert them into an existing test, but there is no current Chrome test window that matches your current test requirements.\n\nI can replay your test to the current step. After which you should be able to insert newly recorded steps.\n\nWould you like to do this?`);
-            brimstone.window.alert(`You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
+            await brimstone.window.alert(`You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
             break;
         default:
             errorDialog(e);
@@ -389,7 +392,7 @@ window.addEventListener("error", async function (errorEvent) {
 
     let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
     if (!allowedIncognitoAccess) {
-        brimstone.window.alert(`Extension requires manual user intervention to allow incognito. 
+        await brimstone.window.alert(`Extension requires manual user intervention to allow incognito. 
         
 When you hit [OK] I'll try to navigate you to the correct page (chrome://extensions/?id=${chrome.runtime.id}).
 
@@ -737,7 +740,7 @@ $('#playButton').on('click', async function () {
         $('#playButton').removeClass('active');
         setToolbarState();
         if (e === 'debugger_already_attached') {
-            brimstone.window.alert("You must close the existing debugger(s) first.");
+            await brimstone.window.alert("You must close the existing debugger(s) first.");
         }
         else {
             setInfoBarText('💀 aborted! ' + e?.message ?? '');
@@ -942,20 +945,11 @@ async function recordSomething(attachActiveTab) {
         // are we doing an incognito recording - this is determined by the option first, or the state of the tab we are going to use
         Test.current.incognito = options.recordIncognito ? true : applicationUnderTestTab.chromeTab.incognito;
 
-
-        // How does user specify that they want to do a splice recording, or a competely fresh recording?
-        // A completely fresh recrding will prompt for the URL, a splice will not.
+        // A completely fresh recording will prompt for the URL, else promp for splice record.
         // If the attachActiveTab is true we splice record, else it is a fresh (new URL) recording.
         if (!attachActiveTab) {
-            if (Test.current.steps.length) {
-                if (!brimstone.window.confirm('Discard the current test?')) {
-                    return;
-                }
-                actions.clearTest();
-            }
-            Test.current.updateOrAppendIndex = 0;
             let defaultUrl = options?.url ?? '';
-            url = brimstone.window.prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
+            url = await brimstone.window.prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
             if (!url) {
                 return; // they bailed
             }
@@ -1013,7 +1007,7 @@ async function recordSomething(attachActiveTab) {
                 await sleep(10); // update the ui please
 
                 // allow recording over the current steps (not insert, but overwriting them)
-                if (!brimstone.window.confirm(`Recording from here will overwrite existing actions, starting with action ${index + 2}, until you stop.`)) {
+                if (!await brimstone.window.confirm(`Recording from here will overwrite existing actions, starting with action ${index + 2}, until you stop.`)) {
                     action.overlay = old.overlay;
                     updateStepInView(Test.current.steps[index]);
                     return;
@@ -1034,13 +1028,21 @@ async function recordSomething(attachActiveTab) {
                 await countDown(3, action);
             }
             else {
-                Test.current.updateOrAppendIndex = 0;
-
                 // overwriting actions in an existing test
+                // this is the case where the user wants to "Record Active Tab" from scratch.
+                Test.current.reset();
+
+                // If you "Record the Active Tab" you will make a recording in incognito or not based on the Active Tab state, not any external preferences!
+                Test.current.incognito = applicationUnderTestTab.chromeTab.incognito;
+
                 if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
                     throw new Errors.ReuseTestWindow();
                 }
                 // there is nothing in the current test, so I should add something
+                if(applicationUnderTestTab.chromeTab.url.startsWith('chrome:')) {
+                    await brimstone.window.alert("We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue.");
+                    return;
+                }
                 await player.attachDebugger({ tab: applicationUnderTestTab });
                 await applicationUnderTestTab.resizeViewport();
 
@@ -1076,7 +1078,14 @@ async function recordSomething(attachActiveTab) {
     }
 }
 
-$('#recordButton').on('click', (e) => recordSomething(false));
+$('#recordButton').on('click', (e) => {
+    // if there are steps we interpret the button as splice record
+    // if no we prompt for URL to record a fresh one
+
+    // if the user wants to start a new (from blank) recording w/o a url
+    // they can use the "Record Active Tab" option in the menu, and not use this button at all.    
+    recordSomething(!!Test.current.steps.length);
+});
 
 async function stopPlaying() {
     $('#playButton').removeClass('active');
