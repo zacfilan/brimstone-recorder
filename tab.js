@@ -154,7 +154,7 @@ export class Tab {
     async fromWindowId(id) {
         try {
             this.chromeWindow = await chrome.windows.get(id);  // if it fails we can't connect - ok.
-            return await this.reuse({ incognito: this.chromeWindow.incognito });
+            return await this.reuse({ incognito: this.chromeWindow.incognito, focused: false });
         }
         catch (e) {
             return false;
@@ -162,7 +162,7 @@ export class Tab {
     }
 
     /** resuse the currently configured window if you can */
-    async reuse({ url = null, incognito }) {
+    async reuse({ url = null, incognito, focused = true }) {
         try {
             // make sure it is still there.
             this.chromeWindow = await chrome.windows.get(this.chromeWindow?.id);  // if it fails we can't connect - ok.
@@ -176,8 +176,9 @@ export class Tab {
                 window.alert(`The window state of the tab you want to record or playback is '${this.chromeWindow.state}'. It will be set to 'normal' to continue.`);
                 await chrome.windows.update(this.chromeWindow.id, { state: 'normal' });
             }
-            await chrome.windows.update(this.chromeWindow.id, { focused: true });
-
+            if (focused) {
+                await chrome.windows.update(this.chromeWindow.id, { focused: true });
+            }
             [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: this.chromeWindow.id });
             if (url) {
                 this.url = url;
