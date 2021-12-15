@@ -663,6 +663,7 @@ $('#playButton').on('click', async function () {
             nextTest = false;
             $('#playButton').addClass('active');
             setToolbarState();
+            await Test.current.imageProcessing(imageProcessingProgress);
 
             let actions = Test.current.steps;
             player.onBeforePlay = updateStepInView;
@@ -703,7 +704,6 @@ $('#playButton').on('click', async function () {
             }
             await startPlaying();
 
-            await Test.current.imageProcessing(imageProcessingProgress);
             playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
 
             $('#playButton').removeClass('active');

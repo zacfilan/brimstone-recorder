@@ -123,13 +123,13 @@ export class Tab {
         // So the only time I can be leaving windows around
         // is if we go from non-inconito to incognito or vice versa.
         if (options.closeOldTestWindowOnCreate) {
-            this.remove();
+            await this.remove();
         }
 
         this.chromeWindow = await chrome.windows.create({
             type: "normal",
             focused: false, // keep focus off omni bar when we open a new incognito window
-            incognito: incognito
+            incognito: incognito // if true this will create the window "You've gone Incognito" 
         });
 
         [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: this.chromeWindow.id });
