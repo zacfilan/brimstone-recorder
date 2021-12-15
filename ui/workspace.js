@@ -74,7 +74,7 @@ class Actions {
     async openOptions() {
         await focusOrCreateTab(chrome.runtime.getURL('options_ui.html'));
     }
-    
+
     /** try to record without specifying a URL */
     async recordActiveTab() {
         await recordSomething(true);
@@ -703,6 +703,7 @@ $('#playButton').on('click', async function () {
             }
             await startPlaying();
 
+            await Test.current.imageProcessing(imageProcessingProgress);
             playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
 
             $('#playButton').removeClass('active');
@@ -904,6 +905,8 @@ function stopRecording(tab) {
     catch (e) {
         console.warn(e);
     }
+
+    Test.current.startImageProcessing(imageProcessingProgress); // just kick it off again
 }
 
 async function focusTab() {
@@ -1073,7 +1076,7 @@ async function recordSomething(attachActiveTab) {
     }
 }
 
-$('#recordButton').on('click', (e) => recordSomething(false) );
+$('#recordButton').on('click', (e) => recordSomething(false));
 
 async function stopPlaying() {
     $('#playButton').removeClass('active');
@@ -1101,6 +1104,11 @@ $('#loadButton').on('click', actions.openZip.bind(actions));
 $('#saveButton').on('click', actions.saveZip);
 $('#clearButton').on('click', actions.clearTest);
 
+function imageProcessingProgress(value, max) {
+    let ib = $('#infobar');
+    ib.html(`${version} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
+}
+
 async function loadNextTest() {
     let numberOfTestsInSuite = fileHandles.length;
     if (++currentTestNumber > numberOfTestsInSuite) {
@@ -1117,10 +1125,12 @@ async function loadNextTest() {
     }
     else {
         await actions.clearTest();
-        let ib = $('#infobar');
-        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1], (value, max) => {
-            ib.html(`${version} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress> `);
-        });
+
+        // This load is just super fast.
+        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1]);
+
+        // kick off without waiting for this. 
+        Test.current.startImageProcessing(imageProcessingProgress);
     }
 
     window.document.title = `Brimstone - ${Test.current.filename}${suite}`;

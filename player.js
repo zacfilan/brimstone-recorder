@@ -147,8 +147,6 @@ export class Player {
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
         this.pixelMatchThreshhold = options.pixelMatchThreshhold;
         this.interKeypressDelay = options.interKeypressDelay;
-        let v = await test.getHydratedForPlayPromise();
-
         let actions = this._actions;
 
         // start timer

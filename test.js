@@ -35,14 +35,40 @@ export class Test {
         this.zip = undefined;
 
         /**
-         * Used to tell if the images are all hydrated or not
-         */
-        this.acceptableHydratedPromise = false;
-
-        /**
          * Allow actions added to the test to overwrite old actions
          */
         this.updateOrAppendIndex = 0;
+
+        this._imageProcessingPromise = null;
+    }
+
+    /** 
+     * Returns a promise that completes when the test images are al processed.
+     * 
+     * All dataurls and PNGs are ready in the test. 
+     * this is S-L-O-W because of the way I create PNG objects. Try to speed up!
+     * 
+     * https://www.npmjs.com/package/pngjs#example
+     * 
+     * https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams
+     */
+    async imageProcessing() {
+        await this._imageProcessingPromise;
+    }
+
+    /** 
+     * Sets a promise completes when the image processing is done.
+     * await this.imageProcessing() somewhere else to wait for it to complete.
+     * 
+     * All dataurls and PNGs are ready in the test. 
+     * this is S-L-O-W because of the way I create PNG objects. Try to speed up!
+     * 
+     * https://www.npmjs.com/package/pngjs#example
+     * 
+     * https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams
+     */
+    startImageProcessing(progressCallback) {
+        this._imageProcessingPromise = this._hydrateForPlay(progressCallback, this.zip)
     }
 
     /**
@@ -182,13 +208,17 @@ export class Test {
     }
 
     /**
-    * async constructor from a filehandle of the zip
+    * async constructor from a filehandle of the zip.
+    * loads all the expected screenshots into data urls as fast as possible from the zip.
+    * 
+    * no feedback.
     */
-    async fromFileHandle(fileHandle, progressCallback) {
+    async fromFileHandle(fileHandle) {
         if (!fileHandle) {
             return this;
         }
-
+        this.reset();
+        
         const blob = await fileHandle.getFile();
         this.zip = await (new JSZip()).loadAsync(blob);
         let screenshots = this.zip.folder("screenshots"); // access screenshots folder from the archive
@@ -238,15 +268,13 @@ export class Test {
             }
         }
         if (screenshotPromises.length) {
-            await Promise.all(screenshotPromises); // FIXME: in truth I don't need to wait for all of these. I only need the if the user looks at them, or during play.
+            // FIXME: in truth I don't need to wait for all of these. 
+            // I only need these dataurls if the user looks at them (navigates to them to manually or because of playing)
+            // but this is PLENTY fast, so don't sweat it!
+            await Promise.all(screenshotPromises);
         }
 
-        this.hydrateForPlay(progressCallback);
         return this;
-    }
-
-    getHydratedForPlayPromise() {
-        return this.acceptableHydratedPromise;
     }
 
     /** schedules some code to set the pngs for expected screnshots
@@ -254,14 +282,18 @@ export class Test {
      * this sets a promise that can be sampled with getHydratedForPlayPromise()
      * @param {Test} test The test we need to hydrate
      */
-    async hydrateForPlay(progressCallback) {
-        this.acceptableHydratedPromise = new Promise(async(resolve) => {
-            let screenshots = this.zip.folder("screenshots");
+    async _hydrateForPlay(progressCallback) {
+        return new Promise(async (resolve) => {
+            let screenshots = this.zip?.folder("screenshots");
             let i = 0;
-            let id = setInterval(() => {
-                progressCallback && progressCallback(i+1, this.steps.length);
-            },
-            1000);
+            let id;
+            if (progressCallback) {
+                id = setInterval(
+                    () => {
+                        progressCallback(i + 1, this.steps.length);
+                    },
+                    1000);
+            }
             for (i = 0; i < this.steps.length; ++i) {
                 let action = this.steps[i];
                 if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
@@ -273,8 +305,10 @@ export class Test {
                     await action.expectedScreenshot.createPngFromDataUrl();
                 }
             }
-            clearInterval(id);
-            progressCallback && progressCallback(this.steps.length, this.steps.length);
+            if (progressCallback) {
+                clearInterval(id);
+                progressCallback(this.steps.length, this.steps.length);
+            }
             resolve(true);
         });
     }
