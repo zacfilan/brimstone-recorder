@@ -1020,7 +1020,7 @@ async function recordSomething(attachActiveTab) {
                     updateStepInView(Test.current.steps[index]);
                     return;
                 }
-                Test.current.updateOrAppendIndex = index + 1;
+                Test.current.recordIndex = index + 1;
 
                 // overwriting actions in an existing test
                 if (!await applicationUnderTestTab.reuse({ incognito: Test.current.incognito })) {
@@ -1060,8 +1060,8 @@ async function recordSomething(attachActiveTab) {
 
                 // update the UI: insert the first text card in the ui
                 await recordUserAction({
-                    type: 'wait',
-                    url: applicationUnderTestTab.url
+                     type: 'goto',
+                     url: 'active tab'
                 });
 
                 // FOCUS ISSUE. when we create a window (because we need to record incognito for example), 

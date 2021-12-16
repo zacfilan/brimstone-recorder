@@ -35,9 +35,11 @@ export class Test {
         this.zip = undefined;
 
         /**
-         * Allow actions added to the test to overwrite old actions
+         * Allow actions added to the test to overwrite old actions. This
+         * is needed to record over sections of the test. It remembers the
+         * index to recd the next action into.
          */
-        this.updateOrAppendIndex = 0;
+        this.recordIndex = 0;
 
         this._imageProcessingPromise = null;
     }
@@ -88,9 +90,12 @@ export class Test {
     updateOrAppendAction(action) {
         // make sure it has a step number
         if (action.index === undefined) { // when recording actions they (may!) come in without an index, so use the running one.
-            action.setIndex(this.updateOrAppendIndex);
+            action.setIndex(this.recordIndex);
         }
-        this.updateOrAppendIndex = action.index + 1;
+        // wait actions only update the UI they don't actually get recorded
+        if(action.type !== 'wait') {
+            this.recordIndex = action.index + 1;
+        }
         this.steps[action.index] = action;
         action.test = this; // each action knows what test it is in
     }

@@ -221,6 +221,9 @@ export class Player {
 
     async goto(action) {
         console.debug("player: goto");
+        if(action.url.startsWith('active tab')) {
+            return; // we aren't realy navigating anywhere
+        }
  
         // I want the navigation done before I exit here
         var resolveNavigationPromise;
