@@ -3,25 +3,29 @@ import * as Errors from "./error.js";
 import { loadOptions } from "./options.js";
 
 export class Tab {
-    constructor() {
+    /**
+     * 
+     * @param {Tab} otherTab 
+     */
+    constructor(otherTab) {
         /** The associated chrome tab 
          * @type {chrome.tabs.Tab}
         */
-        this.chromeTab = null;
+        this.chromeTab = otherTab?.chromeTab;
 
         /** The chrome window this tab is in.
          * @type {chrome.windows.Window}
          */
-        this.chromeWindow = null;
+        this.chromeWindow = otherTab?.chromeWindow;
 
         /** The desired height of the tab. May differ from the associated chromeTab property. */
-        this.height = 0;
+        this.height = otherTab?.height || 0;
 
         /** The desired width of the tab. May differ from the associated chromeTab property. */
-        this.width = 0;
+        this.width = otherTab?.width || 0;
 
         /** The chrome tab url, or perhaps the original that redirected to the chrome tab url. May differ from the associated chromeTab property */
-        this.url = null;
+        this.url = otherTab?.url;
     }
 
     /** 
@@ -150,6 +154,17 @@ export class Tab {
         this.width = this.chromeTab.width;
     }
 
+    async fromTabId(id) {
+        try {
+            this.chromeTab = await chrome.tabs.get(id);
+            this.chromeWindow = await chrome.windows.get(this.chromeTab.windowId);  // if it fails we can't connect - ok.
+            return await this.reuse({ incognito: this.chromeWindow.incognito, focused: false });
+        }
+        catch (e) {
+            return false;
+        }
+    }
+
     /** configure this from a windowId. returns true on success false on failure. */
     async fromWindowId(id) {
         try {
@@ -161,7 +176,11 @@ export class Tab {
         }
     }
 
-    /** resuse the currently configured window if you can */
+    /** 
+     * In order to play or record I need a tab with the correct incongito'ness'.
+     * 
+     * This will attempt to re-use a pre-existing Tab to see if it is sufficient.  
+     * */
     async reuse({ url = null, incognito, focused = true }) {
         try {
             // make sure it is still there.
@@ -197,11 +216,11 @@ export class Tab {
             this.height = this.chromeTab.height;
             this.width = this.chromeTab.width;
 
-            return true;
+            return this;
 
         }
         catch (e) {
-            return false;
+            return null;
         }
     }
 
