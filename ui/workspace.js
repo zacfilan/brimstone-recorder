@@ -677,8 +677,7 @@ var playedRecordings;
 $('#playButton').on('click', async function () {
     let button = $(this);
     if (button.hasClass('active')) {
-        button.removeClass('active'); // stop playing
-        player.stopPlaying();
+        stopPlaying();
         return;
     }
     try {
@@ -776,10 +775,10 @@ $('#playButton').on('click', async function () {
                     break;
             }
         } while (nextTest);
+        stopPlaying();
     }
     catch (e) {
-        $('#playButton').removeClass('active');
-        setToolbarState();
+        stopPlaying();
         if (e === 'debugger_already_attached') {
             await brimstone.window.alert("You must close the existing debugger(s) first.");
         }
@@ -788,7 +787,6 @@ $('#playButton').on('click', async function () {
             throw e;
         }
     }
-
 });
 
 $('#next').on('click', function (e) {
@@ -821,7 +819,7 @@ async function debuggerOnDetach(source, reason) {
             return;
         }
 
-        await recordTab(tabStack.top())
+        await recordTab(tabStack.top());
     }
     else if (isPlaying()) {
         if (source.tabId !== tabStack.top().chromeTab.id) {
@@ -859,23 +857,60 @@ async function hideCursor() {
 
 async function startPlaying() {
     player.usedFor = 'playing';
-    // only listen for navigations, when we are actively playing, and remove the listener when we are not.
-    //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
-    chrome.webNavigation.onCompleted.removeListener(playingWebNavigationOnCompleteHandler);
-    chrome.webNavigation.onCompleted.addListener(playingWebNavigationOnCompleteHandler);
-
+    addEventHandlers();
     await hideCursor();
 }
 
-async function playingWebNavigationOnCompleteHandler(details) {
+async function webNavigationOnCompleteHandler(details) {
     try {
-        console.debug(`tab ${details.tabId} navigation completed`, details);
-        if (details.url === 'about:blank') {
-            console.debug(`    - ignoring navigation to page url 'about:blank'`);
-            return;
-        }
-        await startPlaying();
+        if (isPlaying()) {
+            console.debug(`tabId:${details.tabId} navigation completed`, details);
+            if (details.url === 'about:blank') {
+                console.debug(`    - ignoring navigation to page url 'about:blank'`);
+                return;
+            }
+            if (tabStack.top().chromeTab.id !== details.tabId) {
+                console.debug(`tabId:${details.tabId} navigation completed in untracked tab. will track this tab now.`, details);
 
+                let tab = new Tab();
+                await tab.fromTabId(details.tabId);
+                // this popup will already have the debugger attached
+                // but the player will have the older tab(id) registered for sendCommand so update it.
+                player.tab = tab;
+                tabStack.push(tab);
+            }
+            else {
+                console.debug(`tabId:${details.tabId} navigation completed in tab being played.`, details);
+            }
+            await playTab(tabStack.top());
+        }
+        else if (isRecording()) {
+            if (tabStack.top().chromeTab.id !== details.tabId) {
+                console.debug(`tabId:${details.tabId} navigation completed in untracked tab. will track this tab now.`, details);
+    
+                // tell all the other frames in the previous tab to stop recording. i.e. disable the event handlers if possible.
+                // FIXME: this should be a pause with a "not allowed" type pointer, maybe even an overlay to prevent user interaction, or block all user events.
+                // https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-setIgnoreInputEvents
+                try {
+                    postMessage({ type: 'stop', broadcast: true });
+                    port.disconnect();
+                }
+                catch (e) {
+                    console.warn(e);
+                }
+    
+                let tab = new Tab();
+                await tab.fromTabId(details.tabId);
+                // this popup will already have the debugger attached
+                // but the player will have the older tab(id) registered for sendCommand so update it.
+                player.tab = tab;
+                tabStack.push(tab);
+            }
+            else {
+                console.debug(`tab ${details.tabId} navigation completed in tab being recorded.`, details);
+            }
+            await recordTab(tabStack.top());
+        }
     }
     catch (e) {
         // this can be some intermediate redirect page(s) that the user doesn't actually interact with
@@ -949,7 +984,12 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
     }
 
     // else it's a tab i tracked being opened (e.g. a popup), that was just closed
-    tabStack.pop();
+    let top = tabStack.pop();
+
+    await recordUserAction({
+        type: 'close',
+        url: top.chromeTab.url
+    }); // convert userEvent to testaction, insert at given index
 }
 
 async function tabsOnActivatedHandler(activeInfo) {
@@ -993,6 +1033,7 @@ async function windowsOnCreatedHandler(window) {
 }
 
 async function windowsOnFocusChangedHandler(window) {
+    // first on created, is this
     console.log(`focus changed to winId:${window.id}.`);
 }
 
@@ -1004,25 +1045,10 @@ async function windowsOnRemovedHandler(windowId) {
 //     console.log("EVENT! ", debugee, method, params);
 // }
 
-/**
- * Set up navigation listener, which refires this function when a nav completes.
- * Tell recorders their frameids.
- * Hide the cursor.
- * Resize the viewport.
- * @param {Tab} tab 
- */
-async function prepareToRecord(tab) {
-    player.usedFor = 'recording';
-
-    console.debug(`connect: begin - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
-    console.debug(`connect:       -  tab is ${tab.width}x${tab.height}`);
-
-    // only listen for navigations, when we are actively recording, and remove the listener when we are not recording.
-    //https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
+function addEventHandlers() {
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
 
-    // only listen for tab changes, when we are actively recording, and remove the listener when we are not recording.
     chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
     chrome.tabs.onActivated.addListener(tabsOnActivatedHandler);
 
@@ -1043,9 +1069,43 @@ async function prepareToRecord(tab) {
 
     chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
     chrome.windows.onRemoved.addListener(windowsOnRemovedHandler);
+}
 
+function removeEventHandlers() {
+    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
+
+    chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
+
+    chrome.tabs.onRemoved.removeListener(tabsOnRemovedHandler);
+
+    chrome.tabs.onCreated.removeListener(tabsOnCreatedHandler);
+
+    chrome.tabs.onUpdated.removeListener(tabsOnUpdatedHandler);
+
+    chrome.windows.onCreated.removeListener(windowsOnCreatedHandler);
+
+    chrome.windows.onFocusChanged.removeListener(windowsOnFocusChangedHandler);
+
+    chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
+}
+
+/**
+ * Set up navigation listener, which refires this function when a nav completes.
+ * Tell recorders their frameids.
+ * Hide the cursor.
+ * Resize the viewport.
+ * @param {Tab} tab 
+ */
+async function prepareToRecord() {
+    let tab = tabStack.top();
+    player.usedFor = 'recording';
+
+    console.debug(`connect: begin - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
+    console.debug(`connect:       -  tab is ${tab.width}x${tab.height}`);
+
+    addEventHandlers();
     await tellRecordersTheirFrameIds();
-    await hideCursor(tab);
+    await hideCursor();
     if (tab.height && tab.width) {
         await tab.resizeViewport();
     }
@@ -1053,11 +1113,10 @@ async function prepareToRecord(tab) {
     console.debug(`connect: end   - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
 }
 
-function stopRecording(tab) {
+function stopRecording() {
     tabStack = new Stack();
 
-    chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
-    chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
+    removeEventHandlers();
 
     $('#recordButton').removeClass('active');
     setToolbarState();
@@ -1261,9 +1320,12 @@ $('#recordButton').on('click', (e) => {
     recordSomething(!!Test.current.steps.length);
 });
 
-async function stopPlaying() {
+function stopPlaying() {
+    tabStack = new Stack();
     $('#playButton').removeClass('active');
     setToolbarState();
+    removeEventHandlers();
+    player.stopPlaying();
 }
 
 /**
@@ -1541,6 +1603,17 @@ async function userEventToAction(userEvent) {
             cardModel._view = constants.view.EXPECTED;
             break;
         }
+        case 'close':
+            cardModel.description = `close ${cardModel.url}`;
+            cardModel.overlay = {
+                height: 0,
+                width: 0,
+                top: 0,
+                left: 0
+            };
+            cardModel._view = constants.view.EXPECTED;
+            addExpectedScreenshot(cardModel);
+            break;
         case 'change':
             // change is not a direct UI action. it is only sent on SELECTs that change their value, which happens *after* the user interacts with the shadowDOM.
             // recorder can't detect when the shadowdom is opened (or interacted with at all), so it can't detect the start of a change action. it can't turn off
@@ -1572,8 +1645,7 @@ async function userEventToAction(userEvent) {
 async function recordUserAction(userEvent) {
     let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
 
-    // show the latest screenshot in the expected card and start polling it
-    await captureScreenshotAsDataUrl();
+    // show the latest screenshot in the expected card to give quick feedbak
     let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
     // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
     wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
@@ -1741,7 +1813,8 @@ async function onMessageHandler(message, _port) {
 let recordTabFunctionExecuting = false;
 
 /**
- * Record the tab specified.
+ * Record the tab specified. This should be the top level
+ * safe call to establish recording of the given tab.
  * @param {Tab} tab 
  */
 async function recordTab(tab) {
@@ -1755,50 +1828,22 @@ async function recordTab(tab) {
 
     // FIXME: what happens if we spawn a "real window"?
     player.tab = tab; // at this point the debugger is already attached, to the popup (which is like a tab to the mainwindow, but in its own browser window?)
-    
+
     await prepareToRecord(tab);
     await startRecorders();
     recordTabFunctionExecuting = false;
 }
 
 /**
- * This only is active when we are actively recording.
- * https://developer.chrome.com/docs/extensions/reference/webNavigation/#event-onCompleted
+ * Play the tab specified.
+ * @param {Tab} tab 
  */
-async function webNavigationOnCompleteHandler(details) {
-    // a user action during recording caused a navigation.
-    try {
-        if (tabStack.top().chromeTab.id !== details.tabId) {
-            console.debug(`tab ${details.tabId} navigation completed in untracked tab. will track this tab now.`, details);
+async function playTab(tab) {
+    console.log(`play tabId: ${tab.chromeTab.id}`);
 
-            // tell all the other frames in the previous tab to stop recording. i.e. disable the event handlers if possible.
-            // FIXME: this should be a pause with a "not allowed" type pointer, maybe even an overlay to prevent user interaction, or block all user events.
-            // https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-setIgnoreInputEvents
-            try {
-                postMessage({ type: 'stop', broadcast: true });
-                port.disconnect();
-            }
-            catch (e) {
-                console.warn(e);
-            }
-
-            let tab = new Tab();
-            await tab.fromTabId(details.tabId);
-            // this popup will already have the debugger attached
-            // but the player will have the older tab(id) registered for sendCommand so update it.
-            player.tab = tab;
-            tabStack.push(tab);
-        }
-        else {
-            console.debug(`tab ${details.tabId} navigation completed in tab being recorded.`, details);
-        }
-        await recordTab(tabStack.top());
-
-    }
-    catch (e) {
-        // this can be some intermediate redirect page(s) that the user doesn't actually interact with
-        console.log('navigation completion failed.', e);
-    }
+    // FIXME: what happens if we spawn a "real window"?
+    player.tab = tab; // at this point the debugger is already attached, to the popup (which is like a tab to the mainwindow, but in its own browser window?)
+    await startPlaying();
 }
 
 /** Used to wait for all frameoffsets to be reported */

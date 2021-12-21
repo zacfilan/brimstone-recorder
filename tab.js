@@ -48,6 +48,10 @@ export class Tab {
      * Resize the viewport of this tab to match its width and height properties.
      * */
     async resizeViewport() {
+        if(!this.height || !this.width) {
+            return;
+        }
+        
         let options = await loadOptions();
         // empirically, it needs to be visible to work
         await chrome.windows.update(this.chromeWindow.id, { focused: true });

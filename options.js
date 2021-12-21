@@ -60,7 +60,7 @@ export class Options {
     /**
      * Number of millseconds to wait to terminate a mousewheel sequence.
      */
-    mouseWheelTimeout = 100;
+    mouseWheelTimeout = 250;
 
     /** 
      * Number of milliseconds to wait to terminiate a mousemove sequence action.
@@ -69,7 +69,7 @@ export class Options {
      * but is more likely to record more (unecessary) mouse move actions. Higher numbers will force the user to wait
      * longer to avoid the alerts, but is less likely to record unnecessary moousemoves.
      */
-    mouseMoveTimeout = 100;
+    mouseMoveTimeout = 250;
 
 
 };

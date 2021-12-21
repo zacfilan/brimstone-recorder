@@ -168,7 +168,7 @@ export class Player {
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
             // performed this action, we just need to put the mouse in the correct spot and
             // do the screen verification again
-            if(resume && i === startIndex) {
+            if (resume && i === startIndex) {
                 // not needed? it is already in the right spot?
                 //await this.mousemove(this.mouseLocation); 
             }
@@ -176,9 +176,9 @@ export class Player {
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
             }
             console.log(`end   play [${action.index}] : ${action.description}`);
-            
+
             // grep for FOCUS ISSUE for details
-            if(i === startIndex && action.type === 'goto') {
+            if (i === startIndex && action.type === 'goto') {
                 await this.mousemove({ x: 0, y: 0 });
                 await this.mousemove({ x: -1, y: -1 });
             }
@@ -221,10 +221,10 @@ export class Player {
 
     async goto(action) {
         console.debug("player: goto");
-        if(action.url.startsWith('active tab')) {
+        if (action.url.startsWith('active tab')) {
             return; // we aren't realy navigating anywhere
         }
- 
+
         // I want the navigation done before I exit here
         var resolveNavigationPromise;
         let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
@@ -238,6 +238,24 @@ export class Player {
             url: action.url
         });
         await navPromise; // the above nav is really done.
+    }
+
+    /** close the tab with the given url */
+    async close(action) {
+        // find the tab with the given url and close it
+        let tabs = await chrome.tabs.query({
+            url: action.url
+        });
+
+        if (tabs.length === 1) {
+            // we are going to close this tab. I would like to detach the debugger from just this tab,
+            // by id but it doesn't work. removes it from the all the tabs (in the group?) from just this tab
+            //let tab = tabs[0];
+            //await chrome.debugger.detach({tabId: tab.id}); // this only schedules it? But doens't remove it from the UI?
+           
+            // then this will do the same thing, and we lose both debuggers, anyway.
+            await chrome.tabs.remove(tabs[0].id);
+        }
     }
 
     async keypress(action) {
@@ -779,7 +797,7 @@ export class Player {
         console.debug(`debugger attached`);
     }
 
-    async stopPlaying() {
+    stopPlaying() {
         /** used to async cancel a playing test */
         this._stopPlaying = true;
     }
