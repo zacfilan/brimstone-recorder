@@ -155,11 +155,13 @@ export class TestAction {
 
     /**
      * Called when the extension is given a user action that has been recorded.
+     * @param {Screenshot} ss
      */
-    addExpectedScreenshot(dataUrl) {
+    addExpectedScreenshot(ss) {
         this.expectedScreenshot = new Screenshot({
-            dataUrl: dataUrl,
-            fileName: `step${this.index}_expected.png`
+            dataUrl: ss.dataUrl,
+            fileName: `step${this.index}_expected.png`,
+            tab: ss.tab
             // png: await Player.dataUrlToPNG(dataUrl) // this is expensive to calculate, defer until you really need it.
         });
         return this.expectedScreenshot.createPngFromDataUrl(); // kick it off but don't wait
@@ -354,9 +356,12 @@ export class TestAction {
             }
             footer += `${this.memoryUsed}MBs in use.`;
         }
+        
         if (!stats) {
             footer = '';
         }
+
+        footer += ` ${this.tabWidth}x${this.tabHeight} `;
         footer += `<div class="stepNumber">${this.index + 1}/${this.test.steps.length}</div>`;
         html += `
         </div>

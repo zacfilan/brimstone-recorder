@@ -150,6 +150,15 @@ export class Test {
         this.reindex();
     }
 
+    toJSON() {
+        return {
+            steps: this.steps,
+            version: this.version,
+            hideCursor: this.hideCursor,
+            incognito: this.incognito
+        };
+    }
+
     /**
      * save the current state to a zip file 
      */

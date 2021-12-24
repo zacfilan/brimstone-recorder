@@ -456,12 +456,14 @@ function isPlaying() {
 var uiCardsElement = document.getElementById('cards');
 
 /**
- * asynchronously updated "latest" view of the appn
+ * asynchronously updated "latest" view of the app
+ * @type {Screenshot}
  * */
 var _lastScreenshot;
 
 /** 
  * lock down the screen state at a point in time
+ * @type {Screenshot}
 */
 var _lastSavedScreenshot;
 
@@ -734,7 +736,7 @@ $('#playButton').on('click', async function () {
             if (playingTab.url !== 'about:blank') {
                 await playingTab.resizeViewport();
             }
-            await startPlaying();
+            await playTab();
 
             playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
 
@@ -818,16 +820,12 @@ async function debuggerOnDetach(source, reason) {
             console.debug(`will not record tabId:${source.tabId} is not tracked.`);
             return;
         }
-
-        await recordTab(tabStack.top());
+        // else the tab we were recording had the debugger detach - reattach it.
+        await recordTab();
     }
     else if (isPlaying()) {
-        if (source.tabId !== tabStack.top().chromeTab.id) {
-            console.debug(`will not play tabId:${source.tabId} is not tracked.`);
-            return;
-        }
-
-        await playTab(tabStack.top());
+        // the reattach will happen in the player itself
+        // to the tab in the next played action
     }
     else {
         // the user somehow detached the debugger 
@@ -855,36 +853,15 @@ async function hideCursor() {
     }
 }
 
-async function startPlaying() {
-    player.usedFor = 'playing';
-    addEventHandlers();
-    await hideCursor();
-}
-
+/**
+ * this is called (at least once) for *every* frame in details.tabId
+ * every navigation in the main frame of the tab will result in any previously
+ * attached debugger getting detached. which is why i do so much in here.
+ *  */ 
 async function webNavigationOnCompleteHandler(details) {
     try {
-        if (isPlaying()) {
-            console.debug(`tabId:${details.tabId} navigation completed`, details);
-            if (details.url === 'about:blank') {
-                console.debug(`    - ignoring navigation to page url 'about:blank'`);
-                return;
-            }
-            if (tabStack.top().chromeTab.id !== details.tabId) {
-                console.debug(`tabId:${details.tabId} navigation completed in untracked tab. will track this tab now.`, details);
-
-                let tab = new Tab();
-                await tab.fromTabId(details.tabId);
-                // this popup will already have the debugger attached
-                // but the player will have the older tab(id) registered for sendCommand so update it.
-                player.tab = tab;
-                tabStack.push(tab);
-            }
-            else {
-                console.debug(`tabId:${details.tabId} navigation completed in tab being played.`, details);
-            }
-            await playTab(tabStack.top());
-        }
-        else if (isRecording()) {
+        
+        if (isRecording()) {
             if (tabStack.top().chromeTab.id !== details.tabId) {
                 console.debug(`tabId:${details.tabId} navigation completed in untracked tab. will track this tab now.`, details);
     
@@ -900,16 +877,16 @@ async function webNavigationOnCompleteHandler(details) {
                 }
     
                 let tab = new Tab();
-                await tab.fromTabId(details.tabId);
                 // this popup will already have the debugger attached
                 // but the player will have the older tab(id) registered for sendCommand so update it.
                 player.tab = tab;
                 tabStack.push(tab);
+                await tab.fromTabId(details.tabId);
             }
             else {
                 console.debug(`tab ${details.tabId} navigation completed in tab being recorded.`, details);
             }
-            await recordTab(tabStack.top());
+            await recordTab();
         }
     }
     catch (e) {
@@ -954,11 +931,13 @@ async function startRecorders() {
  * tell all the content scripts what frame they are in via chrome.tab.sendMessage
  */
 async function tellRecordersTheirFrameIds() {
-    console.debug('connect: tell each recorder their frame id');
-    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tabStack.top().chromeTab.id }, response))); // get all frames
+    let tab = tabStack.top();
+    let tabId = tab.chromeTab.id;
+    console.debug(`connect: tell each recorder in tabId:${tabId} their frame id`);
+    let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tabId}, response))); // get all frames
     for (let i = 0; i < frames.length; ++i) {
         let frame = frames[i];
-        await chrome.tabs.sendMessage(tabStack.top().chromeTab.id, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
+        await chrome.tabs.sendMessage(tabId, { func: 'setFrameId', args: { to: frame.frameId } }, { frameId: frame.frameId });
     }
 }
 
@@ -984,12 +963,20 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
     }
 
     // else it's a tab i tracked being opened (e.g. a popup), that was just closed
-    let top = tabStack.pop();
+    let closedTab = tabStack.pop();
 
     await recordUserAction({
         type: 'close',
-        url: top.chromeTab.url
+        url: closedTab.chromeTab.url,
+        sender: {
+            href: closedTab.chromeTab.url
+        }
     }); // convert userEvent to testaction, insert at given index
+
+    if(tabStack.length) {
+        await recordTab(); // switch to the previous tab
+    }
+    // FIXME: else we closed the only active tab, we should end the recording.
 }
 
 async function tabsOnActivatedHandler(activeInfo) {
@@ -1152,7 +1139,7 @@ async function recordSomething(attachActiveTab) {
             // before I take the last screenshot the window must have focus again.
             //await focusTab();
             let last = Test.current.steps[Test.current.steps.length - 1];
-            last.addExpectedScreenshot(last.expectedScreenshot.dataUrl); // build the final png
+            last.addExpectedScreenshot(last.expectedScreenshot); // build the final png
             stopRecording();
             return;
         }
@@ -1194,7 +1181,7 @@ async function recordSomething(attachActiveTab) {
             await player.attachDebugger({ tab: recordingTab });
             await recordingTab.resizeViewport();
 
-            await prepareToRecord(recordingTab);
+            await prepareToRecord();
             button.addClass('active');
             setToolbarState();
 
@@ -1251,7 +1238,7 @@ async function recordSomething(attachActiveTab) {
                 await player.attachDebugger({ tab: recordingTab });
                 await recordingTab.resizeViewport();
 
-                await prepareToRecord(recordingTab);
+                await prepareToRecord();
                 button.addClass('active');
                 setToolbarState();
                 await countDown(3, action);
@@ -1279,7 +1266,7 @@ async function recordSomething(attachActiveTab) {
                 await player.attachDebugger({ tab: recordingTab });
                 await recordingTab.resizeViewport();
 
-                await prepareToRecord(recordingTab);
+                await prepareToRecord();
                 button.addClass('active');
                 setToolbarState();
 
@@ -1324,7 +1311,7 @@ function stopPlaying() {
     tabStack = new Stack();
     $('#playButton').removeClass('active');
     setToolbarState();
-    removeEventHandlers();
+    //removeEventHandlers();
     player.stopPlaying();
 }
 
@@ -1648,8 +1635,11 @@ async function recordUserAction(userEvent) {
     // show the latest screenshot in the expected card to give quick feedbak
     let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
     // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
-    wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
+    wait.expectedScreenshot = new Screenshot(_lastScreenshot); // something to show immediately
     wait._view = constants.view.DYNAMIC;
+    wait.sender = {
+        href: _lastScreenshot?.tab?.url
+    };
 
     updateStepInView(action); // update the UI
     return action;
@@ -1705,12 +1695,13 @@ async function onMessageHandler(message, _port) {
             // refresh the expected action placeholder the user sees.
             // use the lower cost option, just the dataurl don't make into a PNG
             // that will come later when we create the next user action.
-            lastAction.expectedScreenshot = new Screenshot({
-                dataUrl: _lastScreenshot
-            });
+            lastAction.expectedScreenshot = new Screenshot(_lastScreenshot);
             lastAction._view = constants.view.DYNAMIC;
-            updateStepInView(Test.current.steps[ci]);
+            lastAction.sender = {
+                href: _lastScreenshot.tab.url
+            };
 
+            updateStepInView(Test.current.steps[ci]);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'mouseover':
@@ -1771,9 +1762,10 @@ async function onMessageHandler(message, _port) {
 
             // show the latest screenshot in the expected card and start polling it
             await captureScreenshotAsDataUrl();
+
             let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
             // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
-            wait.expectedScreenshot = new Screenshot({ dataUrl: _lastScreenshot }); // something to show immediately
+            wait.expectedScreenshot = new Screenshot(_lastScreenshot); // something to show immediately
             wait._view = constants.view.DYNAMIC;
             wait.shadowDOMAction = true;
 
@@ -1817,7 +1809,8 @@ let recordTabFunctionExecuting = false;
  * safe call to establish recording of the given tab.
  * @param {Tab} tab 
  */
-async function recordTab(tab) {
+async function recordTab() {
+    let tab = tabStack.top();
     console.log(`record tabId: ${tab.chromeTab.id}`);
 
     if (recordTabFunctionExecuting) {
@@ -1825,25 +1818,29 @@ async function recordTab(tab) {
         return;
     }
     recordTabFunctionExecuting = true;
-
     // FIXME: what happens if we spawn a "real window"?
     player.tab = tab; // at this point the debugger is already attached, to the popup (which is like a tab to the mainwindow, but in its own browser window?)
 
-    await prepareToRecord(tab);
+    await prepareToRecord();
     await startRecorders();
     recordTabFunctionExecuting = false;
 }
 
 /**
- * Play the tab specified.
+ * Change the active tab that the player instance
+ * is currently playing.
  * @param {Tab} tab 
  */
-async function playTab(tab) {
+async function playTab() {
+    let tab = tabStack.top();
     console.log(`play tabId: ${tab.chromeTab.id}`);
 
     // FIXME: what happens if we spawn a "real window"?
     player.tab = tab; // at this point the debugger is already attached, to the popup (which is like a tab to the mainwindow, but in its own browser window?)
-    await startPlaying();
+    
+    player.usedFor = 'playing';
+    //addEventHandlers();
+    await hideCursor();
 }
 
 /** Used to wait for all frameoffsets to be reported */

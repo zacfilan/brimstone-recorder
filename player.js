@@ -95,10 +95,9 @@ export class Player {
     */
     actualScreenshotBuffer;
 
-    _playbackComplete = false;
-
     /** mode switch either 'playing' or 'recording', something of a hack. */
     usedFor;
+
     /** Know if there are navigations in flight. */
     _navigationsInFlight = 0;
 
@@ -121,12 +120,52 @@ export class Player {
     //     y: -1
     // };
 
+    /** asynchronously injectable switch to stop the player from playing */
+    _stopPlaying = false;
+
     constructor() {
         /**
          * The tab we are playing on.
          * @type {Tab}
          */
         this.tab = null;
+    }
+
+    /**
+     * In order to play an action, this player
+     * must be configured to drive the tab that
+     * the action occurs on and the debugger needs
+     * to be attached to that tab. 
+     */
+    async configureForAction(action) {
+        if (action.sender?.href && this.tab.chromeTab.url !== action.sender.href 
+            //|| this.tab.chromeWindow.title !== action.sender.title
+            )
+        {
+            // the next action we want to drive is to a different tab/frame so switch.
+            await this.switchTab(action);
+            await this.attachDebugger({tab: this.tab}); // ecessary?
+            await this.tab.resizeViewport();
+        }
+    }
+
+    /**
+     * 
+     * Configure this player to drive the
+     * provided tab.
+     */
+    async switchTab(action) {
+        console.debug(`begin switch to tab w/url ${action.sender.href}`);
+        let tabs = await chrome.tabs.query({ url: action.sender.href } );
+//        let tabs = await chrome.tabs.query({ url: tab.href, title: tab.title } );
+        if(tabs.length !== 1) {
+            throw new Error(`Can't locate tab`);
+        }
+        this.tab = new Tab();
+        await this.tab.fromChromeTab(tabs[0]);
+        this.tab.width = action.tabWidth;
+        this.tab.height = action.tabHeight;
+        console.debug(`end switch to tabId:${this.tab.chromeTab.id}`, this.tab);
     }
 
     /** 
@@ -248,14 +287,19 @@ export class Player {
         });
 
         if (tabs.length === 1) {
-            // we are going to close this tab. I would like to detach the debugger from just this tab,
-            // by id but it doesn't work. removes it from the all the tabs (in the group?) from just this tab
-            //let tab = tabs[0];
-            //await chrome.debugger.detach({tabId: tab.id}); // this only schedules it? But doens't remove it from the UI?
-           
-            // then this will do the same thing, and we lose both debuggers, anyway.
             await chrome.tabs.remove(tabs[0].id);
         }
+
+        // what tab does the user interact with after this tab closes? no idea. the only way to know is after the user
+        // records the next action (from some tab). if the user ends the recording immediately after closing this tab 
+        // we never get that tab identification for the next tab, which is used to determine when this test ends.
+        // options:
+        // 1) on close don't add a wait. add a no screenshot available, operation that get's overwritten if there is a next action recorded.
+        // 2) force the app to go to last tab on stack **probably the correct thing** (test if there isn't one!)
+        // 3) force the app to go to now active tab (same as #2?)
+
+        // #2 requires tracking the tab stack. then i can switch the debugger here or in the callback for the onRemoved. probably the latter.
+        
     }
 
     async keypress(action) {
@@ -566,6 +610,10 @@ export class Player {
         let i = 0;
         let resize = false;
 
+        // If the next action is on a different tab, then we need to switch to that tab to 
+        // take the screenshot.
+        await this.configureForAction(nextStep);
+
         // this loop will run even if the app is in the process of navigating to the next page.
         while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
             if (this._stopPlaying) { // asyncronously injected
@@ -574,27 +622,6 @@ export class Player {
                 return nextStep._match;
             }
             ++i;
-            // await this.tab.resizeViewport(); // this just shouldn't be needed but it is! // FIXME: figure this out eventually
-
-            // There was a mousemove at some point before any *click* action - the mouse got there after all.
-            // I don't always make the move explicit (don't always record it) because the user doesn't always care. But it DOES affect hover styles.
-            // While I wait for the screen to match, I might need to repeatedlty simulate that mousemove to get the screen into the expcted state for the start
-            // of the click action.
-            // switch (nextStep.type) {
-            //     case 'stop':
-            //     case 'click':
-            //     case 'dblclick':
-            //     case 'contextmenu':
-            //     case 'wheel':
-            //         // if the next step is any implicit mouse operation, we want to mousein into the next location, so as to change the screen correctly with hover effect.
-            //         // this requires moving (back) to the current location first, then into the next location 
-            //         await this.mousemove(this.mouseLocation);
-            //         await this.mousemove(nextStep);
-            //         if (nextStep.hoverTime) {
-            //             await sleep(nextStep.hoverTime);
-            //         }
-            //         break;
-            // }
 
             differencesPng = false; // if the last time through we were able to take a screenshot or not
 
@@ -610,6 +637,7 @@ export class Player {
             // these parameters are here to resize the friggin screen in the first place - so png height is right? why did I ever switch the
             // tab sizes in the first place??
             try {
+
                 // this is a little weird, I can check the size before hand, but it's more efficient to 
                 // assume that it will work, than to check every time. make the common case fast.
                 if (resize) {
@@ -691,7 +719,12 @@ export class Player {
 
         // result can come back undefined/null. (e.g. debugger not attached, or can detach wihle the command is in flight)
         let dataUrl = 'data:image/png;base64,' + result.data;
-        return dataUrl;
+        return new Screenshot({
+            dataUrl: dataUrl,
+            tab: {
+                url: this.tab.chromeTab.url
+            }
+        });
     }
 
     /**
@@ -705,14 +738,15 @@ export class Player {
     */
     async _takeScreenshot(expectedWidth, expectedHeight) {
         // unthrottled. 
-        let dataUrl = await this.captureScreenshotAsDataUrl();
-        let png = await Player.dataUrlToPNG(dataUrl);
+        let partialSS = await this.captureScreenshotAsDataUrl();
+        let png = await Player.dataUrlToPNG(partialSS.dataUrl);
         if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
             throw new Error(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}.`);
         }
         return new Screenshot({
-            png,
-            dataUrl
+            png: png,
+            dataUrl: partialSS.dataUrl,
+            tab: partialSS.tab
         });
     }
 
@@ -722,8 +756,8 @@ export class Player {
      * @throws {Exception} on failure.
      */
     async _debuggerSendCommandRaw(method, commandParams) {
-        console.debug(`  begin debugger send command ${method}`, commandParams);
-        let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
+        console.debug(`  begin debugger send command tabId:${this.tab.chromeTab.id} ${method}`, commandParams);
+        let result = await (new Promise( resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
         }
@@ -797,6 +831,9 @@ export class Player {
         console.debug(`debugger attached`);
     }
 
+    /** stop the player from playing. any control after an awaited instruction will
+     * check this and return control.
+     */
     stopPlaying() {
         /** used to async cancel a playing test */
         this._stopPlaying = true;

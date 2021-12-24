@@ -2,6 +2,13 @@ import { Player } from "../player.js";
 
 /** A container for properties of a screenshot */
 export class Screenshot {
+    /**
+     * This is the tab identifer (just url really) of the tab this screenshot was taken from.
+     */
+    tab = {
+        url: ''
+    };
+
     /** 
      * A dataurl for the screenshot.
      * @type {string}  
@@ -20,12 +27,13 @@ export class Screenshot {
 
     /**
      * 
-     * @param {object} args 
+     * @param {Screenshot} args 
      */
     constructor(args = {}) {
         this.dataUrl = args.dataUrl;
         this.png = args.png;
         this.fileName = args.fileName;
+        this.tab = args.tab;
     }
 
     /** A promise that is resolved once we have loaded the dataUrl */
