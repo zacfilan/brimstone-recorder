@@ -1,13 +1,13 @@
 import { Player } from "../player.js";
+import { Tab } from "../tab.js";
 
 /** A container for properties of a screenshot */
 export class Screenshot {
     /**
-     * This is the tab identifer (just url really) of the tab this screenshot was taken from.
+     * This is the tab this screenshot was taken from.
+     * @type {Tab}
      */
-    tab = {
-        url: ''
-    };
+    tab = null;
 
     /** 
      * A dataurl for the screenshot.

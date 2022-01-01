@@ -100,7 +100,7 @@ async function actionOnClickedHandler(tab) {
       }
     }
     catch (e) {
-      console.log('cannot find an open brimstone workspace window');
+      console.debug('cannot find an open brimstone workspace window');
     }
   }
 

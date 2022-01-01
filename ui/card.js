@@ -1,6 +1,7 @@
 import { Player } from "../player.js"
 import { Screenshot } from "./screenshot.js";
 import { loadOptions } from "../options.js";
+import { Tab } from "../tab.js";
 
 const PNG = png.PNG;
 
@@ -40,7 +41,12 @@ export class TestAction {
     /** 
      * @type {object}
      * @property {number} frameId frame in the tab that generated this action */
-    sender;
+     sender;
+
+    /**
+     * @type {Tab} info about the tab this action was recorded on.
+     */
+    tab = null;
 
     /**
      * object that describes the boundingClientRect in percentages
@@ -55,12 +61,6 @@ export class TestAction {
 
     /** text to display in UI about this action */
     description;
-
-    /** the tabHeight when this action was recorded. */
-    tabHeight;
-
-    /** the tabWidth when this action was recorded. */
-    tabWidth;
 
     /** the index of this action within the full test */
     index;
@@ -151,6 +151,7 @@ export class TestAction {
 
     constructor(args) {
         Object.assign(this, args);
+        this.tab = new Tab(this.tab);
     }
 
     /**
@@ -174,10 +175,8 @@ export class TestAction {
             event: this.event, // curated properties from an Event
             x: this.x,
             y: this.y,
-            sender: this.sender,
+            tab: this.tab,
             index: this.index,
-            tabHeight: this.tabHeight,
-            tabWidth: this.tabWidth,
             overlay: this.overlay,
             description: this.description,
             memoryUsed: this.memoryUsed,
@@ -361,7 +360,7 @@ export class TestAction {
             footer = '';
         }
 
-        footer += ` ${this.tabWidth}x${this.tabHeight} `;
+        footer += ` tab:${this.tab.virtualId} ${this.tab.width}x${this.tab.height} `;
         footer += `<div class="stepNumber">${this.index + 1}/${this.test.steps.length}</div>`;
         html += `
         </div>

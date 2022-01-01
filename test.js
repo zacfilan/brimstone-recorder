@@ -253,11 +253,22 @@ export class Test {
         let screenshotPromises = [];
         for (let i = 0; i < actions.length; ++i) {
             // convert old tests
-            if (actions[i].type === 'start') {
-                actions[i].type = 'goto';
+            let _action = actions[i];
+            if (_action.type === 'start') {
+                _action.type = 'goto';
             }
+            if(_action.sender) {
+                _action.tab = sender;
+            }
+            if(_action.tabWidth) {
+                _action.tab.width = _action.tabWidth;
+                _action.tab.height = _action.tabHeight;
+                delete _action.tabWidth;
+                delete _action.tabHeight;
+            }
+            //
 
-            let action = new TestAction(actions[i]);
+            let action = new TestAction(_action);
             this.updateOrAppendAction(action);
             let screenshotPromise;
 

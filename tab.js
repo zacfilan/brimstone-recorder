@@ -2,6 +2,18 @@ import { sleep } from "./utilities.js";
 import * as Errors from "./error.js";
 import { loadOptions } from "./options.js";
 
+/**
+ * Wrapper for chromeTab.
+ * 
+ * Facilitates resizing a tab to the desired size.
+ * 
+ * Also provides methods for *creating* a chromeWindow
+ * and chromeTab for required incognito'ness.
+ * 
+ * The native height, and width
+ * properties are the *desired* height and width which 
+ * can differ from the associated chromeTab properties. 
+ */
 export class Tab {
     /**
      * 
@@ -13,11 +25,6 @@ export class Tab {
         */
         this.chromeTab = otherTab?.chromeTab;
 
-        /** The chrome window this tab is in.
-         * @type {chrome.windows.Window}
-         */
-        this.chromeWindow = otherTab?.chromeWindow;
-
         /** The desired height of the tab. May differ from the associated chromeTab property. */
         this.height = otherTab?.height || 0;
 
@@ -26,17 +33,31 @@ export class Tab {
 
         /** The chrome tab url, or perhaps the original that redirected to the chrome tab url. May differ from the associated chromeTab property */
         this.url = otherTab?.url;
+        
+        /**
+         *  A unique id for this tab in this recording. The real ones are not persistant, so assign a "virtual" tab identifier 
+        * (starting from 0) to each tab in the order they are created (during the recording or playback).
+        */
+        this.virtualId = otherTab?.virtualId;
     }
 
+    toJSON() {
+        return {
+            height: this.height,
+            width: this.width,
+            url: this.url,
+            virtualId: this.virtualId
+        };
+    }
+    
     /** 
      * Re-populates this instance from the chrome tab id.
-     * @param {chrome.tabs.Tab} tab
+     * @param {chrome.tabs.Tab} chromeTab
      */
-    async fromChromeTab(tab) {
-        this.chromeTab = tab;
-        this.chromeWindow = await chrome.windows.get(tab.windowId);
+    fromChromeTab(chromeTab) {
+        this.chromeTab = chromeTab;
 
-        // give these sane defaults.
+        // give these defaults.
         this.height = this.chromeTab.height;
         this.width = this.chromeTab.width;
         this.url = this.chromeTab.url;
@@ -54,7 +75,7 @@ export class Tab {
         
         let options = await loadOptions();
         // empirically, it needs to be visible to work
-        await chrome.windows.update(this.chromeWindow.id, { focused: true });
+        await chrome.windows.update(this.chromeTab.windowId, { focused: true });
 
         console.debug(`resize viewport to ${this.width}x${this.height} requested`);
 
@@ -73,7 +94,7 @@ export class Tab {
 
             if (distance.innerHeight != this.height || distance.innerWidth != this.width) {
                 // it's wrong
-                await chrome.windows.update(this.chromeWindow.id, {
+                await chrome.windows.update(this.chromeTab.windowId, {
                     width: distance.borderWidth + this.width,
                     height: distance.borderHeight + this.height
                 });
@@ -134,13 +155,13 @@ export class Tab {
             await this.remove();
         }
 
-        this.chromeWindow = await chrome.windows.create({
+        let chromeWindow = await chrome.windows.create({
             type: "normal",
             focused: false, // keep focus off omni bar when we open a new incognito window
             incognito: incognito // if true this will create the window "You've gone Incognito" 
         });
 
-        [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: this.chromeWindow.id });
+        [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: chromeWindow.id });
 
         this.url = url;
         // this better be a URL that I can attach a debugger to !
@@ -161,8 +182,7 @@ export class Tab {
     async fromTabId(id) {
         try {
             this.chromeTab = await chrome.tabs.get(id);
-            this.chromeWindow = await chrome.windows.get(this.chromeTab.windowId);  // if it fails we can't connect - ok.
-            return await this.reuse({ incognito: this.chromeWindow.incognito, focused: false });
+            return await this.reuse({ incognito: this.chromeTab.incognito, focused: false });
         }
         catch (e) {
             return false;
@@ -172,8 +192,8 @@ export class Tab {
     /** configure this from a windowId. returns true on success false on failure. */
     async fromWindowId(id) {
         try {
-            this.chromeWindow = await chrome.windows.get(id);  // if it fails we can't connect - ok.
-            return await this.reuse({ incognito: this.chromeWindow.incognito, focused: false });
+            let chromeWindow = await chrome.windows.get(id);  // if it fails we can't connect - ok.
+            return await this.reuse({ incognito: chromeWindow.incognito, focused: false });
         }
         catch (e) {
             return false;
@@ -188,21 +208,21 @@ export class Tab {
     async reuse({ url = null, incognito, focused = true }) {
         try {
             // make sure it is still there.
-            this.chromeWindow = await chrome.windows.get(this.chromeWindow?.id);  // if it fails we can't connect - ok.
+            let chromeWindow = await chrome.windows.get(this.chromeTab.windowId);  // if it fails we can't connect - ok.
 
-            if (incognito !== this.chromeWindow.incognito) {
+            if (incognito !== chromeWindow.incognito) {
                 throw new Error('wrong mode'); // and create one
             }
 
             // i guess they could have maximized it on their own
-            if (this.chromeWindow.state !== 'normal') {
-                window.alert(`The window state of the tab you want to record or playback is '${this.chromeWindow.state}'. It will be set to 'normal' to continue.`);
-                await chrome.windows.update(this.chromeWindow.id, { state: 'normal' });
+            if (chromeWindow.state !== 'normal') {
+                window.alert(`The window state of the tab you want to record or playback is '${chromeWindow.state}'. It will be set to 'normal' to continue.`);
+                await chrome.windows.update(chromeWindow.id, { state: 'normal' });
             }
             if (focused) {
-                await chrome.windows.update(this.chromeWindow.id, { focused: true });
+                await chrome.windows.update(chromeWindow.id, { focused: true });
             }
-            [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: this.chromeWindow.id });
+            [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: chromeWindow.id });
             if (url) {
                 this.url = url;
                 // this better be a URL that I can attach a debugger to !
@@ -231,11 +251,66 @@ export class Tab {
     /** Remove the currently configured window (if it exists) */
     async remove() {
         try {
-            await chrome.windows.remove(this.chromeWindow.id);
+            await chrome.windows.remove(this.chromeTab.windowId);
         }
         catch (e) { }
     }
 
+    /**
+     * Add a virtualId for this Tab. A virtual id is assigned
+     * in the order the tab was created during a recording (or
+     * during playback).
+     */
+    trackCreated() {
+        if(!Tab.getByVirtualId(this.virtualId)) {
+            this.virtualId = Tab._tabsCreated++;
+            Tab._open.push(this);
+            console.debug(`tracking tab`, this);
+        }
+    }
+
+    /**
+     * Remove this Tab (by virtualId) from those being tracked.
+     */
+    trackRemoved() {
+        Tab._open = Tab._open.filter( tab => tab.virtualId !== this.virtualId );
+    }
 };
 
+/** 
+ * Dring playback or recording as tabs are created
+ * they are assigned a sequntial virtual id.
+* @type {Tab[]}
+*/
+Tab._tabsCreated = 0;
 
+/**
+ * @type {Tab[]} the tabs that tracked as currently open.
+ */
+Tab._open = [];
+
+/** The tab we believe is the active tab currently. 
+ * @type {Tab} the tab we believe is the active tab.
+*/
+Tab.active = null;
+
+/**
+ * Get the still open Tab with the given virtual ID
+ * @param {number} vid 
+ */
+ Tab.getByVirtualId = function(vid) {
+    return Tab._open.find( tab => tab.virtualId === vid);
+}
+
+/**
+ * Get the still open Tab with the given real ID
+ * @param {number} rid 
+ */
+ Tab.getByRealId = function(rid) {
+    return Tab._open.find( tab => tab.chromeTab.id === rid);
+}
+
+Tab.reset = function() {
+    Tab._open = [];
+    Tab._tabsCreated = 0;
+}

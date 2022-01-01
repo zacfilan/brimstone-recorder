@@ -123,6 +123,11 @@ export class Player {
     /** asynchronously injectable switch to stop the player from playing */
     _stopPlaying = false;
 
+    /**
+     * @type {Promise<any>} way to block a debugger cmd until the debugger is (re)attached.
+     */
+    _debuggerAttached = null;
+
     constructor() {
         /**
          * The tab we are playing on.
@@ -132,40 +137,31 @@ export class Player {
     }
 
     /**
-     * In order to play an action, this player
+     * In order to _play_ an action, this player
      * must be configured to drive the tab that
-     * the action occurs on and the debugger needs
+     * the action occurs on, and the debugger needs
      * to be attached to that tab. 
+     * @param {TestAction} action the action
      */
     async configureForAction(action) {
-        if (action.sender?.href && this.tab.chromeTab.url !== action.sender.href 
-            //|| this.tab.chromeWindow.title !== action.sender.title
-            )
-        {
-            // the next action we want to drive is to a different tab/frame so switch.
-            await this.switchTab(action);
-            await this.attachDebugger({tab: this.tab}); // ecessary?
+        // this action might be on a different tab
+        // and/or have a different size
+        // the next action we want to drive is to a different tab/frame so switch over to it.
+        console.debug(`begin (try) switch to virtual tabId:${action.tab.virtualId} w/url ${action.tab.url}`);
+        let tab = Tab.getByVirtualId(action.tab.virtualId);
+        if (!tab) {
+            throw new Error(`no virtual tabId:${action.tab.virtualId} registered (yet)`);
+        }
+        this.tab = new Tab(tab);
+        this.tab.height = action.tab.height;
+        this.tab.width = action.tab.width;
+
+        console.debug(`end switched to virtual tabId:${this.tab.virtualId} realTabId:${this.tab.chromeTab.id}`, this.tab);
+
+        if (await this.attachDebugger({ tab: this.tab })) {
             await this.tab.resizeViewport();
         }
-    }
-
-    /**
-     * 
-     * Configure this player to drive the
-     * provided tab.
-     */
-    async switchTab(action) {
-        console.debug(`begin switch to tab w/url ${action.sender.href}`);
-        let tabs = await chrome.tabs.query({ url: action.sender.href } );
-//        let tabs = await chrome.tabs.query({ url: tab.href, title: tab.title } );
-        if(tabs.length !== 1) {
-            throw new Error(`Can't locate tab`);
-        }
-        this.tab = new Tab();
-        await this.tab.fromChromeTab(tabs[0]);
-        this.tab.width = action.tabWidth;
-        this.tab.height = action.tabHeight;
-        console.debug(`end switch to tabId:${this.tab.chromeTab.id}`, this.tab);
+        // else it is on the same tab, so we don't need to switch.
     }
 
     /** 
@@ -282,24 +278,10 @@ export class Player {
     /** close the tab with the given url */
     async close(action) {
         // find the tab with the given url and close it
-        let tabs = await chrome.tabs.query({
-            url: action.url
-        });
-
-        if (tabs.length === 1) {
-            await chrome.tabs.remove(tabs[0].id);
+        let tab = Tab.getByVirtualId(action.tab.virtualId);
+        if (tab) {
+            await chrome.tabs.remove(tab.chromeTab.id);
         }
-
-        // what tab does the user interact with after this tab closes? no idea. the only way to know is after the user
-        // records the next action (from some tab). if the user ends the recording immediately after closing this tab 
-        // we never get that tab identification for the next tab, which is used to determine when this test ends.
-        // options:
-        // 1) on close don't add a wait. add a no screenshot available, operation that get's overwritten if there is a next action recorded.
-        // 2) force the app to go to last tab on stack **probably the correct thing** (test if there isn't one!)
-        // 3) force the app to go to now active tab (same as #2?)
-
-        // #2 requires tracking the tab stack. then i can switch the debugger here or in the callback for the onRemoved. probably the latter.
-        
     }
 
     async keypress(action) {
@@ -608,11 +590,10 @@ export class Player {
         /** Used to display the results of applying the acceptableDifferences to the actual image. */
         let differencesPng = false;
         let i = 0;
-        let resize = false;
+        let badTab = false;
 
         // If the next action is on a different tab, then we need to switch to that tab to 
         // take the screenshot.
-        await this.configureForAction(nextStep);
 
         // this loop will run even if the app is in the process of navigating to the next page.
         while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
@@ -637,18 +618,20 @@ export class Player {
             // these parameters are here to resize the friggin screen in the first place - so png height is right? why did I ever switch the
             // tab sizes in the first place??
             try {
-
-                // this is a little weird, I can check the size before hand, but it's more efficient to 
+                // this is a little weird, I can check for the correct tab + tab size before hand, but it's more efficient to 
                 // assume that it will work, than to check every time. make the common case fast.
-                if (resize) {
-                    resize = false;
-                    await this.tab.resizeViewport(); // I am assuming it was because of the size
+                if (nextStep.tab.virtualId !== this.tab.virtualId) {
+                    await this.configureForAction(nextStep);
+                }
+                if (badTab) {
+                    badTab = false;
+                    await this.tab.resizeViewport();
                 }
                 nextStep.actualScreenshot = await this._takeScreenshot(this.tab.width, this.tab.height);
             }
             catch (e) {
-                console.debug(e.message + '. resize and try again.');
-                resize = true;
+                console.debug(e.message + '. try again.');
+                badTab = true;
                 continue;
             }
 
@@ -719,11 +702,15 @@ export class Player {
 
         // result can come back undefined/null. (e.g. debugger not attached, or can detach wihle the command is in flight)
         let dataUrl = 'data:image/png;base64,' + result.data;
+
+        // debugging
+        //let png = await Player.dataUrlToPNG(dataUrl);
+        //console.debug(`actual screenshot ${png.width}x${png.height}`);
+        //console.debug(`capture ss ${this.tab.width}x${this.tab.height}`);
+
         return new Screenshot({
             dataUrl: dataUrl,
-            tab: {
-                url: this.tab.chromeTab.url
-            }
+            tab: this.tab
         });
     }
 
@@ -740,6 +727,7 @@ export class Player {
         // unthrottled. 
         let partialSS = await this.captureScreenshotAsDataUrl();
         let png = await Player.dataUrlToPNG(partialSS.dataUrl);
+        console.debug(`took screenshot ${png.width}x${png.height}`);
         if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
             throw new Error(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}.`);
         }
@@ -756,8 +744,9 @@ export class Player {
      * @throws {Exception} on failure.
      */
     async _debuggerSendCommandRaw(method, commandParams) {
+        await this._debuggerAttached;
         console.debug(`  begin debugger send command tabId:${this.tab.chromeTab.id} ${method}`, commandParams);
-        let result = await (new Promise( resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
+        let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
         }
@@ -785,9 +774,10 @@ export class Player {
             catch (e) {
                 lastException = e;
                 if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
-                    console.log(`warn got exception while running debugger cmd ${method}:`, commandParams, e);
-                    await this.attachDebugger({ tab: this.tab });
-                    await this.tab.resizeViewport();
+                    console.warn(`got exception while running debugger cmd ${method}:`, commandParams, e);
+                    if (await this.attachDebugger({ tab: this.tab })) {
+                        await this.tab.resizeViewport();
+                    }
 
                     if (this.usedFor === 'playing') {
                         await sleep(2000);
@@ -804,31 +794,31 @@ export class Player {
         }
     }
 
-    /** Schedule attaching the debugger to the given tab.
+    /** 
+     * Schedule attaching the debugger to the given tab.
+     * Returns if an attach was atually performed.
     * @param {{tab: Tab}} 
     */
     async attachDebugger({ tab }) {
         console.debug(`schedule attach debugger`);
-        this.tab = tab;
-
-        await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id }, "1.3", _resolve)));
-        if (chrome.runtime.lastError?.message) {
-            if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
-                throw new Error(chrome.runtime.lastError.message); // not sure how to handle that.
+        return this._debuggerAttached = new Promise(async (resolve, reject) => {
+            await(new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id }, "1.3", _resolve)));
+            if (chrome.runtime.lastError?.message) {
+                if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
+                    reject(chrome.runtime.lastError.message); // not sure how to handle that.
+                }
+                // else we can ignore that, that's what we want, we are already attached
+                console.debug(`debugger already attached to tabId:${tab.chromeTab.id}`);
+                this.tab = tab;
+                resolve (false); // an attach was not required 
             }
-            // else we can ignore that, that's what we want
-        }
-        // else no error 
-
-        // not needed. but left since it took awhile to figure out.
-        //await monitorPageEvents();
-
-        // when you attach a debugger you need to wait a moment for the ["Brimstone" started debugging in this browser] banner to 
-        // start animating and changing the size of the window&viewport, before fixing the viewport area lost.
-        //await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
-
-        await sleep(500); // the animation should practically be done after this, but even if it isn't we can deal with it
-        console.debug(`debugger attached`);
+            else {
+                // else no error - implies that we actually needed to attach the debugger
+                console.debug(`debugger was attached to tabId:${tab.chromeTab.id}`);
+                this.tab = tab;
+                resolve (true); // an attach was required
+            }
+        });
     }
 
     /** stop the player from playing. any control after an awaited instruction will

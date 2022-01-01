@@ -215,6 +215,11 @@ class Recorder {
         // FIXME: a better solution is to create the recorder instance once, I know it's frameId
         // else keep the assigned frameId
 
+        /** The chromeTab.id this instance is running in. */
+        if (this._tabId === undefined) { //  we may reset when recovering from an error, don't lose the frameId
+            this._tabId = 0;
+        }
+
         /** Two way communication with the workspace */
         this._port = false;
 
@@ -378,8 +383,9 @@ class Recorder {
                 this.postMessageOffsetIntoIframes();
                 sendResponse();
                 return;
-            case 'setFrameId':
-                this._frameId = message.args.to;
+            case 'setIds':
+                this._frameId = message.args.frameId;
+                this._tabId = message.args.tabId;
                 sendResponse();
                 break;
             case 'hideCursor':
@@ -476,7 +482,7 @@ class Recorder {
      * If there is nothing pending it will be immediated transmitted.
      *
      * https://developer.chrome.com/docs/extensions/reference/runtime/#type-Port
-     * Note this automatically sends the Sender (frameId) info.
+     * Note this automatically sends the Sender (tabId/frameId) info.
      */
     pushMessage(msg) {
         this.cancelScheduleWaitActionDetection();
@@ -490,7 +496,7 @@ class Recorder {
      * Direct raw postMessage to the extension, frameId is added to message.
      */
     _postMessage(msg) {
-        msg.sender = { frameId: this._frameId, href: window.location.href };
+        msg.sender = { frameId: this._frameId, tabId: this._tabId, href: window.location.href };
         console.debug(`TX: ${msg.type} ${msg.sender.href}`, msg);
         this._port.postMessage(msg);
     }
