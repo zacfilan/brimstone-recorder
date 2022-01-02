@@ -376,6 +376,11 @@ window.addEventListener("error", async function (errorEvent) {
     if (options.developerMode) {
         window.alert(`🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`);
         await sleep(1000);
+        let dbg = console.debug;
+        console.debug = function(...args) {
+            args.unshift('  ');
+            return dbg(...args);
+        };
         debugger;
     }
     else {
@@ -918,7 +923,7 @@ async function startRecorders() {
 async function tellRecordersTheirFrameIds() {
     let tab = Tab.active;
     let tabId = tab.chromeTab.id;
-    console.debug(`connect: tell each recorder in tabId:${tabId} their frame id`);
+    console.debug(`connect: tell each recorder in tab:${tab.id} their frame id`);
     let frames = await (new Promise(response => chrome.webNavigation.getAllFrames({ tabId: tabId }, response))); // get all frames
     for (let i = 0; i < frames.length; ++i) {
         let frame = frames[i];
@@ -930,11 +935,11 @@ async function tellRecordersTheirFrameIds() {
 async function tabsOnRemovedHandler(tabId, removeInfo) {
     let tab = Tab.getByRealId(tabId);
     if (!tab) {
-        console.log(`untracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
+        console.debug(`untracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
         return;
     }
 
-    console.log(`tracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
+    console.debug(`tracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
     tab.trackRemoved();
 
 
@@ -962,7 +967,7 @@ async function tabsOnActivatedHandler(activeInfo) {
     Note that the tab's URL may not be set at the time this event fired, 
     but you can listen to onUpdated events so as to be notified when a URL is set.*/
 
-    console.log(`chromeTab tabId:${activeInfo.tabId} winId:${activeInfo.windowId} is activated.`, activeInfo);
+    console.debug(`chromeTab tabId:${activeInfo.tabId} winId:${activeInfo.windowId} is activated.`, activeInfo);
 
     if (isRecording()) {
         Tab.active = Tab.getByRealId(activeInfo.tabId);
@@ -987,7 +992,7 @@ async function tabsOnActivatedHandler(activeInfo) {
  * @param {chrome.tabs.Tab} chromeTab 
  */
 function tabsOnCreatedHandler(chromeTab) {
-    console.log(`tab tabId:${chromeTab.id} winId:${chromeTab.windowId} is created.`);
+    console.debug(`tab tabId:${chromeTab.id} winId:${chromeTab.windowId} is created.`);
 
     // the user performed an action that opened a new tab in *some* window.
     // should this be considered the tab we are recording now? does it matter?
@@ -1012,7 +1017,7 @@ function tabsOnCreatedHandler(chromeTab) {
  * @param {chrome.tabs.Tab} tab 
  */
 async function tabsOnUpdatedHandler(tabId, changeInfo, tab) {
-    console.log(`tab tabId:${tabId} winId:${tab.windowId} is updated.`, changeInfo);
+    console.debug(`tab tabId:${tabId} winId:${tab.windowId} is updated.`, changeInfo);
 }
 
 /**
@@ -1020,16 +1025,16 @@ async function tabsOnUpdatedHandler(tabId, changeInfo, tab) {
  * @param {chrome.windows.Window} window 
  */
 async function windowsOnCreatedHandler(window) {
-    console.log(`winId:${window.id} is created.`);
+    console.debug(`winId:${window.id} is created.`);
 }
 
 async function windowsOnFocusChangedHandler(window) {
     // first on created, is this
-    console.log(`focus changed to winId:${window.id}.`);
+    console.debug(`focus changed to winId:${window.id}.`);
 }
 
 async function windowsOnRemovedHandler(windowId) {
-    console.log(`winId:${windowId} is removed.`);
+    console.debug(`winId:${windowId} is removed.`);
 }
 
 // function debugEvent(debugee, method, params) {
@@ -1091,7 +1096,7 @@ async function prepareToRecord() {
     let tab = Tab.active;
     player.usedFor = 'recording';
 
-    console.debug(`connect: begin - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
+    console.debug(`connect: begin - preparing to record tab:${tab.id} ${tab.url}`);
     console.debug(`connect:       -  tab is ${tab.width}x${tab.height}`);
 
     addEventHandlers();
@@ -1626,7 +1631,9 @@ async function userEventToAction(userEvent) {
             testAction.description = 'Unknown!';
             break;
     }
-    console.log(`record vtabId:${testAction.tab.virtualId} step:${testAction.index} ${testAction.description} ${testAction.tab.width}x${testAction.tab.height}`);
+
+    let stream = testAction.type === 'wait' ? 'debug': 'log';
+    console[stream](`[tab:${testAction.tab.id} step:${testAction.index}] record ${testAction.description}`);
     return testAction;
 }
 
@@ -1643,6 +1650,10 @@ async function recordUserAction(userEvent) {
     wait.sender = {
         href: _lastScreenshot?.tab?.url
     };
+    if(_lastScreenshot) {
+        wait.tab = _lastScreenshot.tab;
+    }
+    // else we assigned Tab.active to wait.tab.
 
     updateStepInView(action); // update the UI
     return action;
@@ -1814,7 +1825,7 @@ let recordTabFunctionExecuting = false;
  */
 async function recordTab() {
     let tab = Tab.active;
-    console.log(`record tabId: ${tab.chromeTab.id}`);
+    console.log(`record (different) tab:${tab.id}`);
 
     if (recordTabFunctionExecuting) {
         console.warn('the recordTabFunction is already in progress');
@@ -1837,7 +1848,7 @@ async function recordTab() {
  */
 async function playTab() {
     let tab = Tab.active;
-    console.log(`play tabId: ${tab.chromeTab.id}`);
+    console.log(`play tab:${tab.chromeTab.id}`);
 
     // FIXME: what happens if we spawn a "real window"?
     player.tab = tab; // at this point the debugger is already attached, to the popup (which is like a tab to the mainwindow, but in its own browser window?)

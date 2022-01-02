@@ -147,16 +147,16 @@ export class Player {
         // this action might be on a different tab
         // and/or have a different size
         // the next action we want to drive is to a different tab/frame so switch over to it.
-        console.debug(`begin (try) switch to virtual tabId:${action.tab.virtualId} w/url ${action.tab.url}`);
+        console.debug(`begin (try) switch to tab:${action.tab.id} w/url ${action.tab.url}`);
         let tab = Tab.getByVirtualId(action.tab.virtualId);
         if (!tab) {
-            throw new Error(`no virtual tabId:${action.tab.virtualId} registered (yet)`);
+            throw new Error(`no tab:${action.tab.id} registered (yet)`);
         }
         this.tab = new Tab(tab);
         this.tab.height = action.tab.height;
         this.tab.width = action.tab.width;
 
-        console.debug(`end switched to virtual tabId:${this.tab.virtualId} realTabId:${this.tab.chromeTab.id}`, this.tab);
+        console.debug(`end switched to tab:${this.tab.id}`, this.tab);
 
         if (await this.attachDebugger({ tab: this.tab })) {
             await this.tab.resizeViewport();
@@ -199,7 +199,7 @@ export class Player {
                 await this.onBeforePlay(action);
             }
 
-            console.log(`begin play [${action.index}] : ${action.description}`);
+            console.log(`[tab:${action.tab.virtualId} step:${action.index}] begin play ${action.description}`);
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
             // performed this action, we just need to put the mouse in the correct spot and
             // do the screen verification again
@@ -210,7 +210,7 @@ export class Player {
             else {
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
             }
-            console.log(`end   play [${action.index}] : ${action.description}`);
+            console.log(`[tab:${action.tab.virtualId} step:${action.index}] end   play ${action.description}`);
 
             // grep for FOCUS ISSUE for details
             if (i === startIndex && action.type === 'goto') {
@@ -745,12 +745,12 @@ export class Player {
      */
     async _debuggerSendCommandRaw(method, commandParams) {
         await this._debuggerAttached;
-        console.debug(`  begin debugger send command tabId:${this.tab.chromeTab.id} ${method}`, commandParams);
+        console.debug(`begin debugger send command tabId:${this.tab.id} ${method}`, commandParams);
         let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
         if (chrome.runtime.lastError?.message) {
             throw new Error(chrome.runtime.lastError.message);
         }
-        console.debug(`  end   debugger send command ${method}`, commandParams);
+        console.debug(`end   debugger send command ${method}`, commandParams);
         return result; // the debugger method may be a getter of some kind.
     }
 
@@ -814,7 +814,7 @@ export class Player {
             }
             else {
                 // else no error - implies that we actually needed to attach the debugger
-                console.debug(`debugger was attached to tabId:${tab.chromeTab.id}`);
+                console.debug(`debugger was attached to tab:${tab.id}`);
                 this.tab = tab;
                 resolve (true); // an attach was required
             }

@@ -65,6 +65,13 @@ export class Tab {
         return this;
     }
 
+    /**
+     * an identifier for debugging
+     */
+    get id() {
+        return `${this.virtualId ?? '?' }:${this.chromeTab?.id ?? '???'}`;
+    }
+
     /** 
      * Resize the viewport of this tab to match its width and height properties.
      * */
@@ -88,6 +95,9 @@ export class Tab {
 
             await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
             distance = await this.getViewport(); // get viewport data
+            if(!distance) {
+                continue;
+            }
             if (distance.devicePixelRatio !== 1) {
                 throw new Errors.PixelScalingError(); // this must be windows scaling, I cannot reset that.
             }
@@ -98,7 +108,7 @@ export class Tab {
                     width: distance.borderWidth + this.width,
                     height: distance.borderHeight + this.height
                 });
-                console.debug(`  resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
+                console.debug(`resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
             }
             else {
                 // measure twice cut once? It seems that I may be getting a stale measurement the first time.
@@ -108,7 +118,7 @@ export class Tab {
             }
         }
 
-        console.debug(`  viewport now measured to be ${distance.innerWidth}x${distance.innerHeight} `);
+        console.debug(`viewport now measured to be ${distance.innerWidth}x${distance.innerHeight} `);
         if (i == 10) {
             throw new Errors.ResizeViewportError();
         }
@@ -136,10 +146,11 @@ export class Tab {
         });
 
         let distance = frames[0].result;
-
-        distance.borderWidth = distance.outerWidth - distance.innerWidth;
-        distance.borderHeight = distance.outerHeight - distance.innerHeight;
-
+        if(distance) {
+            distance.borderWidth = distance.outerWidth - distance.innerWidth;
+            distance.borderHeight = distance.outerHeight - distance.innerHeight;
+        }
+        // else th script failed somehow
         return distance;
     };
 
@@ -265,7 +276,7 @@ export class Tab {
         if(!Tab.getByVirtualId(this.virtualId)) {
             this.virtualId = Tab._tabsCreated++;
             Tab._open.push(this);
-            console.debug(`tracking tab`, this);
+            console.debug(`tracking tab:${this.id}`, this);
         }
     }
 
