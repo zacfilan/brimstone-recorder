@@ -33,7 +33,7 @@ export class Tab {
 
         /** The chrome tab url, or perhaps the original that redirected to the chrome tab url. May differ from the associated chromeTab property */
         this.url = otherTab?.url;
-        
+
         /**
          *  A unique id for this tab in this recording. The real ones are not persistant, so assign a "virtual" tab identifier 
         * (starting from 0) to each tab in the order they are created (during the recording or playback).
@@ -49,7 +49,7 @@ export class Tab {
             virtualId: this.virtualId
         };
     }
-    
+
     /** 
      * Re-populates this instance from the chrome tab id.
      * @param {chrome.tabs.Tab} chromeTab
@@ -69,22 +69,22 @@ export class Tab {
      * an identifier for debugging
      */
     get id() {
-        return `${this.virtualId ?? '?' }:${this.chromeTab?.id ?? '???'}`;
+        return `${this.virtualId ?? '?'}:${this.chromeTab?.id ?? '???'}`;
     }
 
     /** 
      * Resize the viewport of this tab to match its width and height properties.
      * */
     async resizeViewport() {
-        if(!this.height || !this.width) {
+        if (!this.height || !this.width) {
             return;
         }
-        
+
         let options = await loadOptions();
         // empirically, it needs to be visible to work
         await chrome.windows.update(this.chromeTab.windowId, { focused: true });
 
-        console.debug(`resize viewport to ${this.width}x${this.height} requested`);
+        console.debug(`tab:${this.id} resize viewport to ${this.width}x${this.height} requested`);
 
         let i = 0; let distance;
         let matched = 0;
@@ -93,11 +93,15 @@ export class Tab {
                 await sleep(137); // we get once chance to be fast
             }
 
-            await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
-            distance = await this.getViewport(); // get viewport data
-            if(!distance) {
+            try {
+                await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
+                distance = await this.getViewport(); // get viewport data
+            }
+            catch (e) {
+                console.warn(e);
                 continue;
             }
+
             if (distance.devicePixelRatio !== 1) {
                 throw new Errors.PixelScalingError(); // this must be windows scaling, I cannot reset that.
             }
@@ -146,11 +150,8 @@ export class Tab {
         });
 
         let distance = frames[0].result;
-        if(distance) {
-            distance.borderWidth = distance.outerWidth - distance.innerWidth;
-            distance.borderHeight = distance.outerHeight - distance.innerHeight;
-        }
-        // else th script failed somehow
+        distance.borderWidth = distance.outerWidth - distance.innerWidth;
+        distance.borderHeight = distance.outerHeight - distance.innerHeight;
         return distance;
     };
 
@@ -273,7 +274,7 @@ export class Tab {
      * during playback).
      */
     trackCreated() {
-        if(!Tab.getByVirtualId(this.virtualId)) {
+        if (!Tab.getByVirtualId(this.virtualId)) {
             this.virtualId = Tab._tabsCreated++;
             Tab._open.push(this);
             console.debug(`tracking tab:${this.id}`, this);
@@ -284,7 +285,8 @@ export class Tab {
      * Remove this Tab (by virtualId) from those being tracked.
      */
     trackRemoved() {
-        Tab._open = Tab._open.filter( tab => tab.virtualId !== this.virtualId );
+        Tab._open = Tab._open.filter(tab => tab.virtualId !== this.virtualId);
+        // something else should be made active!
     }
 };
 
@@ -309,19 +311,19 @@ Tab.active = null;
  * Get the still open Tab with the given virtual ID
  * @param {number} vid 
  */
- Tab.getByVirtualId = function(vid) {
-    return Tab._open.find( tab => tab.virtualId === vid);
+Tab.getByVirtualId = function (vid) {
+    return Tab._open.find(tab => tab.virtualId === vid);
 }
 
 /**
  * Get the still open Tab with the given real ID
  * @param {number} rid 
  */
- Tab.getByRealId = function(rid) {
-    return Tab._open.find( tab => tab.chromeTab.id === rid);
+Tab.getByRealId = function (rid) {
+    return Tab._open.find(tab => tab.chromeTab.id === rid);
 }
 
-Tab.reset = function() {
+Tab.reset = function () {
     Tab._open = [];
     Tab._tabsCreated = 0;
 }

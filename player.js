@@ -199,7 +199,7 @@ export class Player {
                 await this.onBeforePlay(action);
             }
 
-            console.log(`[tab:${action.tab.virtualId} step:${action.index}] begin play ${action.description}`);
+            console.log(`[tab:${action.tab.id} step:${action.index}] begin play ${action.description}`);
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
             // performed this action, we just need to put the mouse in the correct spot and
             // do the screen verification again
@@ -208,9 +208,10 @@ export class Player {
                 //await this.mousemove(this.mouseLocation); 
             }
             else {
+                action.tab.chromeTab = this.tab.chromeTab; // just for debugging
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
             }
-            console.log(`[tab:${action.tab.virtualId} step:${action.index}] end   play ${action.description}`);
+            console.log(`[tab:${action.tab.id} step:${action.index}] end   play ${action.description}`);
 
             // grep for FOCUS ISSUE for details
             if (i === startIndex && action.type === 'goto') {
@@ -806,17 +807,20 @@ export class Player {
             if (chrome.runtime.lastError?.message) {
                 if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
                     reject(chrome.runtime.lastError.message); // not sure how to handle that.
+                    return;
                 }
                 // else we can ignore that, that's what we want, we are already attached
                 console.debug(`debugger already attached to tabId:${tab.chromeTab.id}`);
                 this.tab = tab;
                 resolve (false); // an attach was not required 
+                return;
             }
             else {
                 // else no error - implies that we actually needed to attach the debugger
                 console.debug(`debugger was attached to tab:${tab.id}`);
                 this.tab = tab;
                 resolve (true); // an attach was required
+                return;
             }
         });
     }
