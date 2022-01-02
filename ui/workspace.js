@@ -64,13 +64,6 @@ let brimstone = {
     }
 }
 
-/** 
- * We initially must obtain a tab of the right incognito'ness' to
- * *start* playing or recording on. This is sticky.
- * @type {Tab}
- */
-var startingTab = new Tab();
-
 const player = new Player();
 /** used to *not* record pre-requisite screenshots when in the shadowDOM. */
 var shadowDOMScreenshot = 0;
@@ -97,7 +90,7 @@ class Actions {
 
     /** try to record without specifying a URL */
     async recordActiveTab() {
-        await recordSomething(true); // this can start a new recording of the the active tab (no initial goto url)
+        await recordSomething(false); // this can start a new recording of the the active tab (no initial goto url)
     }
 
     async exit() {
@@ -377,10 +370,8 @@ window.addEventListener("error", async function (errorEvent) {
         window.alert(`🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`);
         await sleep(1000);
         let dbg = console.debug;
-        console.debug = function(...args) {
-            args.unshift('  ');
-            return dbg(...args);
-        };
+        // this mreserves the caller file/line, and appends a few spaces to the message
+        console.debug = Function.prototype.bind.call(dbg, console, '  ');
         debugger;
     }
     else {
@@ -392,8 +383,6 @@ window.addEventListener("error", async function (errorEvent) {
     // grab the parent window id from the query parameter   
     const urlParams = new URLSearchParams(window.location.search);
     let _windowId = parseInt(urlParams.get('parent'), 10);
-    await startingTab.fromWindowId(_windowId); // start with this one
-    startingTab.trackCreated();
 
     let allowedIncognitoAccess = await (new Promise(resolve => chrome.extension.isAllowedIncognitoAccess(resolve)));
     if (!allowedIncognitoAccess) {
@@ -679,7 +668,7 @@ $('#playButton').on('click', async function () {
             recordings: []
         };
 
-        Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
+        let startingTab = await getActiveApplicationTab();
 
         do {
             nextTest = false;
@@ -708,8 +697,12 @@ $('#playButton').on('click', async function () {
                 if (!await startingTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
                     await startingTab.create({ url: "about:blank", incognito: Test.current.incognito });   // if not create
                 }
+
+                Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
             }
             else {
+                // do not reset we are resuming play from current state
+
                 // we are resuming play in the middle of some test in the suite. The startingTab needs to already 
                 // be up (and in the right state) to resume 
                 if (!await startingTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
@@ -720,13 +713,12 @@ $('#playButton').on('click', async function () {
             startingTab.width = actions[0].tab.width;
             startingTab.height = actions[0].tab.height;
 
-            let playingTab = new Tab(startingTab);
-            playingTab.trackCreated();
-            Tab.active = playingTab;
+            startingTab.trackCreated();
+            Tab.active = startingTab;
 
-            if (await player.attachDebugger({ tab: playingTab })) {
-                if (playingTab.url !== 'about:blank') {
-                    await playingTab.resizeViewport();
+            if (await player.attachDebugger({ tab: Tab.active })) {
+                if (Tab.active.url !== 'about:blank') {
+                    await Tab.active.resizeViewport();
                 }
             }
             await playTab();
@@ -942,18 +934,20 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
     console.debug(`tracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
     tab.trackRemoved();
 
-
     if (isRecording()) {
-        await recordUserAction({
-            type: 'close',
-            url: tab.chromeTab.url,
-            sender: {
-                href: tab.chromeTab.url
-            }
-        }); // convert userEvent to testaction, insert at given index
+        let userEvent = {
+                type: 'close',
+                url: tab.chromeTab.url,
+                sender: {
+                    href: tab.chromeTab.url
+                }
+        };
+        let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+        await userEventToAction({ type: 'wait' }); // create a new waiting action, but w/o a quick feedback next action
+        updateStepInView(action); // update the UI
 
-        if(Tab._open.length === 0) {
-           // we closed the only active tab, we should end the recording.
+        if (Tab._open.length === 0) {
+            // we closed the only active tab, we should end the recording.
             stopRecording();
         }
     }
@@ -1132,11 +1126,34 @@ async function focusTab() {
 }
 
 /**
+ * get *the* application tab. this can return a Tab without
+ * a bound chromeTab when there is no application tab.
+ * 
+ */
+async function getActiveApplicationTab() {
+    let tabs = await chrome.tabs.query({});
+    if (tabs.length > 2) {
+        let ok = await brimstone.window.confirm('There are multiple application tabs. The active tab will be the initial target.');
+        if (!ok) {
+            return;
+        }
+    }
+
+    let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
+    let recordChromeTab = tabs.find(tab => tab.windowId !== w.id);
+    let tab = new Tab();
+    if (recordChromeTab) {
+        await tab.fromChromeTab(recordChromeTab);
+    }
+    return tab;
+}
+
+/**
  * Let's record something!
  * @param {boolean} attachActiveTab Splice record or URL record
  * @returns 
  */
-async function recordSomething(attachActiveTab) {
+async function recordSomething(promptForUrl) {
     try {
         let button = $('#recordButton');
         if (button.hasClass('active')) {
@@ -1153,12 +1170,14 @@ async function recordSomething(attachActiveTab) {
         let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - unless the user is showing the last only!)
         //updateThumbs(); // If I actually changed it I should show that
 
-        // are we doing an incognito recording - this is determined by the option first, or the state of the tab we are going to use
-        Test.current.incognito = options.recordIncognito ? true : startingTab.chromeTab.incognito;
+        let startingTab = await getActiveApplicationTab();
+        // are we doing an incognito recording - this is determined by the option only now.
+        Test.current.incognito = options.recordIncognito;
 
-        // A completely fresh recording will prompt for the URL, else promp for splice record.
+        // A completely fresh recording will prompt for the URL, else prompt for splice record.
         // If the attachActiveTab is true we splice record, else it is a fresh (new URL) recording.
-        if (!attachActiveTab) {
+
+        if (promptForUrl) {
             let defaultUrl = options?.url ?? '';
             url = await brimstone.window.prompt('Where to? Type or paste URL to start recording from.', defaultUrl);
             if (!url) {
@@ -1172,19 +1191,17 @@ async function recordSomething(attachActiveTab) {
             await saveOptions(options);
             let created = false;
             // recording from beginning
-
             if (!await startingTab.reuse({ url: url, incognito: Test.current.incognito })) {
                 await startingTab.create({ url: url, incognito: Test.current.incognito });
                 created = true;
             }
 
             Tab.reset(); // FIXME: multi-tab multi-recording tests
-            let recordingTab = new Tab(startingTab);
-            recordingTab.trackCreated();
-            Tab.active = recordingTab;
+            startingTab.trackCreated();
+            Tab.active = startingTab;
 
-            if (await player.attachDebugger({ tab: recordingTab })) {
-                await recordingTab.resizeViewport();
+            if (await player.attachDebugger({ tab: Tab.active })) {
+                await Tab.active.resizeViewport();
             }
 
             await prepareToRecord();
@@ -1194,7 +1211,7 @@ async function recordSomething(attachActiveTab) {
             // update the UI: insert the first text card in the ui
             await recordUserAction({
                 type: 'goto',
-                url: recordingTab.url
+                url: Tab.active.url
             });
 
             // FOCUS ISSUE. when we create a window (because we need to record incognito for example), 
@@ -1207,8 +1224,16 @@ async function recordSomething(attachActiveTab) {
             await player.mousemove({ x: -1, y: -1 });
         }
         else {
-            // we are going to record over some steps in the existing test
+            // we are going to start recording *the* active tab at the current url.
+            if (!startingTab.chromeTab) {
+                throw new Errors.ReuseTestWindow();
+            }
+
             if (Test.current.steps.length) {
+                // we are going to record over some steps in the existing test in memory
+                startingTab.trackCreated();
+                Tab.active = startingTab;
+
                 let action = Test.current.steps[index + 1];
                 let old = {
                     overlay: action.overlay
@@ -1233,16 +1258,11 @@ async function recordSomething(attachActiveTab) {
                 Test.current.recordIndex = index + 1;
 
                 // overwriting actions in an existing test
-                if (!await startingTab.reuse({ incognito: Test.current.incognito })) {
+                if (!await Tab.active.reuse({ incognito: Test.current.incognito })) {
                     throw new Errors.ReuseTestWindow();
                 }
 
-                Tab.reset(); // FIXME: I don't know what tabs are actually created right now!
-                let recordingTab = new Tab(startingTab);
-                recordingTab.trackCreated();
-                Tab.active = recordingTab;
-
-                if (await player.attachDebugger({ tab: recordingTab })) {
+                if (await player.attachDebugger({ tab: Tab.active })) {
                     await recordingTab.resizeViewport();
                 }
 
@@ -1252,28 +1272,27 @@ async function recordSomething(attachActiveTab) {
                 await countDown(3, action);
             }
             else {
-                // overwriting actions in an existing test
-                // this is the case where the user wants to "Record Active Tab" from scratch.
-                Test.current.reset();
+                // we are recording a fresh test starting with the active tab.
+                // there is no test loaded in memory. recording starts at
+                // step 1 (index 0)
 
-                Tab.reset(); // FIXME: I don't know what tabs are actually created right now!
-                let recordingTab = new Tab(startingTab);
-                recordingTab.trackCreated();
-                Tab.active = recordingTab;
+                Test.current.reset();
+                startingTab.trackCreated();
+                Tab.active = startingTab;
 
                 // If you "Record the Active Tab" you will make a recording in incognito or not based on the Active Tab state, not any external preferences!
-                Test.current.incognito = recordingTab.chromeTab.incognito;
+                Test.current.incognito = Tab.active.chromeTab.incognito;
 
-                if (!await recordingTab.reuse({ incognito: Test.current.incognito })) {
+                if (!await Tab.active.reuse({ incognito: Test.current.incognito })) {
                     throw new Errors.ReuseTestWindow();
                 }
                 // there is nothing in the current test, so I should add something
-                if (recordingTab.chromeTab.url.startsWith('chrome:')) {
+                if (Tab.active.chromeTab.url.startsWith('chrome:')) {
                     await brimstone.window.alert("We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue.");
                     return;
                 }
-                if (await player.attachDebugger({ tab: recordingTab })) {
-                    await recordingTab.resizeViewport();
+                if (await player.attachDebugger({ tab: Tab.active })) {
+                    await Tab.active.resizeViewport();
                 }
 
                 await prepareToRecord();
@@ -1313,8 +1332,10 @@ $('#recordButton').on('click', (e) => {
     // if no we prompt for URL to record a fresh one
 
     // if the user wants to start a new (from blank) recording w/o a url
-    // they can use the "Record Active Tab" option in the menu, and not use this button at all.    
-    recordSomething(!!Test.current.steps.length);
+    // they can use the "Record Active Tab" option in the menu, and not use this button at all.  
+    let testInMemory = Test.current.steps.length;
+    let promptForUrl = !testInMemory;
+    recordSomething(promptForUrl);
 });
 
 function stopPlaying() {
@@ -1597,7 +1618,7 @@ async function userEventToAction(userEvent) {
             testAction._view = constants.view.EXPECTED;
             break;
         }
-        case 'close':            
+        case 'close':
             testAction.description = `close tab:${testAction.tab.virtualId} ${testAction.url}`;
             testAction.overlay = {
                 height: 0,
@@ -1632,7 +1653,7 @@ async function userEventToAction(userEvent) {
             break;
     }
 
-    let stream = testAction.type === 'wait' ? 'debug': 'log';
+    let stream = testAction.type === 'wait' ? 'debug' : 'log';
     console[stream](`[tab:${testAction.tab.id} step:${testAction.index}] record ${testAction.description}`);
     return testAction;
 }
@@ -1650,7 +1671,7 @@ async function recordUserAction(userEvent) {
     wait.sender = {
         href: _lastScreenshot?.tab?.url
     };
-    if(_lastScreenshot) {
+    if (_lastScreenshot) {
         wait.tab = _lastScreenshot.tab;
     }
     // else we assigned Tab.active to wait.tab.
@@ -1714,6 +1735,7 @@ async function onMessageHandler(message, _port) {
             lastAction.sender = {
                 href: _lastScreenshot.tab.url
             };
+            lastAction.tab = _lastScreenshot.tab; // this is only for the cas where the last action is a close of a tab and we need to show some other active screenshot.
 
             updateStepInView(Test.current.steps[ci]);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
