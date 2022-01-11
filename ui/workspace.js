@@ -3,7 +3,7 @@ import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
-import { sleep, errorDialog, downloadObjectAsJson } from "../utilities.js";
+import { sleep, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole } from "./console.js";
 import { Test, Playlist } from "../test.js";
 import { Screenshot } from "./screenshot.js";
@@ -60,6 +60,11 @@ let brimstone = {
         prompt: async (...args) => {
             await focusWorkspaceWindow();
             return window.prompt('🙋 ' + args[0], ...args.slice(1));
+        },
+        error: async (e) => {
+            await focusWorkspaceWindow();
+            await navigator.clipboard.writeText(e.stack);
+            return window.alert(`🐞 You found a bug, thanks! Details were copied into the copy-buffer. You can CTRL-V (paste) them when you report the error. Errors can be reported via menu "Help"➜"Search/Report Issues".\n\nYou may or may not be able to continue this session.\n\nDetails:\n${e.stack}`);
         }
     }
 }
@@ -343,14 +348,18 @@ async function errorHandler(e) {
             await brimstone.window.alert(`You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
             break;
         default:
-            errorDialog(e);
+            await brimstone.window.error(e);
             break;
     }
 }
 
 // catch all unhandled promise rejections and report them. i.e. any throws that occur within a promise chain.
 window.addEventListener('unhandledrejection', async function (promiseRejectionEvent) {
-    await errorHandler(promiseRejectionEvent.reason);
+    let reason = promiseRejectionEvent.reason;
+    if(!reason.stack) {
+        reason = new Error(reason); // the stack is useless :(
+    }
+    await errorHandler(reason);
     return false;
 });
 
@@ -699,6 +708,7 @@ $('#playButton').on('click', async function () {
                 }
 
                 Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
+                startingTab.trackCreated();
             }
             else {
                 // do not reset we are resuming play from current state
@@ -713,7 +723,6 @@ $('#playButton').on('click', async function () {
             startingTab.width = actions[0].tab.width;
             startingTab.height = actions[0].tab.height;
 
-            startingTab.trackCreated();
             Tab.active = startingTab;
 
             if (await player.attachDebugger({ tab: Tab.active })) {
@@ -814,10 +823,18 @@ async function debuggerOnDetach(debuggee, reason) {
         // else the tab we were recording had the debugger detach. reasons:
         // 1. user manually closed this tab.
         // 2. user manually closed a different tab in this window group. :(
-        // 3. a navigation occurred in the tab.  
-        await recordTab();
+        // 3. a navigation occurred in the tab.
+
+        // if 1 or 2 then we need to figure out what is the active tab before we start recording again
+        // if it is 3, it's fine to call this anyway.
+        await Tab.reaquireActiveTab();  
+
+        // keep on trucking.
+        await recordTab(); 
     }
     else if (isPlaying()) {
+        await Tab.reaquireActiveTab();  
+
         // the reattach will happen in the player itself
         // to the tab in the next played action
     }
@@ -864,10 +881,14 @@ async function webNavigationOnCompleteHandler(details) {
                     console.warn(e);
                 }
                 Tab.active = Tab.getByRealId(details.tabId);
+                if (!Tab.active) {
+                    throw new Error('Active tab is not tracked!');
+                }
             }
             else {
-                console.debug(`tab ${details.tabId} navigation completed in tab being recorded.`, details);
+                console.log(`tab ${details.tabId} navigation completed.`, details);
             }
+
             await recordTab();
         }
     }
@@ -927,24 +948,21 @@ async function tellRecordersTheirFrameIds() {
 async function tabsOnRemovedHandler(tabId, removeInfo) {
     let tab = Tab.getByRealId(tabId);
     if (!tab) {
-        console.debug(`untracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
+        console.log(`untracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
         return;
     }
 
-    console.debug(`tracked tab tabId:${tabId} winId:${removeInfo.windowId} is removed.`, removeInfo);
+    console.log(`tracked tab tab:${tab.id} winId:${removeInfo.windowId} is removed.`, removeInfo);
     tab.trackRemoved();
 
     if (isRecording()) {
-        let userEvent = {
-                type: 'close',
-                url: tab.chromeTab.url,
-                sender: {
-                    href: tab.chromeTab.url
-                }
-        };
-        let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
-        await userEventToAction({ type: 'wait' }); // create a new waiting action, but w/o a quick feedback next action
-        updateStepInView(action); // update the UI
+        await recordUserAction({
+            type: 'close',
+            url: tab.chromeTab.url,
+            sender: {
+                href: tab.chromeTab.url
+            }
+        });
 
         if (Tab._open.length === 0) {
             // we closed the only active tab, we should end the recording.
@@ -957,21 +975,29 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
  * that a started async event handler actually "completes" from an async point of view.
  */
 async function tabsOnActivatedHandler(activeInfo) {
-    /* Fires when the active tab in a window changes. 
-    Note that the tab's URL may not be set at the time this event fired, 
-    but you can listen to onUpdated events so as to be notified when a URL is set.*/
+    /* 
+        Fires when the active tab in a window changes. 
+        Note that the tab's URL may not be set at the time this event fired, 
+        but you can listen to onUpdated events so as to be notified when a URL is set.
+    */
+    Tab.active = Tab.getByRealId(activeInfo.tabId);
+    if (!Tab.active) {
+        throw new Error("active tab is not tracked.")
+    }
+    console.log(`chromeTab tabId:${Tab.active.id} is active.`, activeInfo);
 
-    console.debug(`chromeTab tabId:${activeInfo.tabId} winId:${activeInfo.windowId} is activated.`, activeInfo);
-
+    // we only record one tab at a time: the active tab
+    if (await player.attachDebugger({ tab: Tab.active })) {
+        // if the debugger needed to be attached we fall in here.
+        // and try to resice the viewport.
+        try {
+            await Tab.active.resizeViewport();  // FIXME: resize can fail. not sure why.
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
     if (isRecording()) {
-        Tab.active = Tab.getByRealId(activeInfo.tabId);
-        if (!Tab.active) {
-            throw new Error("active tab is not tracked.")
-        }
-        // the use can only record one tab at a time: the active tab
-        if (await player.attachDebugger({ tab: Tab.active })) {
-            await Tab.active.resizeViewport();
-        }
         await recordTab();
     }
 }
@@ -1126,14 +1152,18 @@ async function focusTab() {
 }
 
 /**
- * get *the* application tab. this can return a Tab without
- * a bound chromeTab when there is no application tab.
+ * Get *the* application Tab that we intend to attch the debugger to.
+ * i.e. the Tab we will starting playing or recording on.
+ * 
+ * This can return a Tab without a virtualId and chromeTab property 
+ * when there is no application tab available at all.
+ * i.e. there are no open windows except the brimstone workspace itself.
  * 
  */
 async function getActiveApplicationTab() {
     let tabs = await chrome.tabs.query({});
     if (tabs.length > 2) {
-        let ok = await brimstone.window.confirm('There are multiple application tabs. The active tab will be the initial target.');
+        let ok = await brimstone.window.confirm('There are multiple application tabs. Brimstone will use the active tab as the initial target.');
         if (!ok) {
             return;
         }
@@ -1231,7 +1261,6 @@ async function recordSomething(promptForUrl) {
 
             if (Test.current.steps.length) {
                 // we are going to record over some steps in the existing test in memory
-                startingTab.trackCreated();
                 Tab.active = startingTab;
 
                 let action = Test.current.steps[index + 1];
@@ -1257,13 +1286,19 @@ async function recordSomething(promptForUrl) {
                 }
                 Test.current.recordIndex = index + 1;
 
+                // see if we are tracking the tab of the action we are recording over
+                Tab.active = Tab.getByVirtualId(action.tab.virtualId);
+                if(!Tab.active) {
+                    throw new Error(`Not currently tracking tab:${action.tab.virtualId}`);
+                }
+
                 // overwriting actions in an existing test
                 if (!await Tab.active.reuse({ incognito: Test.current.incognito })) {
                     throw new Errors.ReuseTestWindow();
                 }
 
                 if (await player.attachDebugger({ tab: Tab.active })) {
-                    await recordingTab.resizeViewport();
+                    await Tab.active.resizeViewport();
                 }
 
                 await prepareToRecord();
@@ -1488,7 +1523,7 @@ function addExpectedScreenshot(testAction, ss = _lastScreenshot) {
  */
 async function userEventToAction(userEvent) {
     let frameId = userEvent?.sender?.frameId;
-    let frameOffset = await getFrameOffset(frameId);
+    let frameOffset = userEvent.type === 'close' ? {left:0, top:0} : await getFrameOffset(frameId);
 
     let testAction = new TestAction(userEvent);
     testAction.tab = Tab.active;
@@ -1654,7 +1689,7 @@ async function userEventToAction(userEvent) {
     }
 
     let stream = testAction.type === 'wait' ? 'debug' : 'log';
-    console[stream](`[tab:${testAction.tab.id} step:${testAction.index}] record ${testAction.description}`);
+    console[stream](`[step:${testAction.index} tab:${testAction.tab.id}] record "${testAction.description}"`);
     return testAction;
 }
 
@@ -1841,13 +1876,13 @@ async function onMessageHandler(message, _port) {
 let recordTabFunctionExecuting = false;
 
 /**
- * Record the tab specified. This should be the top level
- * safe call to establish recording of the given tab.
+ * Record the Tab.active tab. This should be the top level
+ * safe/idempotent call to establish recording of the given tab.
  * @param {Tab} tab 
  */
 async function recordTab() {
     let tab = Tab.active;
-    console.log(`record (different) tab:${tab.id}`);
+    console.log(`record tab:${tab.id}`);
 
     if (recordTabFunctionExecuting) {
         console.warn('the recordTabFunction is already in progress');

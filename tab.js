@@ -286,7 +286,6 @@ export class Tab {
      */
     trackRemoved() {
         Tab._open = Tab._open.filter(tab => tab.virtualId !== this.virtualId);
-        // something else should be made active!
     }
 };
 
@@ -327,3 +326,19 @@ Tab.reset = function () {
     Tab._open = [];
     Tab._tabsCreated = 0;
 }
+
+/** 
+ * figure out the active tab again
+ */
+Tab.reaquireActiveTab = async function() {
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: false }); // the current window is the brimstone workspace
+    if (!tab) {
+        throw new Error('cannot determine active application tab!');
+    }
+    Tab.active = Tab.getByRealId(tab.id);
+    if (!Tab.active) {
+        throw new Error("The currently active tab is not tracked!");
+    }
+    console.log(`switched active tab to ${Tab.active.id}`);
+}
+

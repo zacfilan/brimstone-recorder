@@ -199,7 +199,6 @@ export class Player {
                 await this.onBeforePlay(action);
             }
 
-            console.log(`[tab:${action.tab.id} step:${action.index}] begin play ${action.description}`);
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
             // performed this action, we just need to put the mouse in the correct spot and
             // do the screen verification again
@@ -209,9 +208,10 @@ export class Player {
             }
             else {
                 action.tab.chromeTab = this.tab.chromeTab; // just for debugging
+                console.log(`[step:${action.index+1} tab:${action.tab.id}] begin play "${action.description}"`);
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
+                console.log(`[step:${action.index+1} tab:${action.tab.id}] end   play "${action.description}"`);
             }
-            console.log(`[tab:${action.tab.id} step:${action.index}] end   play ${action.description}`);
 
             // grep for FOCUS ISSUE for details
             if (i === startIndex && action.type === 'goto') {
@@ -633,6 +633,8 @@ export class Player {
             catch (e) {
                 console.debug(e.message + '. try again.');
                 badTab = true;
+                // give other async'ed control paths a chance to run. configureForAction above can be trying to wait for a different tab to become active.
+                await sleep(137);
                 continue;
             }
 

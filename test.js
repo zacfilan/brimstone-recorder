@@ -258,7 +258,10 @@ export class Test {
                 _action.type = 'goto';
             }
             if(_action.sender) {
-                _action.tab = sender;
+                _action.tab = _action.sender;
+            }
+            else if(!_action.tab) {
+                _action.tab = {};
             }
             if(_action.tabWidth) {
                 _action.tab.width = _action.tabWidth;
@@ -266,7 +269,9 @@ export class Test {
                 delete _action.tabWidth;
                 delete _action.tabHeight;
             }
-            //
+            if(_action.tab.virtualId === undefined) {
+                _action.tab.virtualId = 0;
+            }
 
             let action = new TestAction(_action);
             this.updateOrAppendAction(action);
