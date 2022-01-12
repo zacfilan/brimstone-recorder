@@ -234,13 +234,25 @@ class Actions {
     }
 
     async chartMetrics() {
-        let latencyValues = Test.current.steps.map(a => a.latency);
-        let memoryUsedValues = Test.current.steps.map(a => a.memoryUsed);
-        let indicies = Test.current.steps.map(a => a.index);
+        let latencyValues = [];
+        let memoryUsedValues = [];
+        let labels = [];
+
+        let index = 0;
+        for(let ri=0; ri < playedRecordings.recordings.length; ++ri) {
+            let recording = playedRecordings.recordings[ri];
+            for(let si = 0; si < recording.steps.length; ++si) {
+                let step = recording.steps[si];
+                labels.push(step.index+1);
+                memoryUsedValues.push(step.memoryUsed);
+                latencyValues.push(step.latency);
+            }
+        } 
+
         let chartDescriptor = JSON.stringify({
             type: 'line',
             data: {
-                labels: indicies, // x-axis labels
+                labels: labels, // x-axis labels
                 datasets: [
                     {
                         label: 'Latency (secs.)',
@@ -259,32 +271,6 @@ class Actions {
                         yAxisID: 'y1'
                     }
                 ]
-            },
-            options: {
-                stacked: false,
-                title: {
-                    display: true,
-                    text: 'Some stats'
-                },
-                scales: {
-                    yAxes: [
-                        {
-                            id: "y",
-                            type: "linear",
-                            display: true,
-                            position: "left"
-                        },
-                        {
-                            id: "y1",
-                            type: "linear",
-                            display: true,
-                            position: "right",
-                            gridLines: {
-                                drawOnChartArea: false
-                            }
-                        }
-                    ]
-                }
             }
         });
         let window = await chrome.windows.create({
@@ -356,7 +342,7 @@ async function errorHandler(e) {
 // catch all unhandled promise rejections and report them. i.e. any throws that occur within a promise chain.
 window.addEventListener('unhandledrejection', async function (promiseRejectionEvent) {
     let reason = promiseRejectionEvent.reason;
-    if(!reason.stack) {
+    if (!reason.stack) {
         reason = new Error(reason); // the stack is useless :(
     }
     await errorHandler(reason);
@@ -827,13 +813,13 @@ async function debuggerOnDetach(debuggee, reason) {
 
         // if 1 or 2 then we need to figure out what is the active tab before we start recording again
         // if it is 3, it's fine to call this anyway.
-        await Tab.reaquireActiveTab();  
+        await Tab.reaquireActiveTab();
 
         // keep on trucking.
-        await recordTab(); 
+        await recordTab();
     }
     else if (isPlaying()) {
-        await Tab.reaquireActiveTab();  
+        await Tab.reaquireActiveTab();
 
         // the reattach will happen in the player itself
         // to the tab in the next played action
@@ -1288,7 +1274,7 @@ async function recordSomething(promptForUrl) {
 
                 // see if we are tracking the tab of the action we are recording over
                 Tab.active = Tab.getByVirtualId(action.tab.virtualId);
-                if(!Tab.active) {
+                if (!Tab.active) {
                     throw new Error(`Not currently tracking tab:${action.tab.virtualId}`);
                 }
 
@@ -1523,7 +1509,7 @@ function addExpectedScreenshot(testAction, ss = _lastScreenshot) {
  */
 async function userEventToAction(userEvent) {
     let frameId = userEvent?.sender?.frameId;
-    let frameOffset = userEvent.type === 'close' ? {left:0, top:0} : await getFrameOffset(frameId);
+    let frameOffset = userEvent.type === 'close' ? { left: 0, top: 0 } : await getFrameOffset(frameId);
 
     let testAction = new TestAction(userEvent);
     testAction.tab = Tab.active;
