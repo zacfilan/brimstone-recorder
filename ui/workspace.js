@@ -952,6 +952,7 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
 
         if (Tab._open.length === 0) {
             // we closed the only active tab, we should end the recording.
+            console.log("stopping recording since there are no tracked tabs!");
             stopRecording();
         }
     }
@@ -1095,7 +1096,6 @@ function removeEventHandlers() {
  * Set up navigation listener, which refires this function when a nav completes.
  * Tell recorders their frameids.
  * Hide the cursor.
- * Resize the viewport.
  * @param {Tab} tab 
  */
 async function prepareToRecord() {
@@ -1880,6 +1880,11 @@ async function recordTab() {
     player.tab = tab; // at this point the debugger is already attached, to the popup (which is like a tab to the mainwindow, but in its own browser window?)
 
     await prepareToRecord();
+
+    // FIXME: I don't want to ignore the "native" size secondary tabs or popups that are recorded. need to be a little careful here.
+    // need these e.g. when a redirect nav occurs on the current tab.
+    await Tab.active.resizeViewport(); 
+
     await startRecorders();
     recordTabFunctionExecuting = false;
 }
