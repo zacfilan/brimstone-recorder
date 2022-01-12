@@ -187,8 +187,9 @@ export class Tab {
         await navPromise; // the above nav is really done.
 
         // give these sane defaults.
-        this.height = this.chromeTab.height;
-        this.width = this.chromeTab.width;
+        // I don't want to do this when recording from non-incognito to incognito. I want to preserve the original non-incognito size that I removed.
+        //this.height = this.chromeTab.height;
+        //this.width = this.chromeTab.width;
     }
 
     async fromTabId(id) {
