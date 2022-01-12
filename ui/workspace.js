@@ -877,6 +877,14 @@ async function webNavigationOnCompleteHandler(details) {
 
             await recordTab();
         }
+        else if(isPlaying()) {
+            // don't really need to call all of playTab(), just hideCursor should do it.
+            await hideCursor();
+        }
+        else {
+            throw new Error("Navigation callbacks need to be removed.");
+        }
+        // else you shouldn't get here
     }
     catch (e) {
         // this can be some intermediate redirect page(s) that the user doesn't actually interact with
