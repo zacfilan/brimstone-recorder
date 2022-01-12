@@ -140,7 +140,7 @@ export class Player {
      * In order to _play_ an action, this player
      * must be configured to drive the tab that
      * the action occurs on, and the debugger needs
-     * to be attached to that tab. 
+     * to be attached to that tab (if it is not already)
      * @param {TestAction} action the action
      */
     async configureForAction(action) {
@@ -153,12 +153,26 @@ export class Player {
             throw new Error(`no tab:${action.tab.id} registered (yet)`);
         }
         this.tab = new Tab(tab);
+        
+        // the expected PNG height/width that the user blessed is the source of truth
+        // for what the tab viewport size should be.
+        if(action.expectedScreenshot?.png?.height) {
+            action.tab.height = action.expectedScreenshot.png.height;
+        }
+        if(action.expectedScreenshot?.png?.width) {
+            action.tab.width = action.expectedScreenshot.png.width;
+        }
+
         this.tab.height = action.tab.height;
         this.tab.width = action.tab.width;
 
         console.debug(`end switched to tab:${this.tab.id}`, this.tab);
 
         if (await this.attachDebugger({ tab: this.tab })) {
+            // FIXME: if we actually need to resize we may be hiding an application bug where the app is resizing a tab/window differently than before.
+            // yet my current logic counts on this mechanism (mismatched sizes) to wait long enough for a navigation to settle for example. That should be reworked.
+            console.warn("we may be hiding an application bug where the app is resizing a tab/window differently than before");
+            
             await this.tab.resizeViewport();
         }
         // else it is on the same tab, so we don't need to switch.
@@ -617,7 +631,7 @@ export class Player {
             // using REAL tab height which already includes the debug banner.
 
             // these parameters are here to resize the friggin screen in the first place - so png height is right? why did I ever switch the
-            // tab sizes in the first place??
+            // tab sizes in the first place?? 
             try {
                 // this is a little weird, I can check for the correct tab + tab size before hand, but it's more efficient to 
                 // assume that it will work, than to check every time. make the common case fast.

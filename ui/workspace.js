@@ -1882,7 +1882,7 @@ async function recordTab() {
     await prepareToRecord();
 
     // FIXME: I don't want to ignore the "native" size secondary tabs or popups that are recorded. need to be a little careful here.
-    // need these e.g. when a redirect nav occurs on the current tab.
+    // need these e.g. when a redirect nav occurs on the current tab. like in login.
     await Tab.active.resizeViewport(); 
 
     await startRecorders();

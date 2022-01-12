@@ -360,7 +360,7 @@ export class TestAction {
             footer = '';
         }
 
-        footer += ` tab:${this.tab.virtualId} ${this.tab.width}x${this.tab.height} `;
+        footer += ` tab:${this.tab.virtualId} viewport:${this.tab.width}x${this.tab.height} `;
         footer += `<div class="stepNumber">${this.index + 1}/${this.test.steps.length}</div>`;
         html += `
         </div>
