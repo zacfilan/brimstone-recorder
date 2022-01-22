@@ -4,7 +4,7 @@ import { Screenshot } from "./ui/screenshot.js";
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
-import { sleep } from "./utilities.js";
+import { sleep, extractPngSize } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
 import { Test } from "./test.js";
@@ -708,7 +708,10 @@ export class Player {
 
     /** 
      * Uses the debugger API to capture a screenshot.
-     * Returns the dataurl on success.
+     * Returns the dataurl on success. Most calls are 
+     * to update the expected screen during recording,
+     * but is also called in one path for playback inside
+     * of verifyScreenshot. 
      * 
      * @throws {Exception} on failure.
      */
@@ -720,20 +723,22 @@ export class Player {
         // result can come back undefined/null. (e.g. debugger not attached, or can detach wihle the command is in flight)
         let dataUrl = 'data:image/png;base64,' + result.data;
 
-        // debugging
-        //let png = await Player.dataUrlToPNG(dataUrl);
-        //console.debug(`actual screenshot ${png.width}x${png.height}`);
-        //console.debug(`capture ss ${this.tab.width}x${this.tab.height}`);
+        // 
+        let size = extractPngSize(result.data);
+        // console.debug(`actual screenshot ${size.width}x${size.height}`);
+        // console.debug(`capture ss ${this.tab.width}x${this.tab.height}`);
 
         return new Screenshot({
             dataUrl: dataUrl,
-            tab: this.tab
+            tab: this.tab,
+            dataUrlWidth: size.width,
+            dataUrlHeight: size.height
         });
     }
 
     /**
     * Take a screenshot of an expected size. May attempt to resize the viewport as well.
-    * This is a proivate method that is only expected to be called by verifyScreenshot.
+    * This is a private method that is only expected to be called by verifyScreenshot.
     * Swallows exceptions, returns truthy value.
     * @param {number} expectedWidth expected width of screenshot
     * @param {number} expectedHeight expected height of screenshot

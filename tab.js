@@ -122,10 +122,11 @@ export class Tab {
             }
         }
 
-        console.debug(`viewport now measured to be ${distance.innerWidth}x${distance.innerHeight} `);
         if (i == 10) {
             throw new Errors.ResizeViewportError();
         }
+
+        console.debug(`viewport now measured to be ${distance.innerWidth}x${distance.innerHeight} `);
     }
 
     /** Inject a script into the current tab to measure the browser and viewport dimensions. */

@@ -14,6 +14,19 @@ export class Screenshot {
      * @type {string}  
      * */
     dataUrl;
+    /**
+     * The width of the png encoded in the dataUrl
+     * @type {number}
+     */
+     dataUrlWidth;
+    /**
+     * 
+     */
+    /**
+     * The height of the png encoded in the dataUrl
+     *  @type {number}
+     */
+     dataUrlHeight;
 
     /** A PNG of the Screenshot.
      * @type {PNG}
@@ -34,6 +47,8 @@ export class Screenshot {
         this.png = args.png;
         this.fileName = args.fileName;
         this.tab = args.tab;
+        this.dataUrlHeight = args.dataUrlHeight;
+        this.dataUrlWidth = args.dataUrlWidth;
     }
 
     /** A promise that is resolved once we have loaded the dataUrl */

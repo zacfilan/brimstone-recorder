@@ -1021,6 +1021,7 @@ function tabsOnCreatedHandler(chromeTab) {
 
     let newTab = (new Tab()).fromChromeTab(chromeTab);
 
+    // this is also assuming that the debugger is attached!
     newTab.height -= 46; // If it already has the 46 px border on it, then we need to subtract it from the desired viewport height.
     // since this is what will be stored in the recording.
 

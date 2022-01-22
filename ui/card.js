@@ -360,7 +360,20 @@ export class TestAction {
             footer = '';
         }
 
-        footer += ` tab:${this.tab.virtualId} viewport:${this.tab.width}x${this.tab.height} `;
+        let width = '?';
+        let height = '?';
+        if(this.expectedScreenshot) {
+            if(this.expectedScreenshot.dataUrlHeight) {
+                width = this.expectedScreenshot.dataUrlWidth;
+                height = this.expectedScreenshot.dataUrlHeight;
+            }
+            else if(this.expectedScreenshot.png) {
+                width = this.expectedScreenshot.png.width;
+                height = this.expectedScreenshot.png.height;
+            }
+        }
+
+        footer += ` tab:${this.tab.virtualId} viewport:${width}x${height} `;
         footer += `<div class="stepNumber">${this.index + 1}/${this.test.steps.length}</div>`;
         html += `
         </div>
