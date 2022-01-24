@@ -21,3 +21,21 @@ export class ReuseTestWindow extends Error {
         super(msg || 'unable to reuse test window');
     }
 }
+
+/** an error that identifies that we took a screenshot ok, but
+ * not of the required size.
+ */
+export class IncorrectScreenshotSize extends Error {
+    constructor(msg) {
+        super(msg || 'wrong size screenshot taken');
+    }
+}
+
+/** an error that identifies that we issues a cmd to the debugger
+ * but the debugger is not attached.
+ */
+export class DebuggerDetached extends Error {
+    constructor(msg) {
+        super(msg || 'Debugger detached');
+    }   
+}

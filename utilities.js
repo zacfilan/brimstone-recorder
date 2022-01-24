@@ -39,7 +39,7 @@ export function downloadObjectAsJson(exportObj, exportName){
     // so sequential 16 bytes of base64 encode sequential 12 bytes of real data
 
     // read out 24 real bytes that contain words [3], [4], [5] from the base64
-    let binaryString = atob(base64.substring(16, 32));
+    let binaryString = atob(base64.substring(16, 16+16));
     let dv = binaryStringToDataView(binaryString);
 
     // the width and height are in (bigendian) words [1] and [2] from the words pulled out

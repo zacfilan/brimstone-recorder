@@ -27,12 +27,21 @@ export class Tab {
 
         /** The desired height of the tab. May differ from the associated chromeTab property. */
         this.height = otherTab?.height || 0;
-
         /** The desired width of the tab. May differ from the associated chromeTab property. */
         this.width = otherTab?.width || 0;
+        /** @type {boolean} if the size has been blessed implicity by the user.
+         * this happens when the user has seen the expected screenshot during
+         * recording and done any subsequent action. This locks in the dimensions
+         * of the screenshot as correct (blessed) by the user. 
+         * 
+         * When true, a screenshot grabbed on this tab with a different
+         * size will throw an exception.
+         */
+        this.blessed = otherTab?.blessed;
 
         /** The chrome tab url, or perhaps the original that redirected to the chrome tab url. May differ from the associated chromeTab property */
         this.url = otherTab?.url;
+
 
         /**
          *  A unique id for this tab in this recording. The real ones are not persistant, so assign a "virtual" tab identifier 
@@ -303,8 +312,8 @@ Tab._tabsCreated = 0;
  */
 Tab._open = [];
 
-/** The tab we believe is the active tab currently. 
- * @type {Tab} the tab we believe is the active tab.
+/** The tab we believe is active. 
+ * @type {Tab} the tab we believe is active tab.
 */
 Tab.active = null;
 
@@ -333,6 +342,7 @@ Tab.reset = function () {
  * figure out the active tab again
  */
 Tab.reaquireActiveTab = async function() {
+    Tab.active = undefined;
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: false }); // the current window is the brimstone workspace
     if (!tab) {
         throw new Error('cannot determine active application tab!');

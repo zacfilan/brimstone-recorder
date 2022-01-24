@@ -2,6 +2,7 @@ import { Player } from "../player.js"
 import { Screenshot } from "./screenshot.js";
 import { loadOptions } from "../options.js";
 import { Tab } from "../tab.js";
+import { extractPngSize } from "../utilities.js";
 
 const PNG = png.PNG;
 
@@ -362,14 +363,34 @@ export class TestAction {
 
         let width = '?';
         let height = '?';
-        if(this.expectedScreenshot) {
-            if(this.expectedScreenshot.dataUrlHeight) {
-                width = this.expectedScreenshot.dataUrlWidth;
-                height = this.expectedScreenshot.dataUrlHeight;
+        let screenshot;
+        switch(this._view) {
+            case 'dynamic':
+            case 'expected':
+                screenshot = this.expectedScreenshot;
+                break;
+            case 'edit':
+                if(this.editViewDataUrl) {
+                    let size = extractPngSize(this.editViewDataUrl.substring(22, 22+16));
+                    screenshot = {
+                        dataUrlHeight: size.height,
+                        dataUrlWidth: size.width             
+                    };
+                }
+                 break;
+            case 'actual':
+                screenshot = this.actualScreenshot;
+                break;
+        }
+        
+        if(screenshot) {
+            if(screenshot.dataUrlHeight) {
+                width = screenshot.dataUrlWidth;
+                height = screenshot.dataUrlHeight;
             }
-            else if(this.expectedScreenshot.png) {
-                width = this.expectedScreenshot.png.width;
-                height = this.expectedScreenshot.png.height;
+            else if(screenshot.png) {
+                width = screenshot.png.width;
+                height = screenshot.png.height;
             }
         }
 

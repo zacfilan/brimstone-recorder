@@ -708,7 +708,8 @@ $('#playButton').on('click', async function () {
 
             startingTab.width = actions[0].tab.width;
             startingTab.height = actions[0].tab.height;
-
+            startingTab.blessed = true;
+            
             Tab.active = startingTab;
 
             if (await player.attachDebugger({ tab: Tab.active })) {
@@ -921,7 +922,7 @@ async function startRecorders() {
         });
 
     port.onMessage.addListener(onMessageHandler);
-    await captureScreenshotAsDataUrl(); // grab the first screenshot
+    await captureScreenshotAsDataUrlForRecording(); // grab the first screenshot
 }
 
 /**  
@@ -966,7 +967,7 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
     }
 }
 
-/** async event handlers, that contain awaits relinqush control. so other control paths cannot assume
+/** async event handlers, that contain awaits relinquish control. so other control paths cannot assume
  * that a started async event handler actually "completes" from an async point of view.
  */
 async function tabsOnActivatedHandler(activeInfo) {
@@ -981,20 +982,21 @@ async function tabsOnActivatedHandler(activeInfo) {
     }
     console.log(`chromeTab tabId:${Tab.active.id} is active.`, activeInfo);
 
-    // we only record one tab at a time: the active tab
-    if (await player.attachDebugger({ tab: Tab.active })) {
-        // if the debugger needed to be attached we fall in here.
-        // and try to resice the viewport.
-        try {
-            await Tab.active.resizeViewport();  // FIXME: resize can fail. not sure why.
-        }
-        catch (e) {
-            console.warn(e);
-        }
-    }
     if (isRecording()) {
+        // we only record one tab at a time: the active tab
+        if (await player.attachDebugger({ tab: Tab.active })) {
+            // if the debugger needed to be attached we fall in here.
+            // and try to resice the viewport.
+            try {
+                await Tab.active.resizeViewport();  // FIXME: resize can fail. not sure why.
+            }
+            catch (e) {
+                console.warn(e);
+            }
+        }
         await recordTab();
     }
+    // else playing and we will attach to the expected tab, at the expected size
 }
 
 /**
@@ -1019,13 +1021,13 @@ function tabsOnCreatedHandler(chromeTab) {
     // the url for the tab may not be settled yet, but I can handle onUpdated and set the url property then...
     // but the ID is supposed to be all I need. 
 
+    // recording or playing we assume that the debugger is properly attached
     let newTab = (new Tab()).fromChromeTab(chromeTab);
+    newTab.height -= 46; // If it already has the 46 px border on it, then we need to subtract it from the desired viewport height.
+    newTab.trackCreated();
 
     // this is also assuming that the debugger is attached!
-    newTab.height -= 46; // If it already has the 46 px border on it, then we need to subtract it from the desired viewport height.
     // since this is what will be stored in the recording.
-
-    newTab.trackCreated();
 }
 
 /**
@@ -1478,24 +1480,52 @@ function updateThumb(action) {
 }
 
 /** 
- * Uses the debugger API to capture a screenshot.
- * Returns the dataurl on success.
+ * Try to capture a screenshot of the expected size
+ * while making a recording.
  * 
- * Cache the dataURl in the _lastScreenshot variable
+ * The debugger attaches and detaches during the 
+ * normal course of tab opening, closing, and navigating.
+ * 
+ * The debugger banner affects viewport size, hence
+ * we need to make sure we grab a screenshot of the expected
+ * size.
  * 
  * @throws {Exception} on failure.
  */
-async function captureScreenshotAsDataUrl() {
-    _lastScreenshot = await player.captureScreenshotAsDataUrl();
-    return _lastScreenshot;
-}
+async function captureScreenshotAsDataUrlForRecording() {
+    // how long should we wait during recording to be able to 
+    // screenshot of the correct size?
+    let start = performance.now();
+    let lastError;
+    // max time to wait for a screenshot of the correct size to be taken during recording
+    let timeout = 5; // seconds
+    let startingActiveTabId = Tab.active.virtualId;
+    while (((performance.now() - start) / 1000) < timeout) {
+        try {
+            _lastScreenshot = await player.captureScreenshotAsDataUrl();
+            return _lastScreenshot;
+        }
+        catch(e) {
+            lastError = e;
 
-// async function ignoreInputCaptureScreenshotAsDataUrl() {
-//     await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: true });
-//     let ss = await captureScreenshotAsDataUrl();
-//     await player.debuggerSendCommand('Input.setIgnoreInputEvents', { ignore: false });
-//     return ss;
-// }
+            // if the tab we want to take the picture on has closed/is not the active tab then swallow error and don't take the screenshot.
+            if(!Tab.active || Tab.active.virtualId !== startingActiveTabId) {
+                console.info('active tab changed while waiting for a screenshot', lastError);
+                return;
+            }
+            console.warn(lastError);
+
+            if(lastError instanceof Errors.IncorrectScreenshotSize) {
+                // this can only happen during recording if the debugger banner is volatile
+                await player.tab.resizeViewport();
+                await sleep(137);
+                continue;
+            }
+            throw lastError;
+        }
+    }
+    throw lastError;
+}
 
 /**
  * Add the _lastScavedScreenshot to the testAction if that screenshot wasn't of
@@ -1521,7 +1551,7 @@ async function userEventToAction(userEvent) {
     let frameOffset = userEvent.type === 'close' ? { left: 0, top: 0 } : await getFrameOffset(frameId);
 
     let testAction = new TestAction(userEvent);
-    testAction.tab = Tab.active;
+    testAction.tab = new Tab(Tab.active);
 
     Test.current.updateOrAppendAction(testAction);
     let element = userEvent.boundingClientRect;
@@ -1692,6 +1722,7 @@ async function userEventToAction(userEvent) {
  * set up the step and start refreshing the next expected screen */
 async function recordUserAction(userEvent) {
     let action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
+    action.tab.blessed = true;
 
     // show the latest screenshot in the expected card to give quick feedbak
     let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
@@ -1747,7 +1778,7 @@ async function onMessageHandler(message, _port) {
             break;
         // the user is actively waiting for the screen to change
         case 'wait':
-            await captureScreenshotAsDataUrl(); // grab latest image
+            await captureScreenshotAsDataUrlForRecording(); // grab latest image
 
             // only one time ever
             if (!_lastSavedScreenshot) {
@@ -1825,9 +1856,9 @@ async function onMessageHandler(message, _port) {
         case 'change':
             //await (userEvent);
             action = await userEventToAction(userEvent); // convert userEvent to testaction, insert at given index
-
+            action.tab.blessed = true;
             // show the latest screenshot in the expected card and start polling it
-            await captureScreenshotAsDataUrl();
+            await captureScreenshotAsDataUrlForRecording();
 
             let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
             // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction

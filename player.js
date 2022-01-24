@@ -8,6 +8,7 @@ import { sleep, extractPngSize } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
 import { Test } from "./test.js";
+import * as Errors from "./error.js";
 
 var options;
 
@@ -153,18 +154,19 @@ export class Player {
             throw new Error(`no tab:${action.tab.id} registered (yet)`);
         }
         this.tab = new Tab(tab);
-        
+
         // the expected PNG height/width that the user blessed is the source of truth
         // for what the tab viewport size should be.
-        if(action.expectedScreenshot?.png?.height) {
+        if (action.expectedScreenshot?.png?.height) {
             action.tab.height = action.expectedScreenshot.png.height;
         }
-        if(action.expectedScreenshot?.png?.width) {
+        if (action.expectedScreenshot?.png?.width) {
             action.tab.width = action.expectedScreenshot.png.width;
         }
 
         this.tab.height = action.tab.height;
         this.tab.width = action.tab.width;
+        this.tab.blessed = true;
 
         console.debug(`end switched to tab:${this.tab.id}`, this.tab);
 
@@ -172,7 +174,7 @@ export class Player {
             // FIXME: if we actually need to resize we may be hiding an application bug where the app is resizing a tab/window differently than before.
             // yet my current logic counts on this mechanism (mismatched sizes) to wait long enough for a navigation to settle for example. That should be reworked.
             console.warn("we may be hiding an application bug where the app is resizing a tab/window differently than before");
-            
+
             await this.tab.resizeViewport();
         }
         // else it is on the same tab, so we don't need to switch.
@@ -222,9 +224,9 @@ export class Player {
             }
             else {
                 action.tab.chromeTab = this.tab.chromeTab; // just for debugging
-                console.log(`[step:${action.index+1} tab:${action.tab.id}] begin play "${action.description}"`);
+                console.log(`[step:${action.index + 1} tab:${action.tab.id}] begin play "${action.description}"`);
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
-                console.log(`[step:${action.index+1} tab:${action.tab.id}] end   play "${action.description}"`);
+                console.log(`[step:${action.index + 1} tab:${action.tab.id}] end   play "${action.description}"`);
             }
 
             // grep for FOCUS ISSUE for details
@@ -642,7 +644,7 @@ export class Player {
                     badTab = false;
                     await this.tab.resizeViewport();
                 }
-                nextStep.actualScreenshot = await this._takeScreenshot(this.tab.width, this.tab.height);
+                nextStep.actualScreenshot = await this._takeScreenshot();
             }
             catch (e) {
                 console.debug(e.message + '. try again.');
@@ -713,21 +715,30 @@ export class Player {
      * but is also called in one path for playback inside
      * of verifyScreenshot. 
      * 
-     * @throws {Exception} on failure.
+     * @throws {DebuggerDetached} on debugger detach errors that can't be fixed with a single attach
+     * @throws {IncorrectScreenshotSize} on failure.
+     * @throws {Error} on unknown errors
      */
     async captureScreenshotAsDataUrl() {
         let result = await this.debuggerSendCommand('Page.captureScreenshot', {
             format: 'png'
         });
+        // result can come back undefined/null. (e.g. debugger not attached, or can detach while the command is in flight)
+        let dataUrl = 'data:image/png;base64,' + result.data; // in which case this will throw.
 
-        // result can come back undefined/null. (e.g. debugger not attached, or can detach wihle the command is in flight)
-        let dataUrl = 'data:image/png;base64,' + result.data;
-
-        // 
+        // else we got *some* dataUrl back
         let size = extractPngSize(result.data);
-        // console.debug(`actual screenshot ${size.width}x${size.height}`);
-        // console.debug(`capture ss ${this.tab.width}x${this.tab.height}`);
 
+        if (this.tab.blessed) {
+            // since the tab size was blessed by the user we need to check the screenshot size
+            let expectedWidth = this.tab.width;
+            let expectedHeight = this.tab.height;
+            if (expectedWidth && (expectedWidth !== size.width || expectedHeight !== size.height)) {
+                throw new Errors.IncorrectScreenshotSize(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${size.width}x${size.height}.`);
+            }
+        }
+
+        // else we got a screenshot of the size we require (or we don't care about the size)
         return new Screenshot({
             dataUrl: dataUrl,
             tab: this.tab,
@@ -738,21 +749,23 @@ export class Player {
 
     /**
     * Take a screenshot of an expected size. May attempt to resize the viewport as well.
-    * This is a private method that is only expected to be called by verifyScreenshot.
-    * Swallows exceptions, returns truthy value.
+    * This is a private method that is only expected to be called by verifyScreenshot (during playback).
+    * Throws exception if the size of the png doesn't match the expected size,
+    * allows caller to resize then.
+    * 
     * @param {number} expectedWidth expected width of screenshot
     * @param {number} expectedHeight expected height of screenshot
     * @returns Screenshot on success
-    * @throws on failure
+    * @throws {Error} on unknwon errors
+    * @throws {DebuggerDetached} on deached debugger that wasn't fixed with a reattach
+    * @throws {IncorrectScreenshotSize} when a blessed tab captures the wrong screensize
     */
-    async _takeScreenshot(expectedWidth, expectedHeight) {
+    async _takeScreenshot() {
         // unthrottled. 
         let partialSS = await this.captureScreenshotAsDataUrl();
         let png = await Player.dataUrlToPNG(partialSS.dataUrl);
         console.debug(`took screenshot ${png.width}x${png.height}`);
-        if (expectedWidth && (expectedWidth !== png.width || expectedHeight !== png.height)) {
-            throw new Error(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${png.width}x${png.height}.`);
-        }
+
         return new Screenshot({
             png: png,
             dataUrl: partialSS.dataUrl,
@@ -763,14 +776,19 @@ export class Player {
     /** 
      * Send the command to the debugger on the current tab.
      * Returns command result on success.
-     * @throws {Exception} on failure.
+     * @throws {DebuggerDetached} on debugger detch errors
+     * @throws {Error} on unknown errors
      */
     async _debuggerSendCommandRaw(method, commandParams) {
         await this._debuggerAttached;
         console.debug(`begin debugger send command tabId:${this.tab.id} ${method}`, commandParams);
         let result = await (new Promise(resolve => chrome.debugger.sendCommand({ tabId: this.tab.chromeTab.id }, method, commandParams, resolve)));
-        if (chrome.runtime.lastError?.message) {
-            throw new Error(chrome.runtime.lastError.message);
+        let message = chrome.runtime.lastError?.message;
+        if (message) {
+            if (message.includes('Detached while') || message.includes('Debugger is not attached')) {
+                throw new Errors.DebuggerDetached(message);
+            }
+            throw new Error(message);
         }
         console.debug(`end   debugger send command ${method}`, commandParams);
         return result; // the debugger method may be a getter of some kind.
@@ -779,7 +797,8 @@ export class Player {
     /** 
      * Force (re)attach the debugger (if necessary) and send the command.
      * Returns command result on success.
-     * @throws {Exception} on failure.
+     * @throws {DebuggerDetached} on debugger detach errors that cannot be fixed with an attach
+     * @throws {Error} on unknown errors.
      */
     async debuggerSendCommand(method, commandParams) {
         let i = 0;
@@ -795,7 +814,7 @@ export class Player {
             }
             catch (e) {
                 lastException = e;
-                if (e.message && (e.message.includes('Detached while') || e.message.includes('Debugger is not attached'))) {
+                if (lastException instanceof Errors.DebuggerDetached) {
                     console.warn(`got exception while running debugger cmd ${method}:`, commandParams, e);
                     if (await this.attachDebugger({ tab: this.tab })) {
                         await this.tab.resizeViewport();
@@ -824,7 +843,7 @@ export class Player {
     async attachDebugger({ tab }) {
         console.debug(`schedule attach debugger`);
         return this._debuggerAttached = new Promise(async (resolve, reject) => {
-            await(new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id }, "1.3", _resolve)));
+            await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id }, "1.3", _resolve)));
             if (chrome.runtime.lastError?.message) {
                 if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
                     reject(chrome.runtime.lastError.message); // not sure how to handle that.
@@ -833,14 +852,14 @@ export class Player {
                 // else we can ignore that, that's what we want, we are already attached
                 console.debug(`debugger already attached to tabId:${tab.chromeTab.id}`);
                 this.tab = tab;
-                resolve (false); // an attach was not required 
+                resolve(false); // an attach was not required 
                 return;
             }
             else {
                 // else no error - implies that we actually needed to attach the debugger
                 console.debug(`debugger was attached to tab:${tab.id}`);
                 this.tab = tab;
-                resolve (true); // an attach was required
+                resolve(true); // an attach was required
                 return;
             }
         });
