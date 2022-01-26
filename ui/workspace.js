@@ -10,6 +10,7 @@ import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
+import { clone } from "../utilities.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
 const version = 'v' + chrome.runtime.getManifest().version;
@@ -233,21 +234,56 @@ class Actions {
         }
     }
 
+    editActionJson() {
+        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
+        var copy = clone(action); // pass a copy
+
+        // don't allow edit of these
+        delete copy.expectedScreenshot;
+        delete copy.acceptablePixelDifferences;
+        delete copy.actualScreenshot;
+
+        var modalContentContainer = $('#modal-content').html('');
+        var jsonEditorContainer   = $("<div id='json-editor'></div>");
+        modalContentContainer.append(jsonEditorContainer);
+        jsonEditor = new JSONEditor(jsonEditorContainer[0], {
+            mode: 'form',
+            onChangeJSON: json => {
+                Object.assign(action, json);
+                updateStepInView(action);
+            }
+        });
+        jsonEditor.set(copy);
+        modalContentContainer.modal();
+    }
+
+    viewTestJson() {
+        var test = clone(Test.current); // pass a copy
+        var modalContentContainer = $('#modal-content').html('');
+        var jsonEditorContainer   = $("<div id='json-editor'></div>");
+        modalContentContainer.append(jsonEditorContainer);
+        jsonEditor = new JSONEditor(jsonEditorContainer[0], {
+            mode: 'view',
+        });
+        jsonEditor.set(test);
+        modalContentContainer.modal();
+    }
+
     async chartMetrics() {
         let latencyValues = [];
         let memoryUsedValues = [];
         let labels = [];
 
         let index = 0;
-        for(let ri=0; ri < playedRecordings.recordings.length; ++ri) {
+        for (let ri = 0; ri < playedRecordings.recordings.length; ++ri) {
             let recording = playedRecordings.recordings[ri];
-            for(let si = 0; si < recording.steps.length; ++si) {
+            for (let si = 0; si < recording.steps.length; ++si) {
                 let step = recording.steps[si];
-                labels.push(step.index+1);
+                labels.push(step.index + 1);
                 memoryUsedValues.push(step.memoryUsed);
                 latencyValues.push(step.latency);
             }
-        } 
+        }
 
         let chartDescriptor = JSON.stringify({
             type: 'line',
@@ -353,6 +389,11 @@ window.addEventListener("error", async function (errorEvent) {
     await errorHandler(errorEvent.error);
     return false;
 });
+
+/** the jsoneditor instance used in the modal
+ * https://github.com/josdejong/jsoneditor
+ */
+let jsonEditor;
 
 /**********************************************************************************************
  * Main entry point. - allow this extension in incognito please. it increases the likelyhood that a test
@@ -709,7 +750,7 @@ $('#playButton').on('click', async function () {
             startingTab.width = actions[0].tab.width;
             startingTab.height = actions[0].tab.height;
             startingTab.blessed = true;
-            
+
             Tab.active = startingTab;
 
             if (await player.attachDebugger({ tab: Tab.active })) {
@@ -878,7 +919,7 @@ async function webNavigationOnCompleteHandler(details) {
 
             await recordTab();
         }
-        else if(isPlaying()) {
+        else if (isPlaying()) {
             // don't really need to call all of playTab(), just hideCursor should do it.
             await hideCursor();
         }
@@ -1505,17 +1546,17 @@ async function captureScreenshotAsDataUrlForRecording() {
             _lastScreenshot = await player.captureScreenshotAsDataUrl();
             return _lastScreenshot;
         }
-        catch(e) {
+        catch (e) {
             lastError = e;
 
             // if the tab we want to take the picture on has closed/is not the active tab then swallow error and don't take the screenshot.
-            if(!Tab.active || Tab.active.virtualId !== startingActiveTabId) {
+            if (!Tab.active || Tab.active.virtualId !== startingActiveTabId) {
                 console.info('active tab changed while waiting for a screenshot', lastError);
                 return;
             }
             console.warn(lastError);
 
-            if(lastError instanceof Errors.IncorrectScreenshotSize) {
+            if (lastError instanceof Errors.IncorrectScreenshotSize) {
                 // this can only happen during recording if the debugger banner is volatile
                 await player.tab.resizeViewport();
                 await sleep(137);
@@ -1923,7 +1964,7 @@ async function recordTab() {
 
     // FIXME: I don't want to ignore the "native" size secondary tabs or popups that are recorded. need to be a little careful here.
     // need these e.g. when a redirect nav occurs on the current tab. like in login.
-    await Tab.active.resizeViewport(); 
+    await Tab.active.resizeViewport();
 
     await startRecorders();
     recordTabFunctionExecuting = false;

@@ -614,6 +614,7 @@ export function getStep(element) {
 export function getCard(element, test) {
     let view = $(element).closest('.card');
     let index = view.attr('data-index');
+    /** @type {TestAction} */
     let action = test.steps[index];
     return { view, action };
 }

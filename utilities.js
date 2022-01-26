@@ -55,3 +55,7 @@ function binaryStringToDataView(str) {
     }
     return _dataView;
 }
+
+export function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
