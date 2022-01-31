@@ -150,6 +150,12 @@ export class TestAction {
      */
     test = null;
 
+    /**
+     * Add a delay before playing. Can be inserted directly via json.
+     * @type {number}    
+    */
+    waitBeforePlaying = 0;
+    
     constructor(args) {
         Object.assign(this, args);
         this.tab = new Tab(this.tab);
@@ -188,7 +194,8 @@ export class TestAction {
             deltaY: this.deltaY, // only on wheel actions
             name: this.name, // optional
             shadowDOMAction: this.shadowDOMAction,
-            css: this.css // experimental for fun
+            css: this.css, // experimental for fun
+            waitBeforePlaying: this.waitBeforePlaying
         };
 
         if (this.expectedScreenshot) {

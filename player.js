@@ -224,6 +224,10 @@ export class Player {
             }
             else {
                 action.tab.chromeTab = this.tab.chromeTab; // just for debugging
+                if(action.waitBeforePlaying) {
+                    console.log(`[step:${action.index + 1} tab:${action.tab.id}] wait ${action.waitBeforePlaying}ms before playing`);
+                    await sleep(action.waitBeforePlaying);
+                }
                 console.log(`[step:${action.index + 1} tab:${action.tab.id}] begin play "${action.description}"`);
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
                 console.log(`[step:${action.index + 1} tab:${action.tab.id}] end   play "${action.description}"`);
