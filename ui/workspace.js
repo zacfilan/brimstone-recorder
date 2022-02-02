@@ -644,7 +644,6 @@ function addVolatileRegions() {
     // adds to DOM temporarily
 }
 
-
 $('#step').on('click', '.action .title', () => {
     actions.callMethodByUser(actions.editActionName);
 });
@@ -652,7 +651,6 @@ $('#step').on('click', '.action .title', () => {
 $('#step').on('click', '.waiting .click-to-change-view', (...args) => {
     actions.callMethodByUser(actions.cycleEditStates, ...args);
 });
-  
 
 function setInfoBarText(infobarText) {
     if (!infobarText) {
@@ -1252,6 +1250,13 @@ function stopRecording() {
         console.warn(e);
     }
 
+    if(Test.current.replacedAction) {
+        // insert the action that our final useless "end-recording-noop-expected-screenshot-action" replaced.
+        // insert it right after that noop. the user can delete the noop. i don't want to delete that for them.
+        Test.current.replacedAction.index++;
+        Test.current.insertAction(Test.current.replacedAction);
+    }
+
     Test.current.startImageProcessing(imageProcessingProgress); // just kick it off again
 }
 
@@ -1397,6 +1402,7 @@ async function recordSomething(promptForUrl) {
                     return;
                 }
                 Test.current.recordIndex = index + 1;
+                Test.current.replacedAction = null;
 
                 // see if we are tracking the tab of the action we are recording over
                 Tab.active = Tab.getByVirtualId(action.tab.virtualId);
@@ -1708,7 +1714,15 @@ async function userEventToAction(userEvent) {
     let dataUrl = '';
     switch (userEvent.type) {
         case 'wait':
-            testAction.description = 'wait';
+            testAction.description = 'no action. wait only.';
+            testAction.overlay = {
+                height: 0,
+                width: 0,
+                top: 0,
+                left: 0
+            };
+            testAction._view = constants.view.EXPECTED;
+            //addExpectedScreenshot(testAction, _lastScreenshot);
             break;
         case 'mouseover':
             // this is sort of an error case!
