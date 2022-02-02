@@ -42,6 +42,12 @@ export class Test {
         this.recordIndex = 0;
 
         this._imageProcessingPromise = null;
+
+        /**
+         * The last action we *overwrote* during a recording
+         * @type {TestAction}
+         */
+        this.replacedAction = null;        
     }
 
     /** 
@@ -92,11 +98,18 @@ export class Test {
         if (action.index === undefined) { // when recording actions they (may!) come in without an index, so use the running one.
             action.setIndex(this.recordIndex);
         }
+
         // wait actions only update the UI they don't actually get recorded
         if(action.type !== 'wait') {
             this.recordIndex = action.index + 1;
         }
+
+        if(this.steps[action.index]) {
+            // we are replacing a step, hang onto the original one.
+            this.replacedAction = this.steps[action.index];
+        }
         this.steps[action.index] = action;
+        
         action.test = this; // each action knows what test it is in
     }
 
