@@ -694,7 +694,7 @@ export class Player {
 
         // The screenshots don't match
         nextStep._match = constants.match.FAIL;
-        nextStep._view = constants.view.EXPECTED;
+        nextStep._view = constants.view.EDIT;
 
         // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing. 
         if (differencesPng) {

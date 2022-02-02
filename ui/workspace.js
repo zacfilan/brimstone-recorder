@@ -89,7 +89,41 @@ async function focusOrCreateTab(url) {
  * 
  */
 class Actions {
-    /** open the actions for this extension */
+    /** lastAction executed */
+    nameOfLastMethodExecuted;
+
+    /**
+     * last user action executed
+     */
+    nameOfLastUserActionExecuted;
+
+    /**
+     * Pass in another method of this class.
+     * Track it as being called from a user gensture.
+     * @param {function} method 
+     * @returns 
+     */
+    async callMethodByUser(method, ...args) {
+        this.nameOfLastUserActionExecuted = method.name;
+        return await method.call(this, ...args);
+    }
+
+    async callMethodNameByUser(methodName, ...args) {
+        this.nameOfLastUserActionExecuted = methodName;
+        return await this[methodName](...args);
+    }
+
+    /**
+     * Pass in another method of this class.
+     * Track it as being executed.
+     * @param {function} method 
+     * @returns 
+     */
+    async callMethod(method) {
+        this.nameOfLastMethodExecuted = method.name;
+        return await method.call(this);
+    }
+
     async openOptions() {
         await focusOrCreateTab(chrome.runtime.getURL('options_ui.html'));
     }
@@ -179,6 +213,10 @@ class Actions {
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         await action.addMask(view);
         updateStepInView(Test.current.steps[action.index - 1]);
+
+        if(this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
+            this.callMethod(this.playSomething);
+        }
     }
 
     /** edit pixel differences - remove the allowed differences, see the differences */
@@ -201,6 +239,10 @@ class Actions {
         await action.pixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
         addVolatileRegions();
+        
+        if(this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
+            this.callMethod(this.playSomething);
+        }
     }
 
     /** discard the current workspace test */
@@ -347,6 +389,68 @@ class Actions {
         Test.current.insertAction(newAction);
         updateStepInView(Test.current.steps[action.index]);
     }
+
+     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
+     async cycleEditStates(e) {
+        // flip the cards
+        const { view, action } = getCard(e.currentTarget, Test.current);
+        let index;
+        switch (action._view) {
+            case constants.view.EXPECTED:
+                action._view = constants.view.ACTUAL;
+                if (!action.actualScreenshot) {
+                    action.actualScreenshot = new Screenshot({
+                        fileName: '',
+                        dataUrl: action.expectedScreenshot.dataUrl,
+                        png: action.expectedScreenshot.png
+                    });
+                    if (action.acceptablePixelDifferences) {
+                        action._view = constants.view.EDIT;
+                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
+                        action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
+                    }
+                }
+                else {
+                    await action.actualScreenshot.hydrate(Test.current.zip?.folder("screenshots"));
+                }
+                updateStepInView(Test.current.steps[action.index - 1]);
+                break;
+            case constants.view.ACTUAL:
+                action._view = constants.view.EDIT;
+                if (!action.editViewDataUrl) {
+                    if (!action.acceptablePixelDifferences) {
+                        action.acceptablePixelDifferences = new Screenshot();
+                    }
+                    else {
+                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
+                    }
+                    await action.pixelDiff();
+                }
+                updateStepInView(Test.current.steps[action.index - 1]);
+                /** Add rectangles where we don't care about pixel differences. */
+                addVolatileRegions();
+                break;
+            case constants.view.EDIT:
+                action._view = constants.view.EXPECTED;
+                await updateStepInView(Test.current.steps[action.index - 1]);
+                break;
+        }
+    }
+
+    /**
+     * try to play
+     */
+    async playSomething() {
+        await _playSomething();
+    }
+
+    /**
+     * stop playing
+     */
+    async stopPlaying() {
+        await _stopPlaying();
+    }
+    //#endregion userActions
 
 }
 const actions = new Actions();
@@ -495,22 +599,22 @@ var _lastMouseMove;
 
 $('#step').on('click', '#ignoreDelta', async (e) => {
     e.stopPropagation();
-    await actions.ignoreDelta();
+    await actions.callMethodByUser(actions.ignoreDelta);
 });
 
 $('#step').on('click', '#undo', async (e) => {
     e.stopPropagation();
-    await actions.seeDelta();
+    await actions.callMethodByUser(actions.seeDelta);
 });
 
 $("#step").on('click', '#replace', async (e) => {
     e.stopPropagation();
-    await actions.replaceExpectedWithActual();
+    await actions.callMethodByUser(actions.replaceExpectedWithActual);
 });
 
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
     e.stopPropagation();
-    actions.deleteAction();
+    actions.callMethodByUser(actions.deleteAction);
 });
 
 // stop the image drag behavior
@@ -541,56 +645,14 @@ function addVolatileRegions() {
 }
 
 
-$('#step').on('click', '.action .title', actions.editActionName);
+$('#step').on('click', '.action .title', () => {
+    actions.callMethodByUser(actions.editActionName);
+});
 
-$('#step').on('click', '.waiting .click-to-change-view',
-    /** When clicking on an editable action, cycle through expected, actual, and difference views. */
-    async function cycleEditStates(e) {
-        // flip the cards
-        const { view, action } = getCard(e.currentTarget, Test.current);
-        let index;
-        switch (action._view) {
-            case constants.view.EXPECTED:
-                action._view = constants.view.ACTUAL;
-                if (!action.actualScreenshot) {
-                    action.actualScreenshot = new Screenshot({
-                        fileName: '',
-                        dataUrl: action.expectedScreenshot.dataUrl,
-                        png: action.expectedScreenshot.png
-                    });
-                    if (action.acceptablePixelDifferences) {
-                        action._view = constants.view.EDIT;
-                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
-                        action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
-                    }
-                }
-                else {
-                    await action.actualScreenshot.hydrate(Test.current.zip?.folder("screenshots"));
-                }
-                updateStepInView(Test.current.steps[action.index - 1]);
-                break;
-            case constants.view.ACTUAL:
-                action._view = constants.view.EDIT;
-                if (!action.editViewDataUrl) {
-                    if (!action.acceptablePixelDifferences) {
-                        action.acceptablePixelDifferences = new Screenshot();
-                    }
-                    else {
-                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
-                    }
-                    await action.pixelDiff();
-                }
-                updateStepInView(Test.current.steps[action.index - 1]);
-                /** Add rectangles where we don't care about pixel differences. */
-                addVolatileRegions();
-                break;
-            case constants.view.EDIT:
-                action._view = constants.view.EXPECTED;
-                await updateStepInView(Test.current.steps[action.index - 1]);
-                break;
-        }
-    }
-);
+$('#step').on('click', '.waiting .click-to-change-view', (...args) => {
+    actions.callMethodByUser(actions.cycleEditStates, ...args);
+});
+  
 
 function setInfoBarText(infobarText) {
     if (!infobarText) {
@@ -676,6 +738,7 @@ $('#first').on('click', function (e) {
 });
 
 $('#previous').on('click', function (e) {
+    playMatchStatus = constants.match.PASS;
     let index = currentStepIndex();
     if (index > 0) {
         updateStepInView(Test.current.steps[index - 1]);
@@ -691,10 +754,19 @@ var playMatchStatus = constants.match.PASS;
  */
 var playedRecordings;
 
-$('#playButton').on('click', async function () {
+$('#playButton').on('click', () => {
     let button = $(this);
     if (button.hasClass('active')) {
-        stopPlaying();
+        actions.callMethodByUser(actions.stopPlaying);
+        return;
+    }
+    actions.callMethodByUser(actions.playSomething);
+});
+
+async function _playSomething () {
+    let button = $(this);
+    if (button.hasClass('active')) {
+        actions.callMethodByUser(actions.stopPlaying);
         return;
     }
     try {
@@ -705,7 +777,7 @@ $('#playButton').on('click', async function () {
         };
 
         let startingTab = await getActiveApplicationTab();
-
+ 
         do {
             nextTest = false;
             $('#playButton').addClass('active');
@@ -799,21 +871,22 @@ $('#playButton').on('click', async function () {
                     break;
             }
         } while (nextTest);
-        stopPlaying();
+        actions.callMethod(actions.stopPlaying);
     }
     catch (e) {
-        stopPlaying();
-        if (e === 'debugger_already_attached') {
-            await brimstone.window.alert("You must close the existing debugger(s) first.");
+        actions.callMethod(actions.stopPlaying);
+        if(e instanceof Errors.NoActiveTab) {
+            setInfoBarText(`❌ play canceled - ${e?.message ?? ''}`);
         }
         else {
             setInfoBarText('💀 aborted! ' + e?.message ?? '');
             throw e;
         }
     }
-});
+}
 
 $('#next').on('click', function (e) {
+    playMatchStatus = constants.match.PASS;
     let index = currentStepIndex();
     if (index < Test.current.steps.length - 1) {
         updateStepInView(Test.current.steps[index + 1]);
@@ -821,6 +894,7 @@ $('#next').on('click', function (e) {
 });
 
 $('#last').on('click', function (e) {
+    playMatchStatus = constants.match.PASS;
     updateStepInView(Test.current.steps[Test.current.steps.length - 1]);
 });
 
@@ -1203,7 +1277,7 @@ async function getActiveApplicationTab() {
     if (tabs.length > 2) {
         let ok = await brimstone.window.confirm('There are multiple application tabs. Brimstone will use the active tab as the initial target.');
         if (!ok) {
-            return;
+            throw new Errors.NoActiveTab();
         }
     }
 
@@ -1396,7 +1470,12 @@ async function recordSomething(promptForUrl) {
     }
     catch (e) {
         stopRecording();
-        throw e;
+        if(e instanceof Errors.NoActiveTab) {
+            setInfoBarText(`❌ recording canceled - ${e?.message ?? ''}`);
+        }
+        else {
+            throw e;
+        }
     }
 }
 
@@ -1411,7 +1490,7 @@ $('#recordButton').on('click', (e) => {
     recordSomething(promptForUrl);
 });
 
-function stopPlaying() {
+function _stopPlaying() {
     $('#playButton').removeClass('active');
     setToolbarState();
     removeEventHandlers();

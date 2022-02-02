@@ -42,7 +42,7 @@ export class TestAction {
     /** 
      * @type {object}
      * @property {number} frameId frame in the tab that generated this action */
-     sender;
+    sender;
 
     /**
      * @type {Tab} info about the tab this action was recorded on.
@@ -155,7 +155,7 @@ export class TestAction {
      * @type {number}    
     */
     waitBeforePlaying = 0;
-    
+
     constructor(args) {
         Object.assign(this, args);
         this.tab = new Tab(this.tab);
@@ -363,7 +363,7 @@ export class TestAction {
             }
             footer += `${this.memoryUsed}MBs in use.`;
         }
-        
+
         if (!stats) {
             footer = '';
         }
@@ -371,31 +371,31 @@ export class TestAction {
         let width = '?';
         let height = '?';
         let screenshot;
-        switch(this._view) {
+        switch (this._view) {
             case 'dynamic':
             case 'expected':
                 screenshot = this.expectedScreenshot;
                 break;
             case 'edit':
-                if(this.editViewDataUrl) {
-                    let size = extractPngSize(this.editViewDataUrl.substring(22, 22+16));
+                if (this.editViewDataUrl) {
+                    let size = extractPngSize(this.editViewDataUrl.substring(22, 22 + 16));
                     screenshot = {
                         dataUrlHeight: size.height,
-                        dataUrlWidth: size.width             
+                        dataUrlWidth: size.width
                     };
                 }
-                 break;
+                break;
             case 'actual':
                 screenshot = this.actualScreenshot;
                 break;
         }
-        
-        if(screenshot) {
-            if(screenshot.dataUrlHeight) {
+
+        if (screenshot) {
+            if (screenshot.dataUrlHeight) {
                 width = screenshot.dataUrlWidth;
                 height = screenshot.dataUrlHeight;
             }
-            else if(screenshot.png) {
+            else if (screenshot.png) {
                 width = screenshot.png.width;
                 height = screenshot.png.height;
             }

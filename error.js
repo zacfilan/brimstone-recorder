@@ -39,3 +39,10 @@ export class DebuggerDetached extends Error {
         super(msg || 'Debugger detached');
     }   
 }
+
+/** an error that identifies we had issues obtaining an active tab */
+export class NoActiveTab extends Error {
+    constructor(msg) {
+        super(msg || 'The active tab cannot be obtaind.');
+    }   
+}

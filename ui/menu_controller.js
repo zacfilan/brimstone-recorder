@@ -8,6 +8,10 @@ export class MenuController {
         $('#menus .options').removeClass('open');
     }
 
+    /**
+     * 
+     * @param {Actions} actions 
+     */
     constructor(actions) {
         this.actions = actions;
         this.close();
@@ -16,7 +20,7 @@ export class MenuController {
         $('#menus .options .option').on('click', (e) => {
             let action = $(e.target).closest('.option').attr('data-action');
             this.close();
-            this.actions[action](); // execute the action
+            this.actions.callMethodNameByUser(action); // execute the action
         });
 
         /** open or close a menu */
