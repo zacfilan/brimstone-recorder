@@ -286,8 +286,10 @@ class Actions {
         delete copy.actualScreenshot;
 
         var modalContentContainer = $('#modal-content').html('');
+        var wrapper = $('<div class="content-wrapper"></div>');
+        modalContentContainer.append(wrapper);
         var jsonEditorContainer   = $("<div id='json-editor'></div>");
-        modalContentContainer.append(jsonEditorContainer);
+        wrapper.append(jsonEditorContainer);
         jsonEditor = new JSONEditor(jsonEditorContainer[0], {
             mode: 'form',
             onChangeJSON: json => {
@@ -302,8 +304,10 @@ class Actions {
     viewTestJson() {
         var test = clone(Test.current); // pass a copy
         var modalContentContainer = $('#modal-content').html('');
+        var wrapper = $('<div class="content-wrapper"></div>');
+        modalContentContainer.append(wrapper);
         var jsonEditorContainer   = $("<div id='json-editor'></div>");
-        modalContentContainer.append(jsonEditorContainer);
+        wrapper.append(jsonEditorContainer);
         jsonEditor = new JSONEditor(jsonEditorContainer[0], {
             mode: 'view',
         });

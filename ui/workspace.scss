@@ -1,12 +1,17 @@
 //// for any modal
 .modal {
     color: black;
+    height: 80%;
+    .content-wrapper {
+        height: 100%;
+        overflow: auto;
+    }
 }
 .blocker {
     background: rgba(128,128,128,0.75);
 }
 ////
- 
+
 html {
     height: 100%;
 }

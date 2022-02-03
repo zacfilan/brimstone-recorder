@@ -1,5 +1,11 @@
 .modal {
   color: black;
+  height: 80%;
+}
+
+.modal .content-wrapper {
+  height: 100%;
+  overflow: auto;
 }
 
 .blocker {
