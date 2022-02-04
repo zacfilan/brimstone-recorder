@@ -11,7 +11,7 @@ export class Options {
     /** Used in the png matching algorithm. Pixels are allowed some color variance, to deal with anti-aliasing for example.
      * Lower numbers are more strict.
      */
-    pixelMatchThreshhold = .1; // different screens seem to render a little different...
+    pixelMatchThreshhold = .2; // different screens seem to render a little different...
 
     /** delay in ms between typed characters.
      * simulates slower typing 
@@ -71,6 +71,23 @@ export class Options {
      */
     mouseMoveTimeout = 250;
 
+    /**
+     * The url that we post a test's run metrics to.
+     * This can be used to store performance metrics in a database,
+     * if the endpoint is built to do so.
+     * e.g.
+     * https://my.server.com/api/testruns
+     */
+    postMetricsEndpoint = 'https://postman-echo.com/post'; // this is a simple POST echo
+
+    /** 
+     * If we want to automaticaly post the metrics when a test passes.
+     * */
+    postMetricsOnPass = false;
+
+    /** 
+     * If we want to automatically post the metrics when a test fails */
+    postMetricsOnFail = false;
 
 };
 

@@ -248,7 +248,11 @@ export class Player {
             }
             stop = performance.now();
 
-            next.latency = ((stop - start) / 1000).toFixed(1);
+            action.latency = Math.round(stop - start); // in ms
+            
+            // clear out old data
+            next.latency = 0; 
+            next.memoryUsed = 0;
 
             action._view = constants.view.EXPECTED;
             switch (next._match) {
@@ -256,7 +260,7 @@ export class Player {
                 case constants.match.ALLOW:
                     console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
                     next._view = constants.view.EXPECTED;
-                    next.memoryUsed = await this.getClientMemoryByChromeApi();
+                    action.memoryUsed = await this.getClientMemoryByChromeApi();
                     break;// keep on chugging
                 case constants.match.FAIL:
                     console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);

@@ -26,6 +26,10 @@ async function save_options() {
     options.recordIncognito = document.getElementById('recordIncognito').checked;
     options.developerMode = document.getElementById('developerMode').checked;
     options.debugRecorder = document.getElementById('debugRecorder').checked;
+    options.postMetricsOnFail = document.getElementById('postMetricsOnFail').checked;
+    options.postMetricsOnPass = document.getElementById('postMetricsOnPass').checked;
+    options.postMetricsEndpoint = document.getElementById('postMetricsEndpoint').value;
+
     // experiements
     options.experiment.includeCss = document.getElementById('includeCss').checked;
     options.experiment.joinSubTests = document.getElementById('joinSubTests').checked;
@@ -60,6 +64,9 @@ async function restore_options() {
     document.getElementById('recordIncognito').checked = options.recordIncognito;
     document.getElementById('developerMode').checked = options.developerMode;
     document.getElementById('debugRecorder').checked = options.debugRecorder;
+    document.getElementById('postMetricsOnPass').checked = options.postMetricsOnPass;
+    document.getElementById('postMetricsOnFail').checked = options.postMetricsOnFail;
+    document.getElementById('postMetricsEndpoint').value = options.postMetricsEndpoint;
 
     // experiements
     document.getElementById('includeCss').checked = options.experiment.includeCss;

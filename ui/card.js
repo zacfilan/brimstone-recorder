@@ -156,6 +156,9 @@ export class TestAction {
     */
     waitBeforePlaying = 0;
 
+    /** the user perceived latency in millisconds for this action to complete */
+    latency = 0;
+
     constructor(args) {
         Object.assign(this, args);
         this.tab = new Tab(this.tab);
@@ -353,15 +356,22 @@ export class TestAction {
         }
 
         let footer = '';
-        if (this.latency) {
-            let red = this.latency > 3 ? "class='error-text'" : '';
-            footer += `Visible in&nbsp<span ${red}>${this.latency}s</span>.`;
+        // the 2nd card shows the latency of the previous action to complete, and the memory when it did complete.
+        let latency, memoryUsed;
+        if (this.index) {
+            let prev = this.test.steps[this.index - 1];
+            latency = prev.latency;
+            memoryUsed = prev.memoryUsed;
         }
-        if (this.memoryUsed) {
-            if (this.latency) {
+        if (latency) {
+            let red = latency > 3000 ? "class='error-text'" : '';
+            footer += `Visible in&nbsp<span ${red}>${(latency / 1000).toFixed(1)}s</span>.`;
+        }
+        if (memoryUsed) {
+            if (latency) {
                 footer += ' ';
             }
-            footer += `${this.memoryUsed}MBs in use.`;
+            footer += `${memoryUsed}MBs in use.`;
         }
 
         if (!stats) {

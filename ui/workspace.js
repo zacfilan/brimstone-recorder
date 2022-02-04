@@ -11,6 +11,7 @@ import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
 import { clone } from "../utilities.js";
+import * as BDS from "./brimstoneDataService.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
 const version = 'v' + chrome.runtime.getManifest().version;
@@ -198,8 +199,28 @@ class Actions {
         }
     }
 
-    downloadLastRunJson() {
+
+    async downloadLastRunMetrics() {
         downloadObjectAsJson(playedRecordings, 'last_run_metrics');
+    }
+
+    /**
+     * Post the last runs metrics to the endpoint.
+     */
+    async postLastRunMetrics() {
+        let options = await loadOptions();
+        $.ajax({
+            type: "POST",
+            url: options.postMetricsEndpoint,
+            data: JSON.stringify(playedRecordings),
+            contentType: "application/json",
+            success: function (result) {
+                console.log(result);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+                brimstone.window.alert(`There was a problem posting last run's metrics.\n\nMore information may be available in devtools.`);
+            }
+        });
     }
 
     /** retpeat the last added rectangle(s) */
@@ -214,7 +235,7 @@ class Actions {
         await action.addMask(view);
         updateStepInView(Test.current.steps[action.index - 1]);
 
-        if(this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
+        if (this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
             this.callMethod(this.playSomething);
         }
     }
@@ -239,8 +260,8 @@ class Actions {
         await action.pixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
         addVolatileRegions();
-        
-        if(this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
+
+        if (this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
             this.callMethod(this.playSomething);
         }
     }
@@ -288,7 +309,7 @@ class Actions {
         var modalContentContainer = $('#modal-content').html('');
         var wrapper = $('<div class="content-wrapper"></div>');
         modalContentContainer.append(wrapper);
-        var jsonEditorContainer   = $("<div id='json-editor'></div>");
+        var jsonEditorContainer = $("<div id='json-editor'></div>");
         wrapper.append(jsonEditorContainer);
         jsonEditor = new JSONEditor(jsonEditorContainer[0], {
             mode: 'form',
@@ -306,7 +327,7 @@ class Actions {
         var modalContentContainer = $('#modal-content').html('');
         var wrapper = $('<div class="content-wrapper"></div>');
         modalContentContainer.append(wrapper);
-        var jsonEditorContainer   = $("<div id='json-editor'></div>");
+        var jsonEditorContainer = $("<div id='json-editor'></div>");
         wrapper.append(jsonEditorContainer);
         jsonEditor = new JSONEditor(jsonEditorContainer[0], {
             mode: 'view',
@@ -394,8 +415,8 @@ class Actions {
         updateStepInView(Test.current.steps[action.index]);
     }
 
-     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
-     async cycleEditStates(e) {
+    /** When clicking on an editable action, cycle through expected, actual, and difference views. */
+    async cycleEditStates(e) {
         // flip the cards
         const { view, action } = getCard(e.currentTarget, Test.current);
         let index;
@@ -707,11 +728,14 @@ function setToolbarState() {
             rb.attr('disabled', false);
             document.documentElement.style.setProperty('--action-color', 'blue');
 
+            if (playedRecordings?.steps?.length) {
+                $('.metrics.option [data-action]').attr('disabled', false); // everything under metrics
+            }
+
             if (Test.current.steps.length) {
                 $('[data-action="saveZip"]').attr('disabled', false);
                 $('[data-action="clearTest"]').attr('disabled', false);
-                $('[data-action="downloadLastRunJson"]').attr('disabled', false);
-                $('[data-action="chartMetrics"]').attr('disabled', false);
+
 
                 $('.edit.option [data-action]').attr('disabled', false); // everything under edit
                 $('[data-action="deleteAction"]').attr('disabled', false); // delete action icon on card 
@@ -754,7 +778,8 @@ var playMatchStatus = constants.match.PASS;
  * All the recordings (zips) that were played in the last atomic play. This means that it
  * gets reset each time you play.
  */
-var playedRecordings;
+
+var playedRecordings = new BDS.Test();
 
 $('#playButton').on('click', () => {
     let button = $(this);
@@ -765,21 +790,20 @@ $('#playButton').on('click', () => {
     actions.callMethodByUser(actions.playSomething);
 });
 
-async function _playSomething () {
+async function _playSomething() {
     let button = $(this);
     if (button.hasClass('active')) {
         actions.callMethodByUser(actions.stopPlaying);
         return;
     }
+    let options = await loadOptions();
     try {
         let nextTest;
-        playedRecordings = {
-            totalNumberOfActions: 0,
-            recordings: []
-        };
+        playedRecordings = new BDS.Test();
+        playedRecordings.startDate = Date.now();
 
         let startingTab = await getActiveApplicationTab();
- 
+
         do {
             nextTest = false;
             $('#playButton').addClass('active');
@@ -843,17 +867,14 @@ async function _playSomething () {
             switch (playMatchStatus) {
                 case constants.match.PASS:
                 case constants.match.ALLOW:
-                    playedRecordings.totalNumberOfActions += Test.current.steps.length;
-                    playedRecordings.recordings.push({
-                        filename: Test.current.filename,
-                        steps: Test.current.steps.map(testAction => ({
-                            index: testAction.index,
-                            memoryUsed: testAction.memoryUsed,
-                            latency: testAction.latency,
-                            name: testAction.name,
-                            css: testAction.css
-                        }))
-                    });
+                    playedRecordings.steps.push(... Test.current.steps.map(testAction => {
+                        let step = new BDS.Step();
+                        step.index = testAction.index;
+                        step.clientMemory = testAction.memoryUsed;
+                        step.userLatency = testAction.latency;
+                        step.name = testAction.name || testAction.description;
+                        return step;
+                    }));
                     nextTest = await loadNextTest();
                     if (!nextTest) {
                         setInfoBarText('✅ last run passed');
@@ -874,10 +895,17 @@ async function _playSomething () {
             }
         } while (nextTest);
         actions.callMethod(actions.stopPlaying);
+        playedRecordings.endDate = Date.now();
+
+        if ((playMatchStatus === constants.match.PASS && options.postMetricsOnPass) ||
+            (playMatchStatus === constants.match.FAIL && options.postMetricsOnFail)) {
+            await actions.postLastRunMetrics();
+        };
     }
     catch (e) {
         actions.callMethod(actions.stopPlaying);
-        if(e instanceof Errors.NoActiveTab) {
+        playedRecordings.endDate = Date.now();
+        if (e instanceof Errors.NoActiveTab) {
             setInfoBarText(`❌ play canceled - ${e?.message ?? ''}`);
         }
         else {
@@ -1254,7 +1282,7 @@ function stopRecording() {
         console.warn(e);
     }
 
-    if(Test.current.replacedAction) {
+    if (Test.current.replacedAction) {
         // insert the action that our final useless "end-recording-noop-expected-screenshot-action" replaced.
         // insert it right after that noop. the user can delete the noop. i don't want to delete that for them.
         Test.current.replacedAction.index++;
@@ -1480,7 +1508,7 @@ async function recordSomething(promptForUrl) {
     }
     catch (e) {
         stopRecording();
-        if(e instanceof Errors.NoActiveTab) {
+        if (e instanceof Errors.NoActiveTab) {
             setInfoBarText(`❌ recording canceled - ${e?.message ?? ''}`);
         }
         else {
@@ -1734,7 +1762,7 @@ async function userEventToAction(userEvent) {
             addExpectedScreenshot(testAction, _lastScreenshot);
             break;
         case 'mousemove':
-            testAction.description = 'move mouse to here';
+            testAction.description = 'move mouse';
             addExpectedScreenshot(testAction, _lastSavedScreenshot);
             break;
         case 'wheels':
