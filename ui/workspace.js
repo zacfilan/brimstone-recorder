@@ -10,7 +10,7 @@ import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
-import { clone, brimstone } from "../utilities.js";
+import { clone, brimstone, focusWorkspaceWindow } from "../utilities.js";
 import * as BDS from "./brimstoneDataService.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
@@ -60,6 +60,8 @@ async function focusOrCreateTab(url) {
  * 
  */
 class Actions {
+    _modalClosed; // function to resolve a promise externally
+
     /** lastAction executed */
     nameOfLastMethodExecuted;
 
@@ -207,6 +209,7 @@ class Actions {
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         await action.addMask(view);
         updateStepInView(Test.current.steps[action.index - 1]);
+        action.test.dirty = true;
 
         if (this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
             this.callMethod(this.playSomething);
@@ -215,16 +218,19 @@ class Actions {
 
     /** edit pixel differences - remove the allowed differences, see the differences */
     async seeDelta() {
+
         // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
         const { view, action } = getCard('#content .waiting', Test.current);
         action.acceptablePixelDifferences = new Screenshot();
         await action.pixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
         addVolatileRegions();
+        action.test.dirty = true;
     }
 
     /** edit pixel differences - when the recording is wrong */
     async replaceExpectedWithActual() {
+
         // push the actual into the expected and be done with it.
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         action.expectedScreenshot.png = action.actualScreenshot.png;
@@ -233,6 +239,7 @@ class Actions {
         await action.pixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
         addVolatileRegions();
+        action.test.dirty = true;
 
         if (this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
             this.callMethod(this.playSomething);
@@ -246,6 +253,16 @@ class Actions {
 
     /** discard everytihing in the current workspace*/
     async clearTest() {
+        if (Test.current.dirty) {
+            // the dreaded "user gesture required"
+            // await focusWorkspaceWindow();
+            // let result = window.confirm(`🙋❓ File '${Test.current.filename}' has unsaved changes.\n\nDo you want to save?`);
+            // if(result) {
+            //     await actions.saveZip();
+            // }
+
+            let result = await actions.confirmSaveModal();
+        }
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
@@ -454,6 +471,15 @@ class Actions {
     async stopPlaying() {
         await _stopPlaying();
     }
+
+    async confirmSaveModal() {
+        let userButtonPress = new Promise( resolve => {
+            this._modalClosed = resolve;
+        });
+
+        $('#confirmSave').modal();
+        return userButtonPress;
+    }
     //#endregion userActions
 
 }
@@ -654,6 +680,17 @@ $('#step').on('click', '.action .title', () => {
 
 $('#step').on('click', '.waiting .click-to-change-view', (...args) => {
     actions.callMethodByUser(actions.cycleEditStates, ...args);
+});
+
+$('#confirmSaveChangesButton').click( async () => {
+    await actions.saveZip(); //  need to do this here, rather than post the promise the
+    // next line resolves. if i try it post the promise the next line resolves I get
+    // that dreaded "user gesture required"
+    actions._modalClosed('Save Changes');    // i don't actually know if the user actually saved or not, they could have cancelled.
+});
+
+$('#confirmDiscardChangesButton').click( () => {
+    actions._modalClosed('Discard Changes');    
 });
 
 function setInfoBarText(infobarText) {
@@ -878,7 +915,7 @@ async function _playSomething() {
             }
         } while (nextTest);
         actions.callMethod(actions.stopPlaying);
-        if(options.postMetricsOnFail || options.postMetricsOnPass) {
+        if (options.postMetricsOnFail || options.postMetricsOnPass) {
             await actions.postLastRunMetrics(true);
         }
     }
@@ -1480,13 +1517,13 @@ async function recordSomething(promptForUrl) {
             }
         }
 
-        if(!PlayTree.complete) { // pretend it is suite which is the general case I need to handle.
+        if (!PlayTree.complete) { // pretend it is suite which is the general case I need to handle.
             PlayTree.complete = await new PlayTree();
             PlayTree.complete._zipTest = Test.current;
             Test.current._playTree = PlayTree.complete;
         }
         await startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
-        
+
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
@@ -1656,7 +1693,7 @@ async function captureScreenshotAsDataUrlForRecording() {
             if (lastError instanceof Errors.IncorrectScreenshotSize) {
                 // this can only happen during recording if the debugger banner is volatile
                 await player.tab.resizeViewport();
-                await sleep(137);
+                await sleep(500);
                 continue;
             }
             throw lastError;

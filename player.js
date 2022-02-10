@@ -59,7 +59,7 @@ function _changeSelectValue(x, y, value) {
     try {
         var select = document.elementFromPoint(x, y);
         if (select.tagName !== 'SELECT') {
-            return 'not a select element';
+            return `attempt to change non-select element: ${select.outerHTML}`;
         }
         if (select.value === value) {
             return;

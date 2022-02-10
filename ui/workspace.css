@@ -12,6 +12,51 @@
   background: rgba(128, 128, 128, 0.75);
 }
 
+#confirmSave {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  font-size: 14px;
+}
+
+#confirmSave #title {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+#confirmSave #message {
+  margin-bottom: .6em;
+}
+
+#confirmSave #buttons {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: end;
+      -ms-flex-pack: end;
+          justify-content: end;
+  margin-top: 2em;
+}
+
+#confirmSave a.button {
+  margin-left: 1em;
+  background-color: #1a73e8;
+  border: 1px solid white;
+  outline: 2px solid #1a73e8;
+  border-radius: 5px;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#confirmSave a.button:hover {
+  opacity: .5;
+}
+
 html {
   height: 100%;
 }

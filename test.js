@@ -15,6 +15,12 @@ export class Test {
      */
     reset() {
         /**
+         * If the current test has been edited so that the user can be given a 
+         * chance to record before leaving the test.
+         */
+        this.dirty = false;
+
+        /**
          * These are the individual actions of the test.
          * @type {TestAction[]}
          */
@@ -129,6 +135,7 @@ export class Test {
      * persisted until a save. 
      * @param {TestAction} action */
     deleteAction(action) {
+        this.dirty = true;
         let removeIndex = action.index;
         for (let i = action.index + 1; i < this.steps.length; ++i) {
             let action = this.steps[i];
@@ -143,6 +150,7 @@ export class Test {
      * @param {TestAction} action 
      */
     deleteActionsBefore(action) {
+        this.dirty = true;
         this.steps.splice(0, action.index);
         this.reindex();
     }
@@ -160,6 +168,7 @@ export class Test {
      * @param {TestAction} action 
      */
     deleteActionsAfter(action) {
+        this.dirty = true;
         this.steps.splice(action.index + 2);
         this.reindex();
 
@@ -170,6 +179,7 @@ export class Test {
      *  @param {TestAction} newAction The action to insert
      */
     insertAction(newAction) {
+        this.dirty = true;
         this.steps.splice(newAction.index, 0, newAction);
         this.reindex();
     }
@@ -225,7 +235,7 @@ export class Test {
         let blobpromise = this.zip.generateAsync({ type: "blob" });
         try {
             const handle = await window.showSaveFilePicker({
-                suggestedName: `test.zip`,
+                suggestedName: this.filename,
                 types: [
                     {
                         description: 'A ZIP archive that can be run by Brimstone',
@@ -238,10 +248,14 @@ export class Test {
             await writable.write(blob);  // Write the contents of the file to the stream.    
             await writable.close(); // Close the file and write the contents to disk.
             this.filename = handle.name;
+            this.dirty = false;
             return handle;
         }
         catch (e) {
-            console.error(e);
+            if (e instanceof DOMException && e.message === 'The user aborted a request.') {
+                return; // fine
+            }
+            throw e;
         }
     }
 
@@ -523,8 +537,8 @@ export class PlayTree {
                 try {
                     pojo = JSON.parse(blob);
                 }
-                catch(e) {
-                    if(e instanceof SyntaxError) {
+                catch (e) {
+                    if (e instanceof SyntaxError) {
                         throw new Errors.TestLoadError(`Syntax error: ${e.message}`, this._fileHandle.name);
                     }
                 }
@@ -564,10 +578,10 @@ export class PlayTree {
     /** return the path to the parent */
     path() {
         let p = "";
-        for(let node = this; node?._fileHandle?.name; node = node._parent) {
+        for (let node = this; node?._fileHandle?.name; node = node._parent) {
             let old = p;
             p = node._fileHandle.name;
-            if(old) {
+            if (old) {
                 p += '/' + old;
             }
         }
@@ -584,20 +598,20 @@ export class PlayTree {
     buildReports() {
         this.reports = [];
         let reports = this.reports; // shorter alias
-        
+
         // if I am a ziptest node return me
         if (this._zipTest) {
             this._zipTest.lastRun.path = this.path();
             return this.reports = [this._zipTest.lastRun];
         }
-        if(!this.children && this._fileHandle.name.endsWith(".zip")) {
+        if (!this.children && this._fileHandle.name.endsWith(".zip")) {
             // we haven't loaded this zipfile into a zipTest yet, meaning
             // we have not run it.
             return this.reports = [new BDS.Test()]; // returns status "not run"
         }
         // you should either be a _zipTest or have children but not both.
 
-        for(let i = 0; i < this.children.length; ++i) {
+        for (let i = 0; i < this.children.length; ++i) {
             let child = this.children[i];
             /** @type {BDS.Test[]} */
             let childReports;
@@ -616,7 +630,7 @@ export class PlayTree {
             flatReport.wallTime = 0;
             flatReport.userTime = 0;
             flatReport.name = this._fileHandle.name;
-            
+
             var baseIndex = 0;
             for (let i = 0; i < reports.length; ++i) {
                 let report = reports[i];
@@ -624,7 +638,7 @@ export class PlayTree {
                 flatReport.userTime += report.userTime;
                 flatReport.wallTime += report.wallTime;
                 flatReport.endDate = report.endDate;
-                for(let j = 0; j < report.steps.length; ++j) {
+                for (let j = 0; j < report.steps.length; ++j) {
                     let step = report.steps[j];
                     step.baseIndex = baseIndex;
                     step.index += baseIndex;
@@ -633,8 +647,8 @@ export class PlayTree {
                 baseIndex += report.steps.length;
 
                 flatReport.steps.push(...report.steps);
-                if(flatReport.status !== constants.match.PASS) {
-                    flatReport.errorMessage = report.errorMessage || 'unable to generate report due to non-passing subnode'; 
+                if (flatReport.status !== constants.match.PASS) {
+                    flatReport.errorMessage = report.errorMessage || 'unable to generate report due to non-passing subnode';
                     break; // we are outta here
                 }
             }
