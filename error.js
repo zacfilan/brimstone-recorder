@@ -46,3 +46,22 @@ export class NoActiveTab extends Error {
         super(msg || 'The active tab cannot be obtaind.');
     }   
 }
+
+/** an error that identifies we had issues loading the requested test */
+export class TestLoadError extends Error {
+    constructor(msg, testName) {
+        if(!testName) {
+            testName = 'The requested test';
+        }
+        else {
+            testName = `Test '${testName}'`;
+        }
+        if(msg) {
+            msg = `${testName} could not be loaded: \n\n${msg}.`;
+        }
+        else {
+            msg = `${testName} could not be loaded.`;
+        }
+        super(msg);
+    }
+}

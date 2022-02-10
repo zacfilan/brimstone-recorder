@@ -1,8 +1,11 @@
 import { TestAction, constants } from "./ui/card.js";
 import { Screenshot } from "./ui/screenshot.js";
+import { brimstone } from "./utilities.js";
+import * as Errors from "./error.js";
+import * as BDS from "./ui/brimstoneDataService.js";
 
 /**
- * A test instance is a recording of user actions that can be played back
+ * A ziptest instance is a recording of user actions that can be played back
  * and verified.
  */
 export class Test {
@@ -47,7 +50,15 @@ export class Test {
          * The last action we *overwrote* during a recording
          * @type {TestAction}
          */
-        this.replacedAction = null;        
+        this.replacedAction = null;
+
+        /** The PlayTree node for this test.
+         * @type {PlayTree}
+         */
+        this._playTree = null;
+
+        /** Statistics about the last run of this zipfile test */
+        this.lastRun = new BDS.Test();
     }
 
     /** 
@@ -100,16 +111,16 @@ export class Test {
         }
 
         // wait actions only update the UI they don't actually get recorded
-        if(action.type !== 'wait') {
+        if (action.type !== 'wait') {
             this.recordIndex = action.index + 1;
         }
 
-        if(this.steps[action.index]) {
+        if (this.steps[action.index]) {
             // we are replacing a step, hang onto the original one.
             this.replacedAction = this.steps[action.index];
         }
         this.steps[action.index] = action;
-        
+
         action.test = this; // each action knows what test it is in
     }
 
@@ -235,6 +246,19 @@ export class Test {
     }
 
     /**
+     * async constructor from a zip filehandle in playtree.
+     * loads all the expected screenshots into data urls as fast as possible from the zip.
+     * @param {PlayTree} playTree 
+     * @returns 
+     */
+    async fromPlayTree(playTree) {
+        await this.fromFileHandle(playTree._fileHandle);
+        this._playTree = playTree;
+        this._playTree._zipTest = this;
+        return this;
+    }
+
+    /**
     * async constructor from a filehandle of the zip.
     * loads all the expected screenshots into data urls as fast as possible from the zip.
     * 
@@ -245,7 +269,7 @@ export class Test {
             return this;
         }
         this.reset();
-        
+
         const blob = await fileHandle.getFile();
         this.zip = await (new JSZip()).loadAsync(blob);
         let screenshots = this.zip.folder("screenshots"); // access screenshots folder from the archive
@@ -270,19 +294,19 @@ export class Test {
             if (_action.type === 'start') {
                 _action.type = 'goto';
             }
-            if(_action.sender) {
+            if (_action.sender) {
                 _action.tab = _action.sender;
             }
-            else if(!_action.tab) {
+            else if (!_action.tab) {
                 _action.tab = {};
             }
-            if(_action.tabWidth) {
+            if (_action.tabWidth) {
                 _action.tab.width = _action.tabWidth;
                 _action.tab.height = _action.tabHeight;
                 delete _action.tabWidth;
                 delete _action.tabHeight;
             }
-            if(_action.tab.virtualId === undefined) {
+            if (_action.tab.virtualId === undefined) {
                 _action.tab.virtualId = 0;
             }
 
@@ -395,7 +419,10 @@ Test.loadFileHandles = async function loadFileHandles() {
         });
     }
     catch (e) {
-        console.error(e);
+        if (e instanceof DOMException && e.message === 'The user aborted a request.') {
+            return; // fine
+        }
+        throw e;
     }
     return fileHandles;
 };
@@ -406,9 +433,9 @@ Test.loadFileHandles = async function loadFileHandles() {
  */
 Test.current = null;
 
-export class Playlist {
+export class PlayTree {
     /** json identifier for this filetype */
-    type = 'brimstone playlist';
+    type = 'brimstone playtree';
 
     /** @type {string} */
     description;
@@ -416,13 +443,43 @@ export class Playlist {
     /** @type {string} */
     author;
 
-    /**
-     * @type {FieSystemFileHandle[]}
-     */
-    play = [];
+    /** is this playtree to be considered one big flat test, or as a (linear vis DFT) suite of tests? 
+     * If true, each item is a test, else we conceptually flatten the list of items into one big test.
+    */
+    suite = true;
 
-    /**@type {FileSystemDirectoryHandle} */
-    _directoryHandle;
+    /**
+     * Defined only for non-leaf nodes.
+     * @type {PlayTree[]}
+     */
+    children;
+
+    /** 
+     * The filehandle of this node (zip or playlist file).
+     * @type {FileHandle}*/
+    _fileHandle;
+
+    /**
+     * If this node is for a ziptest the test will be stored in here.
+     * @type {Test}
+     * */
+    _zipTest;
+
+    /** @type {PlayTree} */
+    _parent;
+
+    constructor(args) {
+        this._parent = args?.parent;
+    }
+
+    /** 
+     * A set of run reports for this node.
+     * If this node is is zipnode, or a flat (suite:false) playlist
+     * then there will only be one entry. If this node
+     * is a suite (suite:true) then there will be one or more entries.
+     * @type {BDS.Test[]} 
+     * */
+    reports;
 
     toJSON() {
         return {
@@ -435,28 +492,178 @@ export class Playlist {
 
     /**
      * async constructor
-     * @param {FileHandle} fileHandle 
+     * @param {FileHandle[]} fileHandles 
      * @returns this
      */
-    async fromFileHandle(fileHandle) {
-        let directoryEntries = {};
-        for await (let [key, value] of Playlist.directoryHandle.entries()) {
-            directoryEntries[key] = value;
+    async fromFileHandles(...fileHandles) {
+        if (fileHandles.length > 1) {
+            this.children = [];
+            // we want to create this node with many filehandles, so it has children
+            for (let i = 0; i < fileHandles.length; ++i) {
+                let fileHandle = fileHandles[i];
+                let child = await (new PlayTree({ parent: this }).fromFileHandles(fileHandle));
+                this.children.push(child);
+            }
+        }
+        else {
+            // we want to create a node from one file handle
+            this._fileHandle = fileHandles[0];
+            if (this._fileHandle.name.endsWith('.json')) {
+                // the filehandle is to a json file. so we we need to get it's file handles and recurse back to previous case.
+                if (!PlayTree.directoryHandle) {
+                    await brimstone.window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
+                    if (!await PlayTree.loadLibrary()) {
+                        throw new Errors.TestLoadError("Base test directory access must be specified in order to load playlists.", this._fileHandle.name);
+                    }
+                }
+
+                let blob = await this._fileHandle.getFile();
+                blob = await blob.text();
+                let pojo;
+                try {
+                    pojo = JSON.parse(blob);
+                }
+                catch(e) {
+                    if(e instanceof SyntaxError) {
+                        throw new Errors.TestLoadError(`Syntax error: ${e.message}`, this._fileHandle.name);
+                    }
+                }
+
+                this.description = pojo.description;
+                this.author = pojo.author;
+                this.suite = pojo.suite === undefined ? true : pojo.suite;
+
+                /* build a map from filename to filehandle */
+                let directoryEntries = {};
+                for await (let [key, value] of PlayTree.directoryHandle.entries()) {
+                    directoryEntries[key] = value;
+                }
+                // get the filehandles for this playlist
+                let fileHandles = pojo.play.map(playNode => directoryEntries[playNode.name] ?? (() => { throw new Errors.TestLoadError(`playlist item file '${playNode.name}' not found`, this._fileHandle.name) })());
+                // recurse
+                await this.fromFileHandles(...fileHandles);
+            }
+            else {
+                // it's a zip, which terminates recursion
+            }
         }
 
-        let blob = await fileHandle.getFile();
-        blob = await blob.text();
-        let pojo = JSON.parse(blob);
-
-        this.description = pojo.description;
-        this.author = pojo.author;
-        this.play = pojo.play.map(fh => directoryEntries[fh.name]);
-
         return this;
+    }
+
+    /** Give us the depth first traversal of the tree leaf nodes.
+     * i.e. the linear sequence of zip files to play.
+     */
+    depthFirstTraversal(array) {
+        if (!this.children) {
+            array.push(this);
+        }
+        this.children?.forEach(child => child.depthFirstTraversal(array));
+    }
+
+    /** return the path to the parent */
+    path() {
+        let p = "";
+        for(let node = this; node?._fileHandle?.name; node = node._parent) {
+            let old = p;
+            p = node._fileHandle.name;
+            if(old) {
+                p += '/' + old;
+            }
+        }
+        return p;
+    }
+
+    /**
+     * Build the report(s) for this node.
+     * @returns {BDS.Test[]} A set of run reports for this node.
+     * If this node is is zipnode, or a flat (suite:false) playlist
+     * then there will only be one entry. If this node
+     * is a suite (suite:true) then there will be one or more entries.
+    */
+    buildReports() {
+        this.reports = [];
+        let reports = this.reports; // shorter alias
+        
+        // if I am a ziptest node return me
+        if (this._zipTest) {
+            this._zipTest.lastRun.path = this.path();
+            return this.reports = [this._zipTest.lastRun];
+        }
+        if(!this.children && this._fileHandle.name.endsWith(".zip")) {
+            // we haven't loaded this zipfile into a zipTest yet, meaning
+            // we have not run it.
+            return this.reports = [new BDS.Test()]; // returns status "not run"
+        }
+        // you should either be a _zipTest or have children but not both.
+
+        for(let i = 0; i < this.children.length; ++i) {
+            let child = this.children[i];
+            /** @type {BDS.Test[]} */
+            let childReports;
+            childReports = child.buildReports();
+
+            // playing this child has returned either [report], or [report1, report2, ...],
+            // either way keep on appending them into a flat array.
+            reports.push(...childReports);
+        }
+        // now all children are processed
+
+        if (!this.suite) {
+            // i need to return a single report, i.e. [report]
+            let flatReport = new BDS.Test();
+            flatReport.startDate = reports[0].startDate;
+            flatReport.wallTime = 0;
+            flatReport.userTime = 0;
+            flatReport.name = this._fileHandle.name;
+            
+            var baseIndex = 0;
+            for (let i = 0; i < reports.length; ++i) {
+                let report = reports[i];
+                flatReport.status = report.status;
+                flatReport.userTime += report.userTime;
+                flatReport.wallTime += report.wallTime;
+                flatReport.endDate = report.endDate;
+                for(let j = 0; j < report.steps.length; ++j) {
+                    let step = report.steps[j];
+                    step.baseIndex = baseIndex;
+                    step.index += baseIndex;
+                    step.path = report.path;
+                }
+                baseIndex += report.steps.length;
+
+                flatReport.steps.push(...report.steps);
+                if(flatReport.status !== constants.match.PASS) {
+                    flatReport.errorMessage = report.errorMessage || 'unable to generate report due to non-passing subnode'; 
+                    break; // we are outta here
+                }
+            }
+
+            this.reports = [flatReport];
+        }
+        // else it's a suite so we process all the child results as individual tests
+
+        return this.reports;
     }
 }
 
 /**
  * @type {FileSystemDirectoryHandle}
  */
-Playlist.directoryHandle;
+PlayTree.directoryHandle;
+
+/** 
+ * The complete playtree, i.e the root node;
+ * @type {PlayTree}
+ */
+PlayTree.complete;
+
+PlayTree.loadLibrary = async function loadLibrary() {
+    try {
+        PlayTree.directoryHandle = await window.showDirectoryPicker();
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+}

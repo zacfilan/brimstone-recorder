@@ -1,3 +1,5 @@
+import {constants} from "./card.js";
+
 function padDigits(len, num) {
     return num.toString().padStart(len, '0');
   }
@@ -34,11 +36,17 @@ export class Step {
     /** @type {string} the step can be named for human read ability */
     name; 
 
+      /** @type {number} is this was flattened this is the base index this started at */
+    baseIndex;
+
     /** @type {number} the user perceived latency in milliseconds */
     userLatency;
 
     /** @type {number} the memory used before this step executes in MBs*/
     clientMemory;
+
+    /** @type {string} full path to the zipfile */
+    path;
 }
 
 export class Test {
@@ -48,8 +56,11 @@ export class Test {
     /** @type {string} name of the recording or playlist */
     name;
 
+    /** @type {string} full path to the zipfile */
+    path;
+
     /** @type {string} 'pass' or 'fail' */
-    status;
+    status = constants.match.NOTRUN;
 
     /** @type {string} message about fail */
     errorMessage;
@@ -62,11 +73,21 @@ export class Test {
 
     /** @type {number} how many seconds in walltime the run took */
     get wallTime() {
+        if(this._wallTime !== undefined) {
+          return this._wallTime
+        }
         return this.endDate - this.startDate;
     }
+    set wallTime(to) {
+      this._wallTime = to;
+    }
     
-    /** @type {number} how many seconds of user time the rnun took. Sum over all step latencies. */
+    /** @type {number} how many seconds of user time the run took. Sum over all step latencies. */
     get userTime() {
+        if(this._userTime !== undefined) {
+          return this._userTime;
+        }
+
         let t = 0;
         if(this.steps && this.steps.length) {
             for(let i=0; i < this.steps.length; ++i) {
@@ -75,6 +96,12 @@ export class Test {
         }
         return t;
     }
+    set userTime(to) {
+      this._userTime = to;
+    }
+
+    /** Sometimes we want to be able to override the helpful summary of the latencies of the steps */
+    _userTime;
 
     /** @type {Step[]} */
     steps = [];
@@ -102,7 +129,7 @@ export class Test {
             wallTime: this.wallTime,
 
             /** @type {number} how many seconds of user time the run took. Sum over all step latencies. */
-            userTime: this.userTime,
+            userTime: this._userTime || this.userTime,
 
             /** @type {Step[]} */
             steps: this.steps

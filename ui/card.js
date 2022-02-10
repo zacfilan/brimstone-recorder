@@ -21,12 +21,14 @@ export const constants = {
         EDIT: 'edit'
     },
 
+    /** the status of a testrun/step */
     match: {
         PASS: 'pass',
         PLAY: 'play',
         ALLOW: 'allow',
         FAIL: 'fail',
-        CANCEL: 'cancel'
+        CANCEL: 'cancel',
+        NOTRUN: 'notrun'
     }
 };
 

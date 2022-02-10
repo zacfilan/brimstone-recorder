@@ -5,12 +5,12 @@ import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole } from "./console.js";
-import { Test, Playlist } from "../test.js";
+import { Test, PlayTree } from "../test.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
-import { clone } from "../utilities.js";
+import { clone, brimstone } from "../utilities.js";
 import * as BDS from "./brimstoneDataService.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
@@ -40,36 +40,6 @@ Tab.reset();
  */
 Test.current = new Test();
 window.document.title = `Brimstone - ${Test.current.filename}`;
-
-async function focusWorkspaceWindow() {
-    /** @type {chrome.windows.Window} */
-    let w = await (new Promise(resolve => chrome.windows.getCurrent(null, resolve)));  // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason, so get it manually
-    await chrome.windows.update(w.id, { focused: true }); // you must be focused to see the alert
-    return w;
-}
-
-let brimstone = {
-    window: {
-        alert: async (...args) => {
-            let ww = await focusWorkspaceWindow();
-            window.alert('🙋❗ ' + args[0], ...args.slice(1));
-            return ww;
-        },
-        confirm: async (...args) => {
-            await focusWorkspaceWindow();
-            return window.confirm('🙋❓ ' + args[0], ...args.slice(1));
-        },
-        prompt: async (...args) => {
-            await focusWorkspaceWindow();
-            return window.prompt('🙋 ' + args[0], ...args.slice(1));
-        },
-        error: async (e) => {
-            await focusWorkspaceWindow();
-            await navigator.clipboard.writeText(e.stack);
-            return window.alert(`🐞 You found a bug, thanks! Details were copied into the copy-buffer. You can CTRL-V (paste) them when you report the error. Errors can be reported via menu "Help"➜"Search/Report Issues".\n\nYou may or may not be able to continue this session.\n\nDetails:\n${e.stack}`);
-        }
-    }
-}
 
 const player = new Player();
 /** used to *not* record pre-requisite screenshots when in the shadowDOM. */
@@ -157,75 +127,78 @@ class Actions {
         await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/issues');
     }
 
-    /** Let the user open a test (zip or plalistfile) */
+    /** Let the user open a test (zip or json playlist file) */
     async openZip() {
-        fileHandles = [];
+        zipNodes = [];
         currentTestNumber = 0;
         try {
             let tempFileHandles = await Test.loadFileHandles();
-            for (const fileHandle of tempFileHandles) {
-                if (fileHandle.name.endsWith('.json')) {
-                    if (!Playlist.directoryHandle) {
-                        await brimstone.window.alert('You must specify a (base) directory that will contain all your tests before you can use playlists.');
-                        if (!await this.loadLibrary()) {
-                            fileHandles = [];
-                            return;
-                        }
-                    }
-                    let playlist = await (new Playlist()).fromFileHandle(fileHandle);
-                    fileHandles.push(...playlist.play);
-                }
-                else {
-                    fileHandles.push(fileHandle);
-                }
+            if (!tempFileHandles?.length > 0) {
+                return; // user changed mind.
             }
-            if (fileHandles.length) {
+            PlayTree.complete = await (new PlayTree()).fromFileHandles(...tempFileHandles);
+            PlayTree.complete.depthFirstTraversal(zipNodes); // FIXME: add cycle check
+
+            if (zipNodes.length) {
                 await loadNextTest();
             }
         }
         catch (e) {
-            console.warn(e);
+            if (e instanceof Errors.TestLoadError) {
+                await brimstone.window.alert(e);
+            }
+            else {
+                throw e;
+            }
         }
     }
 
-    /** Let the user specify a directory underwhich all recordings/tests/playlists will be accessible */
+    /** Let the user specify a directory under which all recordings/tests/playlists will be accessible */
     async loadLibrary() {
-        try {
-            Playlist.directoryHandle = await window.showDirectoryPicker();
-            return true;
-        }
-        catch (e) {
-            return false;
-        }
+        await PlayTree.loadLibrary();
     }
-
 
     async downloadLastRunMetrics() {
-        downloadObjectAsJson(playedRecordings, 'last_run_metrics');
+        downloadObjectAsJson(lastRunMetrics, 'last_run_metrics');
     }
 
     /**
-     * Post the last runs metrics to the endpoint.
-     */
-    async postLastRunMetrics() {
+    * Report the results of the PlayTree (root node) played.
+    * If the toplevel is a suite, a report for each child will be reported.
+    * Else a single report will be reported. 
+    * 
+    * @param {boolean?} autoPostMetrics If true we will only post if the matching postMetricsOn* option is enabled.
+    * If false we will blindly post the metrics.
+    */
+    async postLastRunMetrics(autoPostMetrics) {
         let options = await loadOptions();
-        $.ajax({
-            type: "POST",
-            url: options.postMetricsEndpoint,
-            data: JSON.stringify(playedRecordings),
-            contentType: "application/json",
-            success: function (result) {
-                console.log(result);
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-                brimstone.window.alert(`There was a problem posting last run's metrics.\n\nMore information may be available in devtools.`);
+
+        // (re)-generate the results in the playtree 
+        let reports = lastRunMetrics;
+        for (let i = 0; i < reports.length; ++i) {
+            let report = reports[i];
+            if (!autoPostMetrics ||
+                (options.postMetricsOnFail && report.status === constants.match.FAIL) ||
+                (options.postMetricsOnPass && report.status === constants.match.PASS)) {
+                $.ajax({
+                    type: "POST",
+                    url: options.postMetricsEndpoint,
+                    data: JSON.stringify(report),
+                    contentType: "application/json",
+                    success: function (result) {
+                        console.log(result);
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        brimstone.window.alert(`There was a problem posting last run's metrics.\n\nMore information may be available in devtools.`);
+                    }
+                });
             }
-        });
+            // else not run or some other crap
+        };
     }
 
-    /** retpeat the last added rectangle(s) */
+    /** repeat the last added rectangle(s) */
     async stampDelta() {
-
     }
 
     /** edit pixel differences - Commit any volatile rectangles or individual pixel deltas. */
@@ -266,11 +239,17 @@ class Actions {
         }
     }
 
-    /** discard the current workspace test */
+    async clearWorkspace() {
+        await this.clearTest();
+        delete PlayTree.current;
+    }
+
+    /** discard everytihing in the current workspace*/
     async clearTest() {
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
+        lastRunMetrics = undefined;
 
         setToolbarState();
         window.document.title = `Brimstone - ${Test.current.filename}`;
@@ -342,13 +321,13 @@ class Actions {
         let labels = [];
 
         let index = 0;
-        for (let ri = 0; ri < playedRecordings.recordings.length; ++ri) {
-            let recording = playedRecordings.recordings[ri];
+        for (let ri = 0; ri < lastRunMetrics.length; ++ri) {
+            let recording = lastRunMetrics[ri];
             for (let si = 0; si < recording.steps.length; ++si) {
                 let step = recording.steps[si];
                 labels.push(step.index + 1);
-                memoryUsedValues.push(step.memoryUsed);
-                latencyValues.push(step.latency);
+                memoryUsedValues.push(step.clientMemory);
+                latencyValues.push(step.userLatency);
             }
         }
 
@@ -728,14 +707,13 @@ function setToolbarState() {
             rb.attr('disabled', false);
             document.documentElement.style.setProperty('--action-color', 'blue');
 
-            if (playedRecordings?.steps?.length) {
+            if (lastRunMetrics?.length) {
                 $('.metrics.option [data-action]').attr('disabled', false); // everything under metrics
             }
 
             if (Test.current.steps.length) {
                 $('[data-action="saveZip"]').attr('disabled', false);
-                $('[data-action="clearTest"]').attr('disabled', false);
-
+                $('[data-action="clearWorkspace"]').attr('disabled', false);
 
                 $('.edit.option [data-action]').attr('disabled', false); // everything under edit
                 $('[data-action="deleteAction"]').attr('disabled', false); // delete action icon on card 
@@ -774,13 +752,6 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
 
-/**
- * All the recordings (zips) that were played in the last atomic play. This means that it
- * gets reset each time you play.
- */
-
-var playedRecordings = new BDS.Test();
-
 $('#playButton').on('click', () => {
     let button = $(this);
     if (button.hasClass('active')) {
@@ -790,6 +761,13 @@ $('#playButton').on('click', () => {
     actions.callMethodByUser(actions.playSomething);
 });
 
+/**
+ * The metrics from the last run.
+ * @type {BDS.Test[]}
+ */
+var lastRunMetrics;
+
+/** play the current playnode */
 async function _playSomething() {
     let button = $(this);
     if (button.hasClass('active')) {
@@ -799,9 +777,6 @@ async function _playSomething() {
     let options = await loadOptions();
     try {
         let nextTest;
-        playedRecordings = new BDS.Test();
-        playedRecordings.startDate = Date.now();
-
         let startingTab = await getActiveApplicationTab();
 
         do {
@@ -809,6 +784,9 @@ async function _playSomething() {
             $('#playButton').addClass('active');
             setToolbarState();
             await Test.current.imageProcessing(imageProcessingProgress);
+            Test.current.lastRun = new BDS.Test();
+            Test.current.lastRun.startDate = Date.now();
+            Test.current.lastRun.name = Test.current.filename;
 
             let actions = Test.current.steps;
             player.onBeforePlay = updateStepInView;
@@ -859,22 +837,26 @@ async function _playSomething() {
             await playTab();
 
             playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
+            Test.current.lastRun.endDate = Date.now();
+            Test.current.lastRun.status = playMatchStatus;
+            Test.current.lastRun.steps = Test.current.steps.map(testAction => {
+                let step = new BDS.Step();
+                step.index = testAction.index;
+                step.clientMemory = testAction.memoryUsed;
+                step.userLatency = testAction.latency;
+                step.name = testAction.name || testAction.description;
+                // FIXME: can add full path here as a separate field.
+                return step;
+            });
 
             $('#playButton').removeClass('active');
+            lastRunMetrics = PlayTree.complete.buildReports();
             setToolbarState();
 
             await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
             switch (playMatchStatus) {
                 case constants.match.PASS:
                 case constants.match.ALLOW:
-                    playedRecordings.steps.push(... Test.current.steps.map(testAction => {
-                        let step = new BDS.Step();
-                        step.index = testAction.index;
-                        step.clientMemory = testAction.memoryUsed;
-                        step.userLatency = testAction.latency;
-                        step.name = testAction.name || testAction.description;
-                        return step;
-                    }));
                     nextTest = await loadNextTest();
                     if (!nextTest) {
                         setInfoBarText('✅ last run passed');
@@ -883,28 +865,25 @@ async function _playSomething() {
                     break;
                 case constants.match.FAIL:
                     updateStepInView(Test.current.steps[currentStepIndex()]);
-                    setInfoBarText(`❌ last run failed after user action ${player.currentAction.index + 1}`);
+                    Test.current.lastRun.errorMessage = `last run failed after user action ${player.currentAction.index + 1}`;
+                    setInfoBarText(`❌ ${Test.current.lastRun.errorMessage}`);
                     break;
                 case constants.match.CANCEL:
                     updateStepInView(Test.current.steps[currentStepIndex()]);
-                    setInfoBarText(`❌ last run canceled after user action ${player.currentAction.index + 1}`);
+                    setInfoBarText(`✋ last run canceled after user action ${player.currentAction.index + 1}`);
                     break;
                 default:
-                    setInfoBarText(`💀 unknown status reported '${playMatchStatus}'`);
+                    setInfoBarText(`💀 unnown status reported '${playMatchStatus}'`);
                     break;
             }
         } while (nextTest);
         actions.callMethod(actions.stopPlaying);
-        playedRecordings.endDate = Date.now();
-
-        if ((playMatchStatus === constants.match.PASS && options.postMetricsOnPass) ||
-            (playMatchStatus === constants.match.FAIL && options.postMetricsOnFail)) {
-            await actions.postLastRunMetrics();
-        };
+        if(options.postMetricsOnFail || options.postMetricsOnPass) {
+            await actions.postLastRunMetrics(true);
+        }
     }
     catch (e) {
         actions.callMethod(actions.stopPlaying);
-        playedRecordings.endDate = Date.now();
         if (e instanceof Errors.NoActiveTab) {
             setInfoBarText(`❌ play canceled - ${e?.message ?? ''}`);
         }
@@ -1501,7 +1480,13 @@ async function recordSomething(promptForUrl) {
             }
         }
 
+        if(!PlayTree.complete) { // pretend it is suite which is the general case I need to handle.
+            PlayTree.complete = await new PlayTree();
+            PlayTree.complete._zipTest = Test.current;
+            Test.current._playTree = PlayTree.complete;
+        }
         await startRecorders(); // this REALLY activates the recorder, by connecting the port, which the recorder interprets as a request to start event listening.
+        
 
         // last thing we do is give the focus back to the window and tab we want to record, so the user doesn't have to.
         await focusTab();
@@ -1554,7 +1539,7 @@ function postMessage(msg) {
 
 $('#loadButton').on('click', actions.openZip.bind(actions));
 $('#saveButton').on('click', actions.saveZip);
-$('#clearButton').on('click', actions.clearTest);
+$('#clearButton').on('click', actions.clearWorkspace.bind(actions));
 
 function imageProcessingProgress(value, max) {
     let ib = $('#infobar');
@@ -1562,7 +1547,7 @@ function imageProcessingProgress(value, max) {
 }
 
 async function loadNextTest() {
-    let numberOfTestsInSuite = fileHandles.length;
+    let numberOfTestsInSuite = zipNodes.length;
     if (++currentTestNumber > numberOfTestsInSuite) {
         return false;
     }
@@ -1570,20 +1555,13 @@ async function loadNextTest() {
     let suite = numberOfTestsInSuite > 1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})` : '';
     //let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
 
-    if (options.experiment.joinSubTests) {
-        throw new Error("not implemented yet");
-        //let nextTest = await constructNextTest();
-        //testFileName = 'untitled';
-    }
-    else {
-        await actions.clearTest();
+    await actions.clearTest();
 
-        // This load is just super fast.
-        Test.current = await (new Test()).fromFileHandle(fileHandles[currentTestNumber - 1]);
+    // This load is just super fast.
+    Test.current = await (new Test()).fromPlayTree(zipNodes[currentTestNumber - 1]);
 
-        // kick off without waiting for this. 
-        Test.current.startImageProcessing(imageProcessingProgress);
-    }
+    // kick off without waiting for this. 
+    Test.current.startImageProcessing(imageProcessingProgress);
 
     window.document.title = `Brimstone - ${Test.current.filename}${suite}`;
     updateStepInView(Test.current.steps[0]);
@@ -1595,8 +1573,10 @@ async function loadNextTest() {
     return true;
 }
 
-/** The filehandles of the tests the user loaded. Used for playing back 1 or more tests. */
-let fileHandles = [];
+/** The filehandles of the tests the user loaded. Used for playing back 1 or more tests.
+ * @type {PlayTree[]}
+ */
+let zipNodes = [];
 /** The 1-based index of the current test. */
 let currentTestNumber = 0;
 

@@ -40,13 +40,7 @@ export class Options {
          * This is not used by the player, but may be
          * useful for external code.
          */
-        includeCss: false,
-        
-        /**
-        * When loading multiple tests, we can treat them as an array of seperate tests, or as one big test.
-        * Which is it?
-        */
-        joinSubTests: false
+        includeCss: false
     };
 
     /**

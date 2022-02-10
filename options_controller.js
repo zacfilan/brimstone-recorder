@@ -32,8 +32,6 @@ async function save_options() {
 
     // experiements
     options.experiment.includeCss = document.getElementById('includeCss').checked;
-    options.experiment.joinSubTests = document.getElementById('joinSubTests').checked;
-
     
     options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
 
@@ -70,7 +68,6 @@ async function restore_options() {
 
     // experiements
     document.getElementById('includeCss').checked = options.experiment.includeCss;
-    document.getElementById('joinSubTests').checked = options.experiment.joinSubTests;
 
     document.getElementById('closeOldTestWindowOnCreate').checked = options.closeOldTestWindowOnCreate;
 
