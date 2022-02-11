@@ -643,10 +643,10 @@ export class PlayTree {
                     step.baseIndex = baseIndex;
                     step.index += baseIndex;
                     step.path = report.path;
+                    flatReport.steps.push(step);
                 }
                 baseIndex += report.steps.length;
 
-                flatReport.steps.push(...report.steps);
                 if (flatReport.status !== constants.match.PASS) {
                     flatReport.errorMessage = report.errorMessage || 'unable to generate report due to non-passing subnode';
                     break; // we are outta here

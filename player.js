@@ -4,7 +4,7 @@ import { Screenshot } from "./ui/screenshot.js";
 const PNG = png.PNG;
 const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
-import { sleep, extractPngSize } from "./utilities.js";
+import { sleep, extractPngSize, brimstone } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
 import { Test } from "./test.js";
@@ -509,15 +509,29 @@ export class Player {
      */
     async change(action) {
         // FIXME: I need to run this in the correct frame!
-        let frames = await chrome.scripting.executeScript({
+        let frames;
+        let errorMessage;
+        frames = await chrome.scripting.executeScript({
             target: { tabId: this.tab.chromeTab.id /*, frameIds: frameIds*/ },
             function: _changeSelectValue,
             args: [action.x, action.y, action.event.value]
         });
-        let errorMessage = frames[0].result;
+        errorMessage = frames[0].result;
 
-        if (errorMessage) {
-            throw new Error(errorMessage); // I'd want to know that.
+        while (errorMessage) {
+            if(errorMessage.startsWith('attempt to change non-select element')) {
+                let retry = await brimstone.window.confirm(`${errorMessage}\n\nTranslation: The screen looks right, but the wrong DOM element received the last action. This can happen if the app uses a transparent blocking element for example. \n\nRetry?`);
+                if(retry) {
+                    frames = await chrome.scripting.executeScript({
+                        target: { tabId: this.tab.chromeTab.id /*, frameIds: frameIds*/ },
+                        function: _changeSelectValue,
+                        args: [action.x, action.y, action.event.value]
+                    });
+                    errorMessage = frames[0].result;
+                    continue;
+                }
+            }
+            await brimstone.window.error(new Error(errorMessage)); // I'd want to know that.
         }
 
         // used in conjustion with the inscript focus to hit escape on the SELECT.
@@ -658,7 +672,7 @@ export class Player {
                 console.debug(e.message + '. try again.');
                 badTab = true;
                 // give other async'ed control paths a chance to run. configureForAction above can be trying to wait for a different tab to become active.
-                await sleep(137);
+                await sleep(500);
                 continue;
             }
 

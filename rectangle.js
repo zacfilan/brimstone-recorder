@@ -19,7 +19,6 @@ export class Rectangle {
             }
         });
         this.rectangle = rectangle;
-        Rectangle.instances.push(rectangle);
         this.redraw();
     }
 
@@ -45,7 +44,6 @@ export class Rectangle {
 
 Rectangle.container = document.body;
 Rectangle._resizing = false;
-Rectangle.instances = [];
 Rectangle.setContainer = function (container, addCallback, delCallback) {
     Rectangle.container = container;
     container.addEventListener("mousedown", e => {

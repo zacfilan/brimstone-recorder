@@ -199,10 +199,6 @@ class Actions {
         };
     }
 
-    /** repeat the last added rectangle(s) */
-    async stampDelta() {
-    }
-
     /** edit pixel differences - Commit any volatile rectangles or individual pixel deltas. */
     async ignoreDelta(e) {
         // add a mask
@@ -273,6 +269,7 @@ class Actions {
 
         $('#cards').empty();
         $('#step').empty();
+        TestAction.lastVolatileRegionsUsed = undefined;
     }
 
     /** save the current test as a zip file */
@@ -632,6 +629,29 @@ $('#step').on('click', '#ignoreDelta', async (e) => {
     await actions.callMethodByUser(actions.ignoreDelta);
 });
 
+$('#step').on('click', '#stampDelta', async (e) => {
+    e.stopPropagation();
+    await actions.callMethodByUser(actions.ignoreDelta);
+});
+
+$('#step').on('mouseenter', '#stampDelta', function(e) {
+    // when the user hovers over the stamp it should show/reveal the last set of used rectangles
+    if(!TestAction.lastVolatileRegionsUsed) {
+        return;
+    }
+    let screenshot = $(this).closest(".card").find('.screenshot');
+    screenshot.append(TestAction.lastVolatileRegionsUsed);
+});
+
+$('#step').on('mouseleave', '#stampDelta', function (e) {
+    // when the user hovers over the stamp it should remove/hide the last set of 
+    if(!TestAction.lastVolatileRegionsUsed) {
+        return;
+    }
+    let screenshot = $(this).closest(".card").find('.screenshot');
+    screenshot.find(".rectangle").remove();
+});
+
 $('#step').on('click', '#undo', async (e) => {
     e.stopPropagation();
     await actions.callMethodByUser(actions.seeDelta);
@@ -661,6 +681,7 @@ $('#cards').on('click', '.thumb',
 
 let diffPromise = false;
 
+/** Enable the ability to draw rectangles on the screenshot. */
 function addVolatileRegions() {
     const { view } = getCard($('#content .card.waiting')[0], Test.current);
     let screenshot = view.find('.screenshot');
@@ -789,7 +810,7 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
 
-$('#playButton').on('click', () => {
+$('#playButton').on('click', function(e) { // I use "this". So no lambda.
     let button = $(this);
     if (button.hasClass('active')) {
         actions.callMethodByUser(actions.stopPlaying);
@@ -806,11 +827,6 @@ var lastRunMetrics;
 
 /** play the current playnode */
 async function _playSomething() {
-    let button = $(this);
-    if (button.hasClass('active')) {
-        actions.callMethodByUser(actions.stopPlaying);
-        return;
-    }
     let options = await loadOptions();
     try {
         let nextTest;
@@ -887,7 +903,6 @@ async function _playSomething() {
             });
 
             $('#playButton').removeClass('active');
-            lastRunMetrics = PlayTree.complete.buildReports();
             setToolbarState();
 
             await chrome.windows.update(chrome.windows.WINDOW_ID_CURRENT, { focused: true });
@@ -915,6 +930,8 @@ async function _playSomething() {
             }
         } while (nextTest);
         actions.callMethod(actions.stopPlaying);
+        lastRunMetrics = PlayTree.complete.buildReports();
+        setToolbarState(); // enable the metrics menu
         if (options.postMetricsOnFail || options.postMetricsOnPass) {
             await actions.postLastRunMetrics(true);
         }
