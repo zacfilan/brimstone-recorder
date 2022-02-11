@@ -631,9 +631,6 @@ export class Player {
         let i = 0;
         let badTab = false;
 
-        // If the next action is on a different tab, then we need to switch to that tab to 
-        // take the screenshot.
-
         // this loop will run even if the app is in the process of navigating to the next page.
         while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
             if (this._stopPlaying) { // asyncronously injected
@@ -657,11 +654,13 @@ export class Player {
             // these parameters are here to resize the friggin screen in the first place - so png height is right? why did I ever switch the
             // tab sizes in the first place?? 
             try {
-                // this is a little weird, I can check for the correct tab + tab size before hand, but it's more efficient to 
-                // assume that it will work, than to check every time. make the common case fast.
+                // If the next action is on a different tab, then we need to switch to that tab to 
+                // take the screenshot.
                 if (nextStep.tab.virtualId !== this.tab.virtualId) {
                     await this.configureForAction(nextStep);
                 }
+                // this is a little weird, I can check for the correct tab + tab size before hand, but it's more efficient to 
+                // assume that it will work, than to check every time. make the common case fast.
                 if (badTab) {
                     badTab = false;
                     await this.tab.resizeViewport();
@@ -708,6 +707,9 @@ export class Player {
                 console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
                 return nextStep._match;
             }
+
+            // else it didn't match so we loop. I should be able to throttle the rate at which I take screenshots, but do I NEED to?
+            // e.g. await sleep(someOptionValue);
         }
 
         // The screenshots don't match

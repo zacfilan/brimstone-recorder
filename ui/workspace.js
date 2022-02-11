@@ -470,11 +470,14 @@ class Actions {
     }
 
     async confirmSaveModal() {
+        Test.current.filename
         let userButtonPress = new Promise( resolve => {
             this._modalClosed = resolve;
         });
 
-        $('#confirmSave').modal();
+        let cs = $('#confirmSave');
+        cs.find("#message").text(`🙋❓ File '${Test.current.filename}' has unsaved changes.`);
+        cs.modal();
         return userButtonPress;
     }
     //#endregion userActions

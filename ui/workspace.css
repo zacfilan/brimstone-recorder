@@ -57,6 +57,11 @@
   opacity: .5;
 }
 
+#confirmSave #confirmDiscardChangesButton {
+  background-color: white;
+  color: #1a73e8;
+}
+
 html {
   height: 100%;
 }
