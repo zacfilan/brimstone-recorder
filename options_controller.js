@@ -2,8 +2,12 @@
 import { loadOptions, saveOptions, Options } from "./options.js";
 var options = new Options();
 
-const interkeyPressDelays = [
+const userKeypressDelay = [
     100, 50, 0
+];
+
+const userMouseDelay = [
+    2000, 500, 0
 ];
 
 const pixelMatchThreshholds = [
@@ -36,7 +40,8 @@ async function save_options() {
     options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
 
     options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
-    options.interKeypressDelay = interkeyPressDelays[parseInt(document.getElementById('typingSpeed').value, 10)];
+    options.userMouseDelay = userMouseDelay[parseInt(document.getElementById('userMouseSpeed').value, 10)];
+    options.userKeypressDelay = userKeypressDelay[parseInt(document.getElementById('userKeypressSpeed').value, 10)];
     options.mouseMoveTimeout = mouseMoveTimeout[parseInt(document.getElementById('mouseMoveTimeout').value, 10)];
     options.mouseWheelTimeout = mouseWheelTimeout[parseInt(document.getElementById('mouseWheelTimeout').value, 10)];
 
@@ -73,7 +78,8 @@ async function restore_options() {
 
 
     document.getElementById('pixelMatchSenstivity').value = pixelMatchThreshholds.indexOf(options.pixelMatchThreshhold);
-    document.getElementById('typingSpeed').value = interkeyPressDelays.indexOf(options.interKeypressDelay);
+    document.getElementById('userMouseSpeed').value = userMouseDelay.indexOf(options.userMouseDelay);
+    document.getElementById('userKeypressSpeed').value = userKeypressDelay.indexOf(options.userKeypressDelay);
 
     document.getElementById('mouseMoveTimeout').value = mouseMoveTimeout.indexOf(options.mouseMoveTimeout);
     document.getElementById('mouseWheelTimeout').value = mouseWheelTimeout.indexOf(options.mouseWheelTimeout);

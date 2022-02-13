@@ -10,6 +10,9 @@ import { loadOptions } from "./options.js";
 import { Test } from "./test.js";
 import * as Errors from "./error.js";
 
+/** cached the options before playing 
+ * @type {Options}
+*/
 var options;
 
 /**
@@ -105,12 +108,6 @@ export class Player {
     /** sensatively parameter to pixelmatch, lower is stricter */
     pixelMatchThreshhold = .1;
 
-    /**
-     * control the speed at which typing multiple back to back characters occurs.
-     * used to simuate slower human typers.
-     */
-    interKeypressDelay = 0;
-
     /** 
      * The last known mouselocation during playback. This is used during a resume
      * playback operation to put the mouse back to where it was prior to 
@@ -197,7 +194,6 @@ export class Player {
         options = await loadOptions();
         document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
         this.pixelMatchThreshhold = options.pixelMatchThreshhold;
-        this.interKeypressDelay = options.interKeypressDelay;
         let actions = this._actions;
 
         // start timer
@@ -224,9 +220,9 @@ export class Player {
             }
             else {
                 action.tab.chromeTab = this.tab.chromeTab; // just for debugging
-                if(action.waitBeforePlaying) {
-                    console.log(`[step:${action.index + 1} tab:${action.tab.id}] wait ${action.waitBeforePlaying}ms before playing`);
-                    await sleep(action.waitBeforePlaying);
+                if(action != 'keys' && options.userMouseDelay) {
+                    console.log(`[step:${action.index + 1} tab:${action.tab.id}] wait ${options.userMouseDelay}ms before playing`);
+                    await sleep(options.userMouseDelay);
                 }
                 console.log(`[step:${action.index + 1} tab:${action.tab.id}] begin play "${action.description}"`);
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
@@ -606,11 +602,11 @@ export class Player {
     async keys(action) {
         for (let i = 0; i < action.event.length; ++i) {
             let event = action.event[i];
-            await this[event.type]({ event }); // pretend it is a distinct action
             // simulate slower typing
-            if (this.interKeypressDelay) {
-                await sleep(this.interKeypressDelay);
+            if (options.userKeypressDelay) {
+                await sleep(options.userKeypressDelay);
             }
+            await this[event.type]({ event }); // pretend it is a distinct action
         }
     }
 
@@ -709,7 +705,8 @@ export class Player {
             }
 
             // else it didn't match so we loop. I should be able to throttle the rate at which I take screenshots, but do I NEED to?
-            // e.g. await sleep(someOptionValue);
+            let someOptionValue = 200;
+            await sleep(someOptionValue);
         }
 
         // The screenshots don't match

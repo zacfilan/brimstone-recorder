@@ -273,6 +273,11 @@ button svg {
   fill: white;
 }
 
+button img {
+  height: 26px;
+  width: 26px;
+}
+
 #workspace {
   display: -webkit-box;
   display: -ms-flexbox;

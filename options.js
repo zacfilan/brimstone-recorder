@@ -13,11 +13,17 @@ export class Options {
      */
     pixelMatchThreshhold = .2; // different screens seem to render a little different...
 
-    /** delay in ms between typed characters.
+    /** delay in ms before a mouse mouse is played.
      * simulates slower typing 
-     * 0 50 100 seem pretty good
+     * 2000 500 0 seem pretty good
     */
-    interKeypressDelay = 0;
+    userMouseDelay = 0;
+
+    /** delay in ms before key action is played
+     * simulates slower typing 
+     * 100 50 0 seem pretty good
+    */
+     userKeypressDelay = 0;
 
     /**
      * Record incognito always

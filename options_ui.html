@@ -16,7 +16,7 @@
                     Seconds to wait for actual screen to match expected screen
                 </td>
                 <td>
-                    <input type="number" min="5" max="120" id="matchTimeout"></input>
+                    <input type="number" min="1" max="120" id="matchTimeout"></input>
                 </td>
             </tr>
             <tr>
@@ -46,19 +46,37 @@
         <table>
             <tr>
                 <td>
-                    Typing speed
+                    User Mouse Speed
                 </td>
                 <!-- 0 to 1 is allowed but high values essentially match everything -->
                 <td>
                     <div class="slider">
-                        <label>Slower</label>
-                        <input type="range" min="0" max="2" step="1" id="typingSpeed" list="speedSettings">
-                        <datalist id="speedSettings">
+                        <label>Sleepy Grandmother</label>
+                        <input type="range" min="0" max="2" step="1" id="userMouseSpeed" list="userMouseSpeedSettings">
+                        <datalist id="userMouseSpeedSettings">
                             <option>0</option>
                             <option>1</option>
                             <option>2</option>
                         </datalist>
-                        <label>Faster</label>
+                        <label>Caffeinated Monkey</label>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    User Typing Speed
+                </td>
+                <!-- 0 to 1 is allowed but high values essentially match everything -->
+                <td>
+                    <div class="slider">
+                        <label>Sleepy Grandmother</label>
+                        <input type="range" min="0" max="2" step="1" id="userKeypressSpeed" list="userKeypressSpeedSettings">
+                        <datalist id="userKeypressSpeedSettings">
+                            <option>0</option>
+                            <option>1</option>
+                            <option>2</option>
+                        </datalist>
+                        <label>Caffeinated Monkey</label>
                     </div>
                 </td>
             </tr>
@@ -80,7 +98,10 @@
                     Post Automatically on Passing Run
                 </td>
                 <td>
-                    <input type="checkbox" id="postMetricsOnPass"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="postMetricsOnPass"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
             <tr>
@@ -88,7 +109,10 @@
                     Post Automatically on Failing Run
                 </td>
                 <td>
-                    <input type="checkbox" id="postMetricsOnFail"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="postMetricsOnFail"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
         </table>
@@ -101,7 +125,10 @@
                     Hide cursor for performance
                 </td>
                 <td>
-                    <input type="checkbox" id="hideCursor"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="hideCursor"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
 
@@ -110,7 +137,10 @@
                     Close previous test window when creating a new one
                 </td>
                 <td>
-                    <input type="checkbox" id="closeOldTestWindowOnCreate"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="closeOldTestWindowOnCreate"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
         </table>
@@ -123,7 +153,10 @@
                     Always record incognito
                 </td>
                 <td>
-                    <input type="checkbox" id="recordIncognito"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="recordIncognito"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
             <tr>
@@ -172,7 +205,10 @@
                     Enable developer mode
                 </td>
                 <td>
-                    <input type="checkbox" id="developerMode"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="developerMode"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
             <tr>
@@ -180,7 +216,10 @@
                     Debug recorder
                 </td>
                 <td>
-                    <input type="checkbox" id="debugRecorder"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="debugRecorder"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
 
@@ -195,7 +234,10 @@
                     Include CSS of element acted on in test
                 </td>
                 <td>
-                    <input type="checkbox" id="includeCss"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="includeCss"></input>
+                        <span class="slider round"></span>
+                      </label>
                 </td>
             </tr>
         </table>
