@@ -161,6 +161,19 @@ export class TestAction {
     /** the user perceived latency in millisconds for this action to complete */
     latency = 0;
 
+    /** 
+     * allow each action to override how long the wait is for this particular action.
+     * if it is unset, when it is needed, it comes from the global options value.
+     * @type {number}
+     */
+     MAX_VERIFY_TIMEOUT;
+    
+    /** 
+     * viewmodel variable for the time reported in the waiting title view
+     * @type {number}
+     */
+     _lastTimeout;
+
     constructor(args) {
         Object.assign(this, args);
         this.tab = new Tab(this.tab);
@@ -529,7 +542,7 @@ export class Step {
 
 
             if (this.next._match === constants.match.PLAY) {
-                title.text += 'Wait for actual to match.';
+                title.text += `Wait ${this.next._lastTimeout} second${this.next._lastTimeout>1? 's': ''} for actual screen to match this.`;
             }
             else {
 

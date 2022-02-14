@@ -192,7 +192,6 @@ export class Player {
         this._stopPlaying = false;
 
         options = await loadOptions();
-        document.documentElement.style.setProperty('--screenshot-timeout', `${options.MAX_VERIFY_TIMEOUT}s`);
         this.pixelMatchThreshhold = options.pixelMatchThreshhold;
         let actions = this._actions;
 
@@ -207,8 +206,13 @@ export class Player {
 
             next = actions[i + 1];
             next._match = constants.match.PLAY;
+            let mustVerifyScreenshot = next.expectedScreenshot && !next.shadowDOMAction;
+            if(mustVerifyScreenshot) {
+                next._lastTimeout = next.MAX_VERIFY_TIMEOUT || options.MAX_VERIFY_TIMEOUT;
+                document.documentElement.style.setProperty('--screenshot-timeout', `${next._lastTimeout}s`); // how long the waiting animation runs for this action
+            }
             if (this.onBeforePlay) {
-                await this.onBeforePlay(action);
+                await this.onBeforePlay(action); // this shows the correct step (and will start the waiting animation)
             }
 
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
@@ -236,7 +240,7 @@ export class Player {
             }
 
             start = performance.now();
-            if (!next.expectedScreenshot || next.shadowDOMAction) { // i don't record an image for shandowdom 
+            if (!mustVerifyScreenshot) { 
                 next._match = constants.view.PASS;
             }
             else {
@@ -628,7 +632,7 @@ export class Player {
         let badTab = false;
 
         // this loop will run even if the app is in the process of navigating to the next page.
-        while (((performance.now() - start) / 1000) < options.MAX_VERIFY_TIMEOUT) {
+        while (((performance.now() - start) / 1000) < nextStep._lastTimeout) {
             if (this._stopPlaying) { // asyncronously injected
                 nextStep._view = constants.view.EXPECTED;
                 nextStep._match = constants.match.CANCEL;
