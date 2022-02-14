@@ -94,6 +94,7 @@ export class Tab {
         await chrome.windows.update(this.chromeTab.windowId, { focused: true });
 
         console.debug(`tab:${this.id} resize viewport to ${this.width}x${this.height} requested`);
+        let lastError = new Errors.ResizeViewportError();
 
         let i = 0; let distance;
         let matched = 0;
@@ -103,36 +104,43 @@ export class Tab {
             }
 
             try {
-                await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
+                if (options.autoZoomTo100) {
+                    console.debug(`tab:${this.id} set zoom to 1`);
+                    await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
+                }
                 distance = await this.getViewport(); // get viewport data
+
+                if (1 != await chrome.tabs.getZoom(this.chromeTab.id)) {
+                    throw lastError = new Errors.ZoomError(); // this must be windows scaling, I cannot reset that.
+                }
+
+                if (distance.devicePixelRatio !== 1) {
+                    throw lastError = new Errors.PixelScalingError();
+                }
+
+                if (distance.innerHeight != this.height || distance.innerWidth != this.width) {
+                    // it's wrong
+                    await chrome.windows.update(this.chromeTab.windowId, {
+                        width: distance.borderWidth + this.width,
+                        height: distance.borderHeight + this.height
+                    });
+                    console.debug(`resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
+                }
+                else {
+                    // measure twice cut once? It seems that I may be getting a stale measurement the first time.
+                    if (++matched > 1) {
+                        break;
+                    }
+                }
             }
             catch (e) {
                 console.warn(e);
                 continue;
             }
-
-            if (distance.devicePixelRatio !== 1) {
-                throw new Errors.PixelScalingError(); // this must be windows scaling, I cannot reset that.
-            }
-
-            if (distance.innerHeight != this.height || distance.innerWidth != this.width) {
-                // it's wrong
-                await chrome.windows.update(this.chromeTab.windowId, {
-                    width: distance.borderWidth + this.width,
-                    height: distance.borderHeight + this.height
-                });
-                console.debug(`resize viewport from ${distance.innerWidth}x${distance.innerHeight} to ${this.width}x${this.height} was required`);
-            }
-            else {
-                // measure twice cut once? It seems that I may be getting a stale measurement the first time.
-                if (++matched > 1) {
-                    break;
-                }
-            }
         }
 
         if (i == 10) {
-            throw new Errors.ResizeViewportError();
+            throw lastError;
         }
 
         console.debug(`viewport now measured to be ${distance.innerWidth}x${distance.innerHeight} `);
@@ -341,7 +349,7 @@ Tab.reset = function () {
 /** 
  * figure out the active tab again
  */
-Tab.reaquireActiveTab = async function() {
+Tab.reaquireActiveTab = async function () {
     Tab.active = undefined;
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: false }); // the current window is the brimstone workspace
     if (!tab) {

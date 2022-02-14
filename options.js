@@ -57,6 +57,9 @@ export class Options {
     /** Only monitor the events in the recorder, do not actually record them. */
     debugRecorder = false;
 
+    /** Always try to help the user by silently resetting their zoom to 100% */
+    autoZoomTo100 = true;
+
     /**
      * Number of millseconds to wait to terminate a mousewheel sequence.
      */
@@ -88,7 +91,6 @@ export class Options {
     /** 
      * If we want to automatically post the metrics when a test fails */
     postMetricsOnFail = false;
-
 };
 
 var options = new Options();

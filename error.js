@@ -6,6 +6,12 @@ export class PixelScalingError extends Error {
     }
 }
 
+export class ZoomError extends Error {
+    constructor(msg) {
+        super(msg || 'zoom error detected');
+    }
+}
+
 /** an error that identifies when we cannot resize the viewport */
 export class ResizeViewportError extends Error {
     constructor(msg) {

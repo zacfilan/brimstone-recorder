@@ -467,7 +467,7 @@ class Actions {
 
     async confirmSaveModal() {
         Test.current.filename
-        let userButtonPress = new Promise( resolve => {
+        let userButtonPress = new Promise(resolve => {
             this._modalClosed = resolve;
         });
 
@@ -483,18 +483,26 @@ const actions = new Actions();
 const menuController = new MenuController(actions);
 
 async function errorHandler(e) {
+    let workspaceWindow;
     switch (e.constructor) {
         case Errors.PixelScalingError:
-            let workspaceWindow = await brimstone.window.alert(`Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
-            // bail
+            workspaceWindow = await brimstone.window.alert(`Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display, for the entire recording.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`);
             try {
                 await chrome.windows.remove(workspaceWindow.id);
             }
             catch (e) {
                 console.log(e);
             }
-            await chrome.windows.remove(w.id); // chrome.windows.WINDOW_ID_CURRENT // doesn't work for some reason
 
+            break;
+        case Errors.ZoomError:
+            workspaceWindow = await brimstone.window.alert(`Invalid chrome zoom factor detected. Brimstone cannot reliably compare zoomed pixels. Please insure that the Chrome "Settings"➜"Appearance"➜"Page zoom" is set to 100%.\n\nWorkspace will close when you hit [OK].`);
+            try {
+                await chrome.windows.remove(workspaceWindow.id);
+            }
+            catch (e) {
+                console.log(e);
+            }
             break;
         case Errors.ReuseTestWindow:
             await brimstone.window.alert(`You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
@@ -633,9 +641,9 @@ $('#step').on('click', '#stampDelta', async (e) => {
     await actions.callMethodByUser(actions.ignoreDelta);
 });
 
-$('#step').on('mouseenter', '#stampDelta', function(e) {
+$('#step').on('mouseenter', '#stampDelta', function (e) {
     // when the user hovers over the stamp it should show/reveal the last set of used rectangles
-    if(!TestAction.lastVolatileRegionsUsed) {
+    if (!TestAction.lastVolatileRegionsUsed) {
         return;
     }
     let screenshot = $(this).closest(".card").find('.screenshot');
@@ -644,7 +652,7 @@ $('#step').on('mouseenter', '#stampDelta', function(e) {
 
 $('#step').on('mouseleave', '#stampDelta', function (e) {
     // when the user hovers over the stamp it should remove/hide the last set of 
-    if(!TestAction.lastVolatileRegionsUsed) {
+    if (!TestAction.lastVolatileRegionsUsed) {
         return;
     }
     let screenshot = $(this).closest(".card").find('.screenshot');
@@ -702,15 +710,15 @@ $('#step').on('click', '.waiting .click-to-change-view', (...args) => {
     actions.callMethodByUser(actions.cycleEditStates, ...args);
 });
 
-$('#confirmSaveChangesButton').click( async () => {
+$('#confirmSaveChangesButton').click(async () => {
     await actions.saveZip(); //  need to do this here, rather than post the promise the
     // next line resolves. if i try it post the promise the next line resolves I get
     // that dreaded "user gesture required"
     actions._modalClosed('Save Changes');    // i don't actually know if the user actually saved or not, they could have cancelled.
 });
 
-$('#confirmDiscardChangesButton').click( () => {
-    actions._modalClosed('Discard Changes');    
+$('#confirmDiscardChangesButton').click(() => {
+    actions._modalClosed('Discard Changes');
 });
 
 function setInfoBarText(infobarText) {
@@ -809,7 +817,7 @@ $('#previous').on('click', function (e) {
 /** Remember the state of the last play, so I can resume correctly. */
 var playMatchStatus = constants.match.PASS;
 
-$('#playButton').on('click', function(e) { // I use "this". So no lambda.
+$('#playButton').on('click', function (e) { // I use "this". So no lambda.
     let button = $(this);
     if (button.hasClass('active')) {
         actions.callMethodByUser(actions.stopPlaying);
@@ -1069,8 +1077,11 @@ async function webNavigationOnCompleteHandler(details) {
         // else you shouldn't get here
     }
     catch (e) {
-        // this can be some intermediate redirect page(s) that the user doesn't actually interact with
-        console.log('navigation completion failed.', e);
+        if (e instanceof Errors.PixelScalingError || e instanceof Errors.ZoomError) {
+            throw e;
+        }
+        // FIXME: do these EVER occur anymore?
+        console.warn('swallowed navigation completion exception.', e);
     }
 }
 
