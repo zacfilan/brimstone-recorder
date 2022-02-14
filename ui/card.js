@@ -547,7 +547,7 @@ export class Step {
             else {
 
                 if (this.next._match === constants.match.FAIL) {
-                    title.text += 'Failed match. ';
+                    title.text += `Failed to match in ${this.next._lastTimeout} second${this.next._lastTimeout>1? 's': ''}. `;
                 }
 
                 switch (this.next._view) {

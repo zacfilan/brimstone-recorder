@@ -1,5 +1,11 @@
 import {constants} from "./card.js";
 
+/** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
+export const brimstoneVersion = 'v' + chrome.runtime.getManifest().version;
+
+/** The chrome version comes from the useragent string */
+export const chromeVersion = /Chrome\/([0-9.]+)/.exec(navigator.userAgent)[1];
+
 function padDigits(len, num) {
     return num.toString().padStart(len, '0');
   }
@@ -71,6 +77,15 @@ export class Test {
     /** @type {Date} when the run ended */
     endDate = 0;
 
+    /** @type {string} this is the url that this test starts on */
+    startingServer;
+
+    /** @type {string} the version of brimstone-recorder used */
+    brimstoneVersion;
+
+    /** @type {string} the version of chrome used*/
+    chromeVersion;
+
     /** @type {number} how many seconds in walltime the run took */
     get wallTime() {
         if(this._wallTime !== undefined) {
@@ -132,7 +147,13 @@ export class Test {
             userTime: this._userTime || this.userTime,
 
             /** @type {Step[]} */
-            steps: this.steps
+            steps: this.steps,
+
+            chromeVersion: this.chromeVersion,
+
+            brimstoneVersion: this.brimstoneVersion,
+
+            startingServer: this.startingServer
         }
     }
 };

@@ -13,10 +13,6 @@ import { MenuController } from "./menu_controller.js";
 import { clone, brimstone, focusWorkspaceWindow } from "../utilities.js";
 import * as BDS from "./brimstoneDataService.js";
 
-/** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
-const version = 'v' + chrome.runtime.getManifest().version;
-
-// some meta keycodes
 const ALT_KEYCODE = 18;
 const META_KEYCODE = 91;
 const CTRL_KEYCODE = 17;
@@ -729,7 +725,7 @@ function setInfoBarText(infobarText) {
             infobarText = 'ready';
         }
     }
-    $('#infobar').html(version + ' ' + infobarText);
+    $('#infobar').html(BDS.brimstoneVersion + ' ' + infobarText);
 }
 
 function setToolbarState() {
@@ -843,6 +839,9 @@ async function _playSomething() {
             Test.current.lastRun = new BDS.Test();
             Test.current.lastRun.startDate = Date.now();
             Test.current.lastRun.name = Test.current.filename;
+            Test.current.lastRun.startingServer = Test.current.startingServer || Test.current.steps[0].url;
+            Test.current.lastRun.brimstoneVersion = BDS.brimstoneVersion;
+            Test.current.lastRun.chromeVersion = BDS.chromeVersion;
 
             let actions = Test.current.steps;
             player.onBeforePlay = updateStepInView;
@@ -1601,7 +1600,7 @@ $('#clearButton').on('click', actions.clearWorkspace.bind(actions));
 
 function imageProcessingProgress(value, max) {
     let ib = $('#infobar');
-    ib.html(`${version} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
+    ib.html(`${BDS.brimstoneVersion} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
 }
 
 async function loadNextTest() {
@@ -1617,6 +1616,7 @@ async function loadNextTest() {
 
     // This load is just super fast.
     Test.current = await (new Test()).fromPlayTree(zipNodes[currentTestNumber - 1]);
+    Test.current.startingServer = Test.current.steps[0].url || zipNodes[0]._zipTest.startingServer || null;
 
     // kick off without waiting for this. 
     Test.current.startImageProcessing(imageProcessingProgress);
