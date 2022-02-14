@@ -26,9 +26,6 @@ export class Test {
          */
         this.steps = [];
 
-        /** The version of brimstone-recorder used to record this test. */
-        this.version = 'v' + chrome.runtime.getManifest().version;
-
         /** Should we hide the cursor for this test for performance? */
         this.hideCursor = true;
 
@@ -65,6 +62,14 @@ export class Test {
 
         /** Statistics about the last run of this zipfile test */
         this.lastRun = new BDS.Test();
+
+        /**
+         * The server this test starts on. Normall this would come from the first 
+         * action. The first action normally is a goto <URL>. But in the case of 
+         * a multizip test, later zips might be internal parts of the workflow.
+         * in that case we still need to propagate the url into the DB.
+         */
+        this.startingServer = null;
     }
 
     /** 
@@ -187,7 +192,7 @@ export class Test {
     toJSON() {
         return {
             steps: this.steps,
-            version: this.version,
+            brimstoneVersion: BDS.brimstoneVersion,
             hideCursor: this.hideCursor,
             incognito: this.incognito
         };
@@ -630,6 +635,9 @@ export class PlayTree {
             flatReport.wallTime = 0;
             flatReport.userTime = 0;
             flatReport.name = this._fileHandle.name;
+            flatReport.startingServer = reports[0].startingServer;
+            flatReport.chromeVersion = BDS.chromeVersion;
+            flatReport.brimstoneVersion = BDS.brimstoneVersion;
 
             var baseIndex = 0;
             for (let i = 0; i < reports.length; ++i) {
