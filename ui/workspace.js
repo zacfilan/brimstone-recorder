@@ -414,7 +414,7 @@ class Actions {
         const { view, action } = getCard(e.currentTarget, Test.current);
         let index;
         switch (action._view) {
-            case constants.view.EXPECTED:
+            case constants.view.EXPECTED: // expected -> actual
                 action._view = constants.view.ACTUAL;
                 if (!action.actualScreenshot) {
                     action.actualScreenshot = new Screenshot({
@@ -433,7 +433,7 @@ class Actions {
                 }
                 updateStepInView(Test.current.steps[action.index - 1]);
                 break;
-            case constants.view.ACTUAL:
+            case constants.view.ACTUAL: // actual -> edit
                 action._view = constants.view.EDIT;
                 if (!action.editViewDataUrl) {
                     if (!action.acceptablePixelDifferences) {
@@ -448,7 +448,7 @@ class Actions {
                 /** Add rectangles where we don't care about pixel differences. */
                 addVolatileRegions();
                 break;
-            case constants.view.EDIT:
+            case constants.view.EDIT: // edit -> expected
                 action._view = constants.view.EXPECTED;
                 await updateStepInView(Test.current.steps[action.index - 1]);
                 break;
@@ -920,6 +920,7 @@ async function _playSomething() {
                     break;
                 case constants.match.FAIL:
                     updateStepInView(Test.current.steps[currentStepIndex()]);
+                    addVolatileRegions();
                     Test.current.lastRun.errorMessage = `last run failed after user action ${player.currentAction.index + 1}`;
                     setInfoBarText(`❌ ${Test.current.lastRun.errorMessage}`);
                     break;
