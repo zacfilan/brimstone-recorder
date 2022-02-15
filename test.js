@@ -647,14 +647,14 @@ export class PlayTree {
             var baseIndex = 0;
             for (let i = 0; i < reports.length; ++i) {
                 let report = reports[i];
-                flatReport.status = report.status;
+                flatReport.status = report.status === 'allow' ? 'pass' : report.status; // an allow is a pass
                 flatReport.userTime += report.userTime;
                 flatReport.wallTime += report.wallTime;
                 flatReport.endDate = report.endDate;
                 flatReport.errorMessage = report.errorMessage;
                 let lastStep = report.failingStep || report.steps.length;
                 for (let j = 0; j < lastStep; ++j) {
-                    let step = report.steps[j];
+                    let step = clone(report.steps[j]);
                     step.baseIndex = baseIndex;
                     step.index += baseIndex;
                     step.path = report.path;
