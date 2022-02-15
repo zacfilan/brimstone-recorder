@@ -3,6 +3,7 @@ import { Screenshot } from "./ui/screenshot.js";
 import { brimstone } from "./utilities.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
+import {clone} from "./utilities.js"
 
 /**
  * A ziptest instance is a recording of user actions that can be played back
@@ -184,6 +185,8 @@ export class Test {
      *  @param {TestAction} newAction The action to insert
      */
     insertAction(newAction) {
+        newAction.test = this;
+        newAction.tab = clone(this.steps[newAction.index].tab);
         this.dirty = true;
         this.steps.splice(newAction.index, 0, newAction);
         this.reindex();
@@ -646,19 +649,20 @@ export class PlayTree {
                 flatReport.userTime += report.userTime;
                 flatReport.wallTime += report.wallTime;
                 flatReport.endDate = report.endDate;
-                for (let j = 0; j < report.steps.length; ++j) {
+                flatReport.errorMessage = report.errorMessage;
+                let lastStep = report.failingStep || report.steps.length;
+                for (let j = 0; j < lastStep; ++j) {
                     let step = report.steps[j];
                     step.baseIndex = baseIndex;
                     step.index += baseIndex;
                     step.path = report.path;
                     flatReport.steps.push(step);
                 }
-                baseIndex += report.steps.length;
-
-                if (flatReport.status !== constants.match.PASS) {
-                    flatReport.errorMessage = report.errorMessage || 'unable to generate report due to non-passing subnode';
-                    break; // we are outta here
+                if(report.failingStep) {
+                    flatReport.errorMessage = report.errorMessage;
+                    break;
                 }
+                baseIndex += report.steps.length;
             }
 
             this.reports = [flatReport];

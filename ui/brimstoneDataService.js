@@ -71,6 +71,12 @@ export class Test {
     /** @type {string} message about fail */
     errorMessage;
 
+    /** 
+     * @type {number} The 1-based index of the step that executed
+     * but did not result in the expected screenshot.
+     */
+    failingStep;
+
     /** @type {Date} when the run started */
     startDate = 0;
     

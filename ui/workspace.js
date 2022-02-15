@@ -4,7 +4,7 @@ import * as iconState from "../iconState.js";
 import { Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep, downloadObjectAsJson } from "../utilities.js";
-import { disableConsole } from "./console.js";
+import { disableConsole, enableConsole } from "./console.js";
 import { Test, PlayTree } from "../test.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, saveOptions } from "../options.js";
@@ -929,6 +929,7 @@ async function _playSomething() {
                     updateStepInView(Test.current.steps[currentStepIndex()]);
                     addVolatileRegions();
                     Test.current.lastRun.errorMessage = `last run failed after user action ${player.currentAction.index + 1}`;
+                    Test.current.lastRun.failingStep = player.currentAction.index + 1;
                     setInfoBarText(`❌ ${Test.current.lastRun.errorMessage}`);
                     break;
                 case constants.match.CANCEL:
@@ -1456,6 +1457,7 @@ async function recordSomething(promptForUrl) {
             }
 
             if (Test.current.steps.length) {
+                startingTab.trackCreated();
                 // we are going to record over some steps in the existing test in memory
                 Tab.active = startingTab;
 

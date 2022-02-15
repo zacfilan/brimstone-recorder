@@ -56,6 +56,11 @@ function binaryStringToDataView(str) {
     return _dataView;
 }
 
+/**
+ * Make a deep clone of any object, via JSON magic.
+ * @param {any} obj 
+ * @returns 
+ */
 export function clone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
