@@ -202,38 +202,40 @@ class Actions {
         await action.addMask(view);
         updateStepInView(Test.current.steps[action.index - 1]);
         action.test.dirty = true;
-
-        if (this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
+        if(action.autoPlay) {
             this.callMethod(this.playSomething);
         }
     }
 
     /** edit pixel differences - remove the allowed differences, see the differences */
     async seeDelta() {
-
         // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
         const { view, action } = getCard('#content .waiting', Test.current);
+        action.autoPlay = false;
         action.acceptablePixelDifferences = new Screenshot();
         await action.pixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
+
         addVolatileRegions();
         action.test.dirty = true;
     }
 
     /** edit pixel differences - when the recording is wrong */
-    async replaceExpectedWithActual() {
+    async replaceExpectedWithActual(e) {
 
         // push the actual into the expected and be done with it.
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         action.expectedScreenshot.png = action.actualScreenshot.png;
         action.expectedScreenshot.dataUrl = action.actualScreenshot.dataUrl;
         action.acceptablePixelDifferences = new Screenshot();
+        delete action.lastVerifyScreenshotDiffDataUrl;
+
         await action.pixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
         addVolatileRegions();
         action.test.dirty = true;
 
-        if (this.nameOfLastMethodExecuted === 'stopPlaying' && playMatchStatus === constants.match.FAIL) {
+        if(action.autoPlay) {
             this.callMethod(this.playSomething);
         }
     }
@@ -258,6 +260,7 @@ class Actions {
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
+        Tab.reset();
         lastRunMetrics = undefined;
 
         setToolbarState();
@@ -270,8 +273,10 @@ class Actions {
 
     /** save the current test as a zip file */
     async saveZip() {
-        let file = await Test.current.saveFile();
-        if (file) {
+        let fileHandle = await Test.current.saveFile();
+        // the name may have changed
+        if (fileHandle) {
+            Test.current.filename = fileHandle.name;
             window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
         }
     }
@@ -633,12 +638,12 @@ var _lastMouseMove;
 
 $('#step').on('click', '#ignoreDelta', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.ignoreDelta);
+    await actions.callMethodByUser(actions.ignoreDelta, e);
 });
 
 $('#step').on('click', '#stampDelta', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.ignoreDelta);
+    await actions.callMethodByUser(actions.ignoreDelta, e);
 });
 
 $('#step').on('mouseenter', '#stampDelta', function (e) {
@@ -666,7 +671,7 @@ $('#step').on('click', '#undo', async (e) => {
 
 $("#step").on('click', '#replace', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.replaceExpectedWithActual);
+    await actions.callMethodByUser(actions.replaceExpectedWithActual, e);
 });
 
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
@@ -926,8 +931,12 @@ async function _playSomething() {
                     }
                     break;
                 case constants.match.FAIL:
-                    updateStepInView(Test.current.steps[currentStepIndex()]);
-                    addVolatileRegions();
+                    let step = Test.current.steps[currentStepIndex()];
+                    let next = Test.current.steps[currentStepIndex()+1];
+                    next.autoPlay = true;
+                    updateStepInView(step);
+                    
+                    addVolatileRegions(); // you can draw right away
                     Test.current.lastRun.errorMessage = `last run failed after user action ${player.currentAction.index + 1}`;
                     Test.current.lastRun.failingStep = player.currentAction.index + 1;
                     setInfoBarText(`❌ ${Test.current.lastRun.errorMessage}`);
@@ -1510,7 +1519,7 @@ async function recordSomething(promptForUrl) {
                 // there is no test loaded in memory. recording starts at
                 // step 1 (index 0)
 
-                Test.current.reset();
+                Test.current = new Test();
                 startingTab.trackCreated();
                 Tab.active = startingTab;
 

@@ -600,6 +600,10 @@ button img {
           animation-fill-mode: both;
 }
 
+#content .autoPlay svg path {
+  fill: green;
+}
+
 /** only show the meter on the next card when playing back */
 #step {
   height: calc(100% - 172px);

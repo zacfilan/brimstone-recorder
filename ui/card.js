@@ -174,6 +174,11 @@ export class TestAction {
      */
      _lastTimeout;
 
+     /**
+      * If the edit actions are autoplay or not
+      */
+     autoPlay = false;
+
     constructor(args) {
         Object.assign(this, args);
         this.tab = new Tab(this.tab);
@@ -570,25 +575,31 @@ export class Step {
                         // <button title="Repeat last added rectangle(s)" id="stampDelta">
                         //     <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="stamp" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-stamp fa-w-16 fa-7x"><path fill="currentColor" d="M416 256h-66.56c-16.26 0-29.44-13.18-29.44-29.44v-9.46c0-27.37 8.88-53.42 21.46-77.73 9.11-17.61 12.9-38.38 9.05-60.42-6.77-38.78-38.47-70.7-77.26-77.45C267.41.49 261.65 0 256 0c-53.02 0-96 42.98-96 96 0 14.16 3.12 27.54 8.68 39.57C182.02 164.43 192 194.71 192 226.5v.06c0 16.26-13.18 29.44-29.44 29.44H96c-53.02 0-96 42.98-96 96v48c0 8.84 7.16 16 16 16h16v64c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-64h16c8.84 0 16-7.16 16-16v-48c0-53.02-42.98-96-96-96zM48 352c0-26.47 21.53-48 48-48h66.56c42.7 0 77.44-34.74 77.44-77.5 0-34.82-8.82-70.11-27.74-111.06-2.83-6.12-4.26-12.66-4.26-19.44 0-26.47 21.53-48 48-48 2.96 0 6 .27 9.02.79 18.82 3.28 34.89 19.43 38.2 38.42 1.87 10.71.39 20.85-4.4 30.11C280.78 152.21 272 184.85 272 217.1v9.46c0 42.7 34.74 77.44 77.44 77.44H416c26.47 0 48 21.53 48 48v16H48v-16zm384 112H80v-48h352v48z" class=""></path></svg>
                         // </button>
+                        let bclass = this.next.autoPlay ? 'class="autoPlay"': '';
+                        let titleSuffix = this.next.autoPlay ? '. Autoplay.':'';
                         title.actions = `
-                        <button title="Use Last Rectangles" id="stampDelta">
+                        <button title="Use Last Rectangles${titleSuffix}" id="stampDelta" ${bclass}>
                             <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="stamp" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-stamp fa-w-16 fa-7x"><path fill="currentColor" d="M416 256h-66.56c-16.26 0-29.44-13.18-29.44-29.44v-9.46c0-27.37 8.88-53.42 21.46-77.73 9.11-17.61 12.9-38.38 9.05-60.42-6.77-38.78-38.47-70.7-77.26-77.45C267.41.49 261.65 0 256 0c-53.02 0-96 42.98-96 96 0 14.16 3.12 27.54 8.68 39.57C182.02 164.43 192 194.71 192 226.5v.06c0 16.26-13.18 29.44-29.44 29.44H96c-53.02 0-96 42.98-96 96v48c0 8.84 7.16 16 16 16h16v64c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-64h16c8.84 0 16-7.16 16-16v-48c0-53.02-42.98-96-96-96zM48 352c0-26.47 21.53-48 48-48h66.56c42.7 0 77.44-34.74 77.44-77.5 0-34.82-8.82-70.11-27.74-111.06-2.83-6.12-4.26-12.66-4.26-19.44 0-26.47 21.53-48 48-48 2.96 0 6 .27 9.02.79 18.82 3.28 34.89 19.43 38.2 38.42 1.87 10.71.39 20.85-4.4 30.11C280.78 152.21 272 184.85 272 217.1v9.46c0 42.7 34.74 77.44 77.44 77.44H416c26.47 0 48 21.53 48 48v16H48v-16zm384 112H80v-48h352v48z" class=""></path></svg>
                         </button>
 
-                        <button title="Accept Unpredictable Pixels" id="ignoreDelta">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      </button>
-              
-                      <button title="Clear Unpredictable Pixels" id="undo">
-                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"
-                          class="svg-inline--fa fa-undo fa-w-16" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                          <path fill="currentColor"
-                            d="M212.333 224.333H12c-6.627 0-12-5.373-12-12V12C0 5.373 5.373 0 12 0h48c6.627 0 12 5.373 12 12v78.112C117.773 39.279 184.26 7.47 258.175 8.007c136.906.994 246.448 111.623 246.157 248.532C504.041 393.258 393.12 504 256.333 504c-64.089 0-122.496-24.313-166.51-64.215-5.099-4.622-5.334-12.554-.467-17.42l33.967-33.967c4.474-4.474 11.662-4.717 16.401-.525C170.76 415.336 211.58 432 256.333 432c97.268 0 176-78.716 176-176 0-97.267-78.716-176-176-176-58.496 0-110.28 28.476-142.274 72.333h98.274c6.627 0 12 5.373 12 12v48c0 6.627-5.373 12-12 12z">
-                          </path>
-                        </svg>
-                      </button>
-              
-                      <button title="Replace Expected with Actual" id="replace">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M211.8 339.8C200.9 350.7 183.1 350.7 172.2 339.8L108.2 275.8C97.27 264.9 97.27 247.1 108.2 236.2C119.1 225.3 136.9 225.3 147.8 236.2L192 280.4L300.2 172.2C311.1 161.3 328.9 161.3 339.8 172.2C350.7 183.1 350.7 200.9 339.8 211.8L211.8 339.8zM0 96C0 60.65 28.65 32 64 32H384C419.3 32 448 60.65 448 96V416C448 451.3 419.3 480 384 480H64C28.65 480 0 451.3 0 416V96zM48 96V416C48 424.8 55.16 432 64 432H384C392.8 432 400 424.8 400 416V96C400 87.16 392.8 80 384 80H64C55.16 80 48 87.16 48 96z"/></svg>                      </button>`;
+                        <button title="Accept Unpredictable Pixels${titleSuffix}" id="ignoreDelta" ${bclass}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
+                        </button>
+
+                        <button title="Replace Expected with Actual${titleSuffix}" id="replace" ${bclass}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M211.8 339.8C200.9 350.7 183.1 350.7 172.2 339.8L108.2 275.8C97.27 264.9 97.27 247.1 108.2 236.2C119.1 225.3 136.9 225.3 147.8 236.2L192 280.4L300.2 172.2C311.1 161.3 328.9 161.3 339.8 172.2C350.7 183.1 350.7 200.9 339.8 211.8L211.8 339.8zM0 96C0 60.65 28.65 32 64 32H384C419.3 32 448 60.65 448 96V416C448 451.3 419.3 480 384 480H64C28.65 480 0 451.3 0 416V96zM48 96V416C48 424.8 55.16 432 64 432H384C392.8 432 400 424.8 400 416V96C400 87.16 392.8 80 384 80H64C55.16 80 48 87.16 48 96z"/></svg>
+                        </button>
+
+                        <button title="Clear Unpredictable Pixels" id="undo">
+                          <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"
+                            class="svg-inline--fa fa-undo fa-w-16" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                            <path fill="currentColor"
+                              d="M212.333 224.333H12c-6.627 0-12-5.373-12-12V12C0 5.373 5.373 0 12 0h48c6.627 0 12 5.373 12 12v78.112C117.773 39.279 184.26 7.47 258.175 8.007c136.906.994 246.448 111.623 246.157 248.532C504.041 393.258 393.12 504 256.333 504c-64.089 0-122.496-24.313-166.51-64.215-5.099-4.622-5.334-12.554-.467-17.42l33.967-33.967c4.474-4.474 11.662-4.717 16.401-.525C170.76 415.336 211.58 432 256.333 432c97.268 0 176-78.716 176-176 0-97.267-78.716-176-176-176-58.496 0-110.28 28.476-142.274 72.333h98.274c6.627 0 12 5.373 12 12v48c0 6.627-5.373 12-12 12z">
+                            </path>
+                         </svg>
+                        </button>
+             
+ `;
                         src = this.next.editViewDataUrl ?? '../images/notfound.png';
                         break;
                 }

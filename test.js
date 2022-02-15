@@ -14,7 +14,7 @@ export class Test {
      * reset state
      * @param {Test} test
      */
-    reset() {
+    _reset() {
         /**
          * If the current test has been edited so that the user can be given a 
          * chance to record before leaving the test.
@@ -56,11 +56,6 @@ export class Test {
          */
         this.replacedAction = null;
 
-        /** The PlayTree node for this test.
-         * @type {PlayTree}
-         */
-        this._playTree = null;
-
         /** Statistics about the last run of this zipfile test */
         this.lastRun = new BDS.Test();
 
@@ -71,6 +66,12 @@ export class Test {
          * in that case we still need to propagate the url into the DB.
          */
         this.startingServer = null;
+
+        /** The PlayTree node for this test.
+         * @type {PlayTree}
+         */
+        this._playTree = new PlayTree();
+        this._playTree._zipTest = this;
     }
 
     /** 
@@ -106,9 +107,7 @@ export class Test {
      * default constructor
      */
     constructor() {
-        this.reset();
-        this._playTree = new PlayTree();
-        this._playTree._zipTest = this;
+        this._reset();
     }
 
     /**
@@ -292,7 +291,7 @@ export class Test {
         if (!fileHandle) {
             return this;
         }
-        this.reset();
+        this._reset();
 
         const blob = await fileHandle.getFile();
         this.zip = await (new JSZip()).loadAsync(blob);

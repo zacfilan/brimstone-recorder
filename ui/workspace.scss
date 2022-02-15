@@ -497,6 +497,9 @@ button {
             animation-fill-mode: both;
         }
     }
+    .autoPlay svg path {
+        fill: green
+    }
 }
 
 /** only show the meter on the next card when playing back */
