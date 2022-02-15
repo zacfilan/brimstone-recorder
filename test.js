@@ -107,6 +107,8 @@ export class Test {
      */
     constructor() {
         this.reset();
+        this._playTree = new PlayTree();
+        this._playTree._zipTest = this;
     }
 
     /**
@@ -586,9 +588,9 @@ export class PlayTree {
     /** return the path to the parent */
     path() {
         let p = "";
-        for (let node = this; node?._fileHandle?.name; node = node._parent) {
+        for (let node = this; node?._fileHandle?.name || node?._zipTest?.filename ; node = node._parent) {
             let old = p;
-            p = node._fileHandle.name;
+            p = node?._fileHandle?.name || node?._zipTest?.filename;
             if (old) {
                 p += '/' + old;
             }

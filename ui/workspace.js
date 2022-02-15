@@ -35,7 +35,7 @@ Tab.reset();
  * @type {Test}
  */
 Test.current = new Test();
-window.document.title = `Brimstone - ${Test.current.filename}`;
+window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
 
 const player = new Player();
 /** used to *not* record pre-requisite screenshots when in the shadowDOM. */
@@ -261,7 +261,7 @@ class Actions {
         lastRunMetrics = undefined;
 
         setToolbarState();
-        window.document.title = `Brimstone - ${Test.current.filename}`;
+        window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
 
         $('#cards').empty();
         $('#step').empty();
@@ -272,7 +272,7 @@ class Actions {
     async saveZip() {
         let file = await Test.current.saveFile();
         if (file) {
-            window.document.title = `Brimstone - ${Test.current.filename}`;
+            window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
         }
     }
 
@@ -1634,7 +1634,7 @@ async function loadNextTest() {
     // kick off without waiting for this. 
     Test.current.startImageProcessing(imageProcessingProgress);
 
-    window.document.title = `Brimstone - ${Test.current.filename}${suite}`;
+    window.document.title = `Brimstone - ${Test.current._playTree.path()}${suite}`;
     updateStepInView(Test.current.steps[0]);
     // for (let i = 1; i < Test.current.steps.length; ++i) {
     //      let action = Test.current.steps[i];
