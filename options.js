@@ -91,9 +91,22 @@ export class Options {
     /** 
      * If we want to automatically post the metrics when a test fails */
     postMetricsOnFail = false;
+
+    /**
+     * Allow another knob for fixing bad pixels globally. This is easy to abuse!
+     */
+    numberOfRedPixelsAllowed = 0;
+
+    /**
+     * Allow the user to identify the machine that this instance of brimstone-recorder 
+     * is installed on. can be used to classify application test run persisted performance 
+     * based on which machine was running the test app.
+     * @type {string}
+     */
+    installedOnAlias;
 };
 
-var options = new Options();
+export var options = new Options();
 
 /** load the user settable options from chrome storage
  * 

@@ -537,7 +537,7 @@ button img {
 
 #content .card.waiting {
   /** show the failed progress bar as red for failed states */
-  /** the text that says "allowed differences..*/
+  /** the text that says "has unpredicable pixels" */
 }
 
 #content .card.waiting.edit {
@@ -588,8 +588,12 @@ button img {
           animation-fill-mode: unset;
 }
 
-#content .card.waiting #allowed-differences {
+#content .card.waiting #unpredictable-pixels {
   color: orange;
+}
+
+#content .card.waiting #error-pixels {
+  color: red;
 }
 
 #content .card.waiting .progress {

@@ -486,9 +486,12 @@ button {
             animation-fill-mode: unset;
         }
 
-        /** the text that says "allowed differences..*/
-        #allowed-differences {
+        /** the text that says "has unpredicable pixels" */
+        #unpredictable-pixels {
             color: orange;
+        }
+        #error-pixels {
+            color: red;
         }
 
         .progress {

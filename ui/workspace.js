@@ -257,6 +257,10 @@ class Actions {
 
             let result = await actions.confirmSaveModal();
         }
+        
+
+        Test.current.removeScreenshots();
+        
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
@@ -401,12 +405,24 @@ class Actions {
      * Insert a blank action before the current one. This along with recording over actions,
      * allows the user to insert newly recorded actions.
      */
-    insertActionBefore() {
+    async insertActionAfter() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        let newAction = new TestAction();
-        newAction.setIndex(action.index);
+        let next = Test.current.steps[action.index+1];
+        let newAction = await userEventToAction({
+            type: 'wait',
+            sender: action.sender,
+            tab: action.tab,
+            expectedScreenshot: next?.expectedScreenshot && new Screenshot(next.expectedScreenshot),
+            actualScreenshot: next?.actualScreenshot && new Screenshot(next.actualScreenshot),
+            acceptablePixelDifferences: next?.acceptablePixelDifferences && new Screenshot(next.acceptablePixelDifferences),
+            test: Test.current,
+            index: action.index+1
+        }, false);
+        if(newAction.acceptablePixelDifferences) {
+            newAction._match === constants.match.ALLOW;
+        }
         Test.current.insertAction(newAction);
-        updateStepInView(Test.current.steps[action.index]);
+        updateStepInView(newAction);
     }
 
     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
@@ -556,6 +572,14 @@ let jsonEditor;
     else {
         disableConsole(); // can be reenabled in the debugger later
     }
+
+    for(let i = 0; i < 3 && !options.installedOnAlias; ++i) {
+        options.installedOnAlias = await brimstone.window.prompt('Please provide an identifier for this computer. It can be the real computer name or something else, e.g. "Zac\'s Laptop"');
+        await saveOptions(options);
+    }
+
+    // let info = await (new Promise(resolve => chrome.runtime.getPlatformInfo(resolve)));
+    // console.log(info, navigator.userAgent);
 
     setToolbarState();
     /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
@@ -1339,7 +1363,9 @@ function stopRecording() {
         console.warn(e);
     }
 
-    if (Test.current.replacedAction) {
+    // this is only supposed to be used when we are recording over steps in the MIDDLE of the 
+    // test. FIXME: whole mechanism is a little gross.
+    if (Test.current.replacedAction?.index === Test.current.steps.length-1) {
         // insert the action that our final useless "end-recording-noop-expected-screenshot-action" replaced.
         // insert it right after that noop. the user can delete the noop. i don't want to delete that for them.
         Test.current.replacedAction.index++;
@@ -1759,25 +1785,24 @@ function addExpectedScreenshot(testAction, ss = _lastScreenshot) {
 }
 
 /** 
- * This is only used during recording. 
+ * This is normally only used during recording. 
  * 
  * Process a user event received from the content script (during recording)
- * screenshot, annotate event and convert to card
+ * screenshot, annotate event and convert to TestAction;
+ * 
  */
-async function userEventToAction(userEvent) {
+async function userEventToAction(userEvent, insert=true) {
     let frameId = userEvent?.sender?.frameId;
     let frameOffset = userEvent.type === 'close' ? { left: 0, top: 0 } : await getFrameOffset(frameId);
 
     let testAction = new TestAction(userEvent);
     testAction.tab = new Tab(Tab.active);
-
-    Test.current.updateOrAppendAction(testAction);
+    // FIXME: remove this. This is here currently because addExpectedScreenshot has a ependency on the index
+    // which has a dependency on this call because it can set the index
+    if(insert) {
+        Test.current.updateOrAppendAction(testAction);
+    }
     let element = userEvent.boundingClientRect;
-
-    let recordingTab = Tab.active;
-
-    testAction.tab.height = recordingTab.height;
-    testAction.tab.width = recordingTab.width;
 
     testAction.x += frameOffset.left;
     testAction.y += frameOffset.top;
@@ -1788,25 +1813,31 @@ async function userEventToAction(userEvent) {
          * of the overlay in percentages of the aspect-ratio preserved image.
          */
         testAction.overlay = {
-            height: element.height * 100 / recordingTab.height, // height of target element as a percent of screenshot height
-            width: element.width * 100 / recordingTab.width, // width of target element as a percent screenshot width
+            height: element.height * 100 / testAction.tab.height, // height of target element as a percent of screenshot height
+            width: element.width * 100 / testAction.tab.width, // width of target element as a percent screenshot width
 
             /** absolute y coordinate of the TARGET ELEMENT as a percent of screenshot */
-            top: (element.top + frameOffset.top) * 100 / recordingTab.height,
+            top: (element.top + frameOffset.top) * 100 / testAction.tab.height,
             /** absolute x coordinate of the TARGET ELEMENT as a percent of screenshot */
-            left: (element.left + frameOffset.left) * 100 / recordingTab.width,
+            left: (element.left + frameOffset.left) * 100 / testAction.tab.width,
 
             /** absolute x coordinate of the mouse position as a percent of screenshot */
-            x: testAction.x * 100 / recordingTab.width,
+            x: testAction.x * 100 / testAction.tab.width,
             /** absolute y coordinate of the mouse position as a percent of screenshot */
-            y: testAction.y * 100 / recordingTab.height
+            y: testAction.y * 100 / testAction.tab.height
         };
     }
 
     let dataUrl = '';
     switch (userEvent.type) {
         case 'wait':
-            testAction.description = 'no action. wait only.';
+            if(!testAction.event) {
+                testAction.event = {};
+            }
+            if(testAction.event.milliseconds === undefined) {
+                testAction.event.milliseconds = 0;
+            }
+            testAction.description = `wait ${testAction.event.milliseconds}ms.`;
             testAction.overlay = {
                 height: 0,
                 width: 0,
@@ -1815,6 +1846,16 @@ async function userEventToAction(userEvent) {
             };
             testAction._view = constants.view.EXPECTED;
             //addExpectedScreenshot(testAction, _lastScreenshot);
+            break;
+        case 'pollscreen':
+            testAction.description = 'no action performed.'; // do I even need a message?
+            testAction.overlay = {
+                height: 0,
+                width: 0,
+                top: 0,
+                left: 0
+            };
+            testAction._view = constants.view.EXPECTED;
             break;
         case 'mouseover':
             // this is sort of an error case!
@@ -1939,7 +1980,7 @@ async function userEventToAction(userEvent) {
             break;
     }
 
-    let stream = testAction.type === 'wait' ? 'debug' : 'log';
+    let stream = testAction.type === 'pollscreen' ? 'debug' : 'log';
     console[stream](`[step:${testAction.index} tab:${testAction.tab.id}] record "${testAction.description}"`);
     return testAction;
 }
@@ -1951,7 +1992,7 @@ async function recordUserAction(userEvent) {
     action.tab.blessed = true;
 
     // show the latest screenshot in the expected card to give quick feedbak
-    let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
+    let wait = await userEventToAction({ type: 'pollscreen' }); // create a new waiting action
     // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
     wait.expectedScreenshot = new Screenshot(_lastScreenshot); // something to show immediately
     wait._view = constants.view.DYNAMIC;
@@ -1978,17 +2019,6 @@ async function onMessageHandler(message, _port) {
     // the last one contains the screenshot the user was looking at in the expected when they recorded this action
     let action;
     switch (userEvent.type) {
-        case 'error':
-            // remove current expected
-            if (Test.current.steps.length > 2) {
-                Test.current.steps.splice(Test.current.steps.length - 1); // the expected and the mouseove start
-
-                // rename the mouse start step, cause that needs to be re-recorded.
-                Test.current.steps[Test.current.steps.length - 1].type = 'wait';
-                updateStepInView(Test.current.steps[Test.current.steps.length - 2]); // update the UI 
-            }
-            stopRecording(); // I need to broadcast stop to all the frames
-            break;
         case 'frameOffset':
             if (userEvent.sender.frameId === _waitForFrameOffsetMessageFromFrameId) {
                 console.log(`connect: using frameOffset for frameId ${userEvent.sender.frameId}`);
@@ -2003,7 +2033,7 @@ async function onMessageHandler(message, _port) {
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         // the user is actively waiting for the screen to change
-        case 'wait':
+        case 'pollscreen':
             await captureScreenshotAsDataUrlForRecording(); // grab latest image
 
             // only one time ever
@@ -2086,7 +2116,7 @@ async function onMessageHandler(message, _port) {
             // show the latest screenshot in the expected card and start polling it
             await captureScreenshotAsDataUrlForRecording();
 
-            let wait = await userEventToAction({ type: 'wait' }); // create a new waiting action
+            let wait = await userEventToAction({ type: 'pollscreen' }); // create a new waiting action
             // use the lower cost option: just the dataUrl not the PNG. the PNG is generated when we create a userAction
             wait.expectedScreenshot = new Screenshot(_lastScreenshot); // something to show immediately
             wait._view = constants.view.DYNAMIC;

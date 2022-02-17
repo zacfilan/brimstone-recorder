@@ -9,6 +9,7 @@ import { constants, TestAction } from "./ui/card.js";
 import { loadOptions } from "./options.js";
 import { Test } from "./test.js";
 import * as Errors from "./error.js";
+import * as BDS from "./ui/brimstoneDataService.js";
 
 /** cached the options before playing 
  * @type {Options}
@@ -215,6 +216,10 @@ export class Player {
                 await this.onBeforePlay(action); // this shows the correct step (and will start the waiting animation)
             }
 
+            if(action.breakPoint) {
+                return constants.match.CANCEL;
+            }
+
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
             // performed this action, we just need to put the mouse in the correct spot and
             // do the screen verification again
@@ -351,7 +356,13 @@ export class Player {
         });
     }
 
-    wait(action) {
+    async wait(action) {
+        if(action.event.milliseconds) {
+            await sleep(action.event.milliseconds);
+        }
+    }
+
+    pollscreen(action) {
         return; // 'nuff said
     }
 
@@ -615,6 +626,41 @@ export class Player {
     }
 
     /**
+     * Get the version of this application under test by
+     * getting all text under the pointed to element. 
+     * I wish I could defer this to a user supplied script, but
+     * that's not an option with MV3. :(
+     * @param {TestAction} action 
+     */
+    async getVersion(action) {
+        function _getText(x,y) {
+            try {
+                var element = document.elementFromPoint(x, y);
+                return {textContent: element.textContent};
+            }
+            catch (e) {
+                return e.message;
+            }
+        }
+
+        let frames = await chrome.scripting.executeScript({
+            target: { tabId: this.tab.chromeTab.id /*, frameIds: frameIds*/ },
+            function: _getText,
+            args: [action.x, action.y]
+        });
+        let result = frames[0].result;
+        if(!result) {
+            throw new Error("Nothing returned from getVersion");
+        }
+        if(result.textContent) {
+            BDS.Test.applicationVersion = result.textContent;   
+        }
+        else {
+            throw new Error(result);
+        }
+    }
+
+    /**
      * Called after we play the current action.
      * 
      * Repeatedly check the expected screenshot required to start the next action
@@ -692,7 +738,7 @@ export class Player {
             nextStep.numMaskedPixels = numMaskedPixels;
 
             differencesPng = diffPng;
-            if (numDiffPixels === 0) { // it matched
+            if (numDiffPixels <= options.numberOfRedPixelsAllowed) { // it matched
                 nextStep._match = constants.match.PASS;
 
                 nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');

@@ -286,7 +286,7 @@ class Recorder {
         /** An identifier for the timeout that will record a 'mousemove' user action */
         this.pendingMouseMoveTimeout = false;
 
-        /** An identifier for the timeout that will "record" a 'wait' user action */
+        /** An identifier for the timeout that will "record" a 'pollscreen' user action */
         this.waitActionDetectionTimeout = null;
 
         /** the active element on the start of a mousemove. used for error recorvery. roll back focus to this element on error. */
@@ -330,7 +330,7 @@ class Recorder {
             return;
         }
         this.waitActionDetectionTimeout = null;
-        this.pushMessage({ type: 'wait' });
+        this.pushMessage({ type: 'pollscreen' });
     }
 
     /**
@@ -544,8 +544,8 @@ class Recorder {
                         && !this.pendingKeyTimeout
                         && !this.pendingWheelTimeout
                         && !this.pendingMouseMoveTimeout) {
-                        if (msg.args !== 'wait') {
-                            this.pushMessage({ type: 'wait' });
+                        if (msg.args !== 'pollscreen') {
+                            this.pushMessage({ type: 'pollscreen' });
                         }
                         else {
                             this.scheduleWaitActionDetection(); // the queue is empty right now, if it is still empty in 1 sec take a picture
@@ -612,7 +612,7 @@ class Recorder {
                 msg.x = msg.boundingClientRect.x + msg.boundingClientRect.width / 2;
                 msg.y = msg.boundingClientRect.y + msg.boundingClientRect.height / 2;
                 break;
-            case 'wait':
+            case 'pollscreen':
                 break;
             case 'wheel':
                 msg.event.deltaX = e.deltaX;
@@ -678,41 +678,6 @@ class Recorder {
         this.pendingMouseMoveTimeout = null;
         let msg = this.buildMsg(this.lastMouseMoveEvent);
         this.pushMessage(msg);
-    }
-
-    /** Pop an alert, reset what we can for the user and keep recording. */
-    recoverableUserError(lastEventType = 'unknownEvent') {
-        this._userError(lastEventType, true);
-    }
-
-    /** Pop an alert, end the recording and reset the workspace UI. The user will need to manually restart recording. */
-    unrecoverableUserError(lastEventType = 'mousemove') {
-        this._userError(lastEventType, false);
-    }
-
-    _userError(lastEventType = 'mousemove', recoverable) {
-        let icon = recoverable ? '🟡' : '🛑';
-        let msg = `${icon} Please wait for Brimstone to record your '${lastEventType}'' before you attempt to '${this.event.type}'.\n\n`;
-        if (recoverable) {
-            msg += `As soon as you hit OK you will be recording again.`;
-            if (this.activeElement) {
-                this.activeElement.focus(); // mousedown applies :active and there is nothing we can do to prevent it. So we recover from it.
-            }
-        }
-        else {
-            msg += `Recording stopped. Match screenshot in "Expected result" (for some step in the workspace) to what is actually showing in the app. You may need to move back a few steps in the recording to do this. Once they match click the record button to continue. This time wait for any ${lastEventType} to complete before you attempt another action.`;
-            this._postMessage({ type: 'error' }); // update the workspace UI
-        }
-        window.alert(msg);
-        let p = this._port;
-        this.reset(); // flush state
-        if (recoverable) {
-            this._port = p; // but hang onto the port
-            this.addEventListeners(); // and keep on recording
-        }
-        else {
-            this.addEventListeners('message'); // need to keep just this one open
-        }
     }
 
     clearPendingMouseMove() {
@@ -866,7 +831,7 @@ class Recorder {
             // this is expected for events that are queued and **simulated**, and recorded in aggregate, so let expected ones go to the big recorder switch
             // for proper accounting.
             // FIXME: can't I replace all these with pending* varables
-            if (this.messageQueue[0].type === 'wait' || this.mouseMovePending || this.pendingClick || e.type === 'keydown' || e.type === 'keyup' || e.type === 'wheel' || e.type === 'scroll') {
+            if (this.messageQueue[0].type === 'pollscreen' || this.mouseMovePending || this.pendingClick || e.type === 'keydown' || e.type === 'keyup' || e.type === 'wheel' || e.type === 'scroll') {
                 ; // expected - these will be processed by the big recorder swtich
             }
             else {
@@ -883,8 +848,6 @@ class Recorder {
             case 'mousemove':
                 if (this.pendingWheelTimeout) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        // this.recoverableUserError('wheel'); // don't allow movemouse until the present wheel event is recorded
-                        // return this.cancel(e);
                     }
                     else {
                         return this.propagate(e); // unless it is on the same element (fatfinger) then ignore this event
@@ -915,23 +878,11 @@ class Recorder {
             case 'mousedown':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        // this.recoverableUserError('mousemove'); // don't click until the mousemove completes
-                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove(); // unless it is on the same element (fatfinger)
                     }
                 }
-
-                // if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                //     this.recoverableUserError('wheel');
-                //     return this.cancel(e);
-                // }
-
-                // if (this.pendingKeyTimeout) {
-                //     this.recoverableUserError('keys');
-                //     return this.cancel(e);
-                // }
 
                 this.mouseDown = e; // down right now
                 this.lastMouseDownEvent = e; // and hang onto it after it is not the last event
@@ -944,8 +895,6 @@ class Recorder {
 
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        // this.recoverableUserError('mousemove'); // don't allow wheel event until mousemove completed
-                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
@@ -998,16 +947,6 @@ class Recorder {
                     return;
                 }
 
-                // if (this.mouseMovePending) {
-                //     this.recoverableUserError('mousemove');
-                //     return this.cancel(e);
-                // }
-
-                // if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                //     this.recoverableUserError('wheel');
-                //     return this.cancel(e);
-                // }
-
                 this.handleKey(e);
                 return this.cancel(e);
             case 'keypress':
@@ -1016,8 +955,6 @@ class Recorder {
             case 'dblclick':
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        // this.recoverableUserError();
-                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove();
@@ -1031,8 +968,6 @@ class Recorder {
 
                 if (this.mouseMovePending) {
                     if (this.mouseMoveStartingElement !== e.target) {
-                        // this.recoverableUserError('mousemove');// don't allow a click until a mousemove completes
-                        // return this.cancel(e);
                     }
                     else {
                         this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
@@ -1050,24 +985,11 @@ class Recorder {
 
                             if (this.mouseMovePending) {
                                 if (this.mouseMoveStartingElement !== this.pendingClick.target) {
-                                    // this.recoverableUserError('mousemove'); // don't allow a click until a mousemove completes
-                                    // return;
                                 }
                                 else {
                                     this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
                                 }
                             }
-
-                            // if (this.pendingWheelTimeout) { // don't click until the present wheel event is recorded
-                            //     this.recoverableUserError('wheel');
-                            //     return;
-                            // }
-
-                            // if (this.pendingKeyTimeout) {
-                            //     this.recoverableUserError('keys');
-                            //     return;
-                            // }
-
 
                             msg = this.buildMsg(this.pendingClick);
                             this.pushMessage(msg); // take screenshot, and then simulate

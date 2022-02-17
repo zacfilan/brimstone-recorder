@@ -123,8 +123,8 @@ export class Test {
             action.setIndex(this.recordIndex);
         }
 
-        // wait actions only update the UI they don't actually get recorded
-        if (action.type !== 'wait') {
+        // pollscreen actions only update the UI they don't actually get recorded
+        if (action.type !== 'pollscreen') {
             this.recordIndex = action.index + 1;
         }
 
@@ -182,7 +182,7 @@ export class Test {
     }
 
     /**
-     *  insert the action at the index specified in the action
+     *  insert (splice in) the action at the index specified in the action
      *  @param {TestAction} newAction The action to insert
      */
     insertAction(newAction) {
@@ -409,6 +409,20 @@ export class Test {
                 progressCallback(this.steps.length, this.steps.length);
             }
             resolve(true);
+        });
+    }
+
+    /**
+     * A hack to reduce the memory footprint.
+     * A better approach is to refactor the PlayTree, Test, TestAction, BDS.Test BDS.step classes.
+     */
+    removeScreenshots() {
+        this.steps.forEach(step => {
+            delete step.actualScreenshot;
+            delete step.expectedScreenshot;
+            delete step.acceptablePixelDifferences;
+            delete step.lastVerifyScreenshotDiffDataUrl;
+            delete step.editViewDataUrl;
         });
     }
 }

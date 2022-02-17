@@ -3,6 +3,7 @@ import { Screenshot } from "./screenshot.js";
 import { loadOptions } from "../options.js";
 import { Tab } from "../tab.js";
 import { extractPngSize } from "../utilities.js";
+import {options} from "../options.js";
 
 const PNG = png.PNG;
 
@@ -41,6 +42,14 @@ const pointer = `
 </svg>`;
 
 export class TestAction {
+    /**
+     * a string that identifies the action type. 
+     * FIXME: i think it would make sense to refactor these as a subclass of 
+     * TestAction?
+     * @type {string} 
+     */
+    type;
+
     /** 
      * @type {object}
      * @property {number} frameId frame in the tab that generated this action */
@@ -174,6 +183,11 @@ export class TestAction {
      */
      _lastTimeout;
 
+     /** 
+      * @type {boolean} if true playback will stop before this action is played.
+     */
+     breakPoint = false;
+
      /**
       * If the edit actions are autoplay or not
       */
@@ -218,7 +232,8 @@ export class TestAction {
             name: this.name, // optional
             shadowDOMAction: this.shadowDOMAction,
             css: this.css, // experimental for fun
-            waitBeforePlaying: this.waitBeforePlaying
+            waitBeforePlaying: this.waitBeforePlaying,
+            breakPoint: this.breakPoint
         };
 
         if (this.expectedScreenshot) {
@@ -606,7 +621,12 @@ export class Step {
             }
 
             if (this.next._match === constants.match.ALLOW) {
-                title.text += ` <span id='allowed-differences'>&nbspHas allowed differences.</span>`;
+                title.text += ` <span id='unpredictable-pixels'>&nbspHas unpredictable pixels.</span>`;
+            }
+            // only show the has allowed red pixels if there are some and the option is on. cap the number
+            if(options.numberOfRedPixelsAllowed && this.next.numDiffPixels) {
+                let count = Math.min(options.numberOfRedPixelsAllowed, this.next.numDiffPixels);
+                title.text += ` <span id='error-pixels'>&nbspHas ${count} allowed red pixels.</span>`;
             }
 
             html += this.next.toHtml({ title: title, src: src, className: 'waiting', stats: true });

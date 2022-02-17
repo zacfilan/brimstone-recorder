@@ -2,23 +2,23 @@
 import { loadOptions, saveOptions, Options } from "./options.js";
 var options = new Options();
 
-const userKeypressDelay = [
+const userKeypressDelayLookup = [
     100, 50, 0
 ];
 
-const userMouseDelay = [
+const userMouseDelayLookup = [
     2000, 500, 0
 ];
 
-const pixelMatchThreshholds = [
+const pixelMatchThreshholdLookup = [
     .2, .1, 0
 ];
 
-const mouseWheelTimeout = [
+const mouseWheelTimeoutLookup = [
     500, 250, 100
 ];
 
-const mouseMoveTimeout = [
+const mouseMoveTimeoutLookup = [
     500, 250, 100
 ];
 
@@ -26,32 +26,34 @@ const mouseMoveTimeout = [
 async function save_options() {
     options.MAX_VERIFY_TIMEOUT = parseInt(matchTimeout.value, 10);
 
-    options.hideCursor = document.getElementById('hideCursor').checked;
-    options.recordIncognito = document.getElementById('recordIncognito').checked;
-    options.developerMode = document.getElementById('developerMode').checked;
-    options.debugRecorder = document.getElementById('debugRecorder').checked;
-    options.autoZoomTo100 = document.getElementById('autoZoomTo100').checked;
-    options.postMetricsOnFail = document.getElementById('postMetricsOnFail').checked;
-    options.postMetricsOnPass = document.getElementById('postMetricsOnPass').checked;
-    options.postMetricsEndpoint = document.getElementById('postMetricsEndpoint').value;
+    options.hideCursor = hideCursor.checked;
+    options.recordIncognito = recordIncognito.checked;
+    options.developerMode = developerMode.checked;
+    options.debugRecorder = debugRecorder.checked;
+    options.autoZoomTo100 = autoZoomTo100.checked;
+    options.postMetricsOnFail = postMetricsOnFail.checked;
+    options.postMetricsOnPass = postMetricsOnPass.checked;
+    options.postMetricsEndpoint = postMetricsEndpoint.value;
+    options.installedOnAlias = installedOnAlias.value;
 
     // experiements
-    options.experiment.includeCss = document.getElementById('includeCss').checked;
+    options.experiment.includeCss = includeCss.checked;
     
-    options.closeOldTestWindowOnCreate = document.getElementById('closeOldTestWindowOnCreate').checked;
+    options.closeOldTestWindowOnCreate = closeOldTestWindowOnCreate.checked;
 
-    options.pixelMatchThreshhold = pixelMatchThreshholds[parseFloat(document.getElementById('pixelMatchSenstivity').value)];
-    options.userMouseDelay = userMouseDelay[parseInt(document.getElementById('userMouseSpeed').value, 10)];
-    options.userKeypressDelay = userKeypressDelay[parseInt(document.getElementById('userKeypressSpeed').value, 10)];
-    options.mouseMoveTimeout = mouseMoveTimeout[parseInt(document.getElementById('mouseMoveTimeout').value, 10)];
-    options.mouseWheelTimeout = mouseWheelTimeout[parseInt(document.getElementById('mouseWheelTimeout').value, 10)];
+    options.pixelMatchThreshhold = pixelMatchThreshholdLookup[parseFloat(pixelMatchSenstivity.value)];
+    options.numberOfRedPixelsAllowed = parseInt(numberOfRedPixelsAllowed.value, 10);
+    options.userMouseDelay = userMouseDelayLookup[parseInt(userMouseSpeed.value, 10)];
+    options.userKeypressDelay = userKeypressDelayLookup[parseInt(userKeypressSpeed.value, 10)];
+    options.mouseMoveTimeout = mouseMoveTimeoutLookup[parseInt(mouseMoveTimeout.value, 10)];
+    options.mouseWheelTimeout = mouseWheelTimeoutLookup[parseInt(mouseWheelTimeout.value, 10)];
 
     await saveOptions(options);
     console.log(options);
 
-    document.getElementById('status').textContent = 'Options saved.';
+    optionsSaveStatus.textContent = 'Options saved.';
     setTimeout(function () {
-        document.getElementById('status').textContent = '';
+        optionsSaveStatus.textContent = '';
     }, 750);
 }
 
@@ -63,31 +65,33 @@ async function save_defaults() {
 
 async function restore_options() {
     options = await loadOptions();
-    document.getElementById('matchTimeout').value = options.MAX_VERIFY_TIMEOUT;
-    document.getElementById('hideCursor').checked = options.hideCursor;
-    document.getElementById('recordIncognito').checked = options.recordIncognito;
-    document.getElementById('developerMode').checked = options.developerMode;
-    document.getElementById('debugRecorder').checked = options.debugRecorder;
-    document.getElementById('autoZoomTo100').checked = options.autoZoomTo100;
-    document.getElementById('postMetricsOnPass').checked = options.postMetricsOnPass;
-    document.getElementById('postMetricsOnFail').checked = options.postMetricsOnFail;
-    document.getElementById('postMetricsEndpoint').value = options.postMetricsEndpoint;
+    matchTimeout.value = options.MAX_VERIFY_TIMEOUT;
+    hideCursor.checked = options.hideCursor;
+    recordIncognito.checked = options.recordIncognito;
+    developerMode.checked = options.developerMode;
+    debugRecorder.checked = options.debugRecorder;
+    autoZoomTo100.checked = options.autoZoomTo100;
+    postMetricsOnPass.checked = options.postMetricsOnPass;
+    postMetricsOnFail.checked = options.postMetricsOnFail;
+    postMetricsEndpoint.value = options.postMetricsEndpoint;
+    installedOnAlias.value = options.installedOnAlias;
 
     // experiements
-    document.getElementById('includeCss').checked = options.experiment.includeCss;
+    includeCss.checked = options.experiment.includeCss;
 
-    document.getElementById('closeOldTestWindowOnCreate').checked = options.closeOldTestWindowOnCreate;
+    closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
 
 
-    document.getElementById('pixelMatchSenstivity').value = pixelMatchThreshholds.indexOf(options.pixelMatchThreshhold);
-    document.getElementById('userMouseSpeed').value = userMouseDelay.indexOf(options.userMouseDelay);
-    document.getElementById('userKeypressSpeed').value = userKeypressDelay.indexOf(options.userKeypressDelay);
+    pixelMatchSenstivity.value = pixelMatchThreshholdLookup.indexOf(options.pixelMatchThreshhold);
+    numberOfRedPixelsAllowed.value = options.numberOfRedPixelsAllowed;
+    userMouseSpeed.value = userMouseDelayLookup.indexOf(options.userMouseDelay);
+    userKeypressSpeed.value = userKeypressDelayLookup.indexOf(options.userKeypressDelay);
 
-    document.getElementById('mouseMoveTimeout').value = mouseMoveTimeout.indexOf(options.mouseMoveTimeout);
-    document.getElementById('mouseWheelTimeout').value = mouseWheelTimeout.indexOf(options.mouseWheelTimeout);
+    mouseMoveTimeout.value = mouseMoveTimeoutLookup.indexOf(options.mouseMoveTimeout);
+    mouseWheelTimeout.value = mouseWheelTimeoutLookup.indexOf(options.mouseWheelTimeout);
 
 }
 
 document.addEventListener('DOMContentLoaded', restore_options);
-document.getElementById('save').addEventListener('click', save_options);
-document.getElementById('reset').addEventListener('click', save_defaults);
+save.addEventListener('click', save_options);
+reset.addEventListener('click', save_defaults);

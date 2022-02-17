@@ -1,3 +1,4 @@
+import {options} from "../options.js";
 import {constants} from "./card.js";
 
 /** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
@@ -159,7 +160,19 @@ export class Test {
 
             brimstoneVersion: this.brimstoneVersion,
 
-            startingServer: this.startingServer
+            startingServer: this.startingServer,
+
+            brimstoneComputerAlias: options.installedOnAlias,
+
+            applicationVersion: Test.applicationVersion
         }
     }
 };
+
+/**
+ * Some applications will have version identifier(s) as the apps are developed.
+ * This varaible is meant to catch the version identifer(s). e.g. from executing
+ * a player.getVersion() user action.
+ * @type {string}
+ */
+Test.applicationVersion;

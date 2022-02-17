@@ -38,7 +38,14 @@
                     </div>
                 </td>
             </tr>
-
+            <tr>
+                <td>
+                    Max number of red pixels allowed before failing
+                </td>
+                <td>
+                    <input type="number" min="0" max="50" id="numberOfRedPixelsAllowed"></input>
+                </td>
+            </tr>
         </table>
     </details>
     <details open>
@@ -70,7 +77,8 @@
                 <td>
                     <div class="slider">
                         <label>Sleepy Grandmother</label>
-                        <input type="range" min="0" max="2" step="1" id="userKeypressSpeed" list="userKeypressSpeedSettings">
+                        <input type="range" min="0" max="2" step="1" id="userKeypressSpeed"
+                            list="userKeypressSpeedSettings">
                         <datalist id="userKeypressSpeedSettings">
                             <option>0</option>
                             <option>1</option>
@@ -101,7 +109,7 @@
                     <label class="switch">
                         <input type="checkbox" id="postMetricsOnPass"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
             <tr>
@@ -112,7 +120,15 @@
                     <label class="switch">
                         <input type="checkbox" id="postMetricsOnFail"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Alias for this computer
+                </td>
+                <td>
+                    <input type="text" id="installedOnAlias"></input>
                 </td>
             </tr>
         </table>
@@ -128,7 +144,7 @@
                     <label class="switch">
                         <input type="checkbox" id="hideCursor"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
 
@@ -140,7 +156,7 @@
                     <label class="switch">
                         <input type="checkbox" id="closeOldTestWindowOnCreate"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
         </table>
@@ -156,7 +172,7 @@
                     <label class="switch">
                         <input type="checkbox" id="recordIncognito"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
             <tr>
@@ -208,7 +224,7 @@
                     <label class="switch">
                         <input type="checkbox" id="developerMode"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
             <tr>
@@ -219,7 +235,7 @@
                     <label class="switch">
                         <input type="checkbox" id="debugRecorder"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
             <tr>
@@ -230,7 +246,7 @@
                     <label class="switch">
                         <input type="checkbox" id="autoZoomTo100"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
 
@@ -248,7 +264,7 @@
                     <label class="switch">
                         <input type="checkbox" id="includeCss"></input>
                         <span class="slider round"></span>
-                      </label>
+                    </label>
                 </td>
             </tr>
         </table>
@@ -257,7 +273,7 @@
     <br>
     <br>
 
-    <div id="status"></div>
+    <div id="optionsSaveStatus"></div>
     <button id="save">Save</button> <button id="reset">Restore Defaults</button>
 
     <script type="module" src="options_controller.js"></script>
