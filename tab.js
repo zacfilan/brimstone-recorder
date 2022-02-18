@@ -100,7 +100,7 @@ export class Tab {
         let matched = 0;
         for (i = 0; i < 10; i++) {
             if (i) {
-                await sleep(500); // we get once chance to be fast
+                await sleep(options.resizeViewportRetryTimeout); // we get once chance to be fast
             }
 
             try {

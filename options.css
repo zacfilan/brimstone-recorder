@@ -99,4 +99,8 @@ svg {
 .switch .slider.round:before {
   border-radius: 50%;
 }
+
+#timeouts {
+  margin-left: 1em;
+}
 /*# sourceMappingURL=options.css.map */

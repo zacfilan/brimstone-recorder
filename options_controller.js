@@ -24,29 +24,52 @@ const mouseMoveTimeoutLookup = [
 
 // Saves options to chrome.storage
 async function save_options() {
+    //#region checking options
     options.MAX_VERIFY_TIMEOUT = parseInt(matchTimeout.value, 10);
+    options.pixelMatchThreshhold = pixelMatchThreshholdLookup[parseFloat(pixelMatchSenstivity.value)];
+    options.numberOfRedPixelsAllowed = parseInt(numberOfRedPixelsAllowed.value, 10);
+    //#endregion checking option
 
+    //#region playback options
+    options.userMouseDelay = userMouseDelayLookup[parseInt(userMouseSpeed.value, 10)];
+    options.userKeypressDelay = userKeypressDelayLookup[parseInt(userKeypressSpeed.value, 10)];
+    //#endregion playback options
+
+    //#region database options
+    options.postMetricsEndpoint = postMetricsEndpoint.value;
+    options.postMetricsOnPass = postMetricsOnPass.checked;
+    options.postMetricsOnFail = postMetricsOnFail.checked;
+    options.installedOnAlias = installedOnAlias.value;
+    //#endregion database options
+
+    //#region general options
     options.hideCursor = hideCursor.checked;
+    options.closeOldTestWindowOnCreate = closeOldTestWindowOnCreate.checked;
+    //#endregion general options
+
+    //#region recording options
     options.recordIncognito = recordIncognito.checked;
+    options.mouseMoveTimeout = mouseMoveTimeoutLookup[parseInt(mouseMoveTimeout.value, 10)];
+    options.mouseWheelTimeout = mouseWheelTimeoutLookup[parseInt(mouseWheelTimeout.value, 10)];
+    //#endregion recording options
+
+    //#region developer options
     options.developerMode = developerMode.checked;
     options.debugRecorder = debugRecorder.checked;
     options.autoZoomTo100 = autoZoomTo100.checked;
-    options.postMetricsOnFail = postMetricsOnFail.checked;
-    options.postMetricsOnPass = postMetricsOnPass.checked;
-    options.postMetricsEndpoint = postMetricsEndpoint.value;
-    options.installedOnAlias = installedOnAlias.value;
+    //#region timeouts
+    options.verifyScreenshotRetryComparisonTimeout = parseInt(verifyScreenshotRetryComparisonTimeout.value);
+    options.verifyScreenshotTakeScreenshotRetryTimeout = parseInt(verifyScreenshotTakeScreenshotRetryTimeout.value);
+    options.debuggerSendCommandOnPlayRetryTimeout = parseInt(debuggerSendCommandOnPlayRetryTimeout.value);
+    options.resizeViewportRetryTimeout = parseInt(resizeViewportRetryTimeout.value);
+    options.captureScreenshotAsDataUrlForRecordingTimeout = parseInt(captureScreenshotAsDataUrlForRecordingTimeout.value);
+    options.captureScreenshotAsDataUrlForRecordingRetryTimeout = parseInt(captureScreenshotAsDataUrlForRecordingRetryTimeout.value);
+    //#endregion timeouts
+    //#endregion developer options 
 
-    // experiements
+    //#region experiments
     options.experiment.includeCss = includeCss.checked;
-    
-    options.closeOldTestWindowOnCreate = closeOldTestWindowOnCreate.checked;
-
-    options.pixelMatchThreshhold = pixelMatchThreshholdLookup[parseFloat(pixelMatchSenstivity.value)];
-    options.numberOfRedPixelsAllowed = parseInt(numberOfRedPixelsAllowed.value, 10);
-    options.userMouseDelay = userMouseDelayLookup[parseInt(userMouseSpeed.value, 10)];
-    options.userKeypressDelay = userKeypressDelayLookup[parseInt(userKeypressSpeed.value, 10)];
-    options.mouseMoveTimeout = mouseMoveTimeoutLookup[parseInt(mouseMoveTimeout.value, 10)];
-    options.mouseWheelTimeout = mouseWheelTimeoutLookup[parseInt(mouseWheelTimeout.value, 10)];
+    //#endregion experiments
 
     await saveOptions(options);
     console.log(options);
@@ -65,30 +88,55 @@ async function save_defaults() {
 
 async function restore_options() {
     options = await loadOptions();
+
+    //#region checking options
     matchTimeout.value = options.MAX_VERIFY_TIMEOUT;
+    pixelMatchSenstivity.value = pixelMatchThreshholdLookup.indexOf(options.pixelMatchThreshhold);
+    numberOfRedPixelsAllowed.value = options.numberOfRedPixelsAllowed;
+    //#endregion checking options
+
+    //#region playback options
+    userKeypressSpeed.value = userKeypressDelayLookup.indexOf(options.userKeypressDelay);
+    userMouseSpeed.value = userMouseDelayLookup.indexOf(options.userMouseDelay);
+    //#endregion playback options
+
+    //#region database options
+    postMetricsEndpoint.value = options.postMetricsEndpoint;
+    postMetricsOnPass.checked = options.postMetricsOnPass;
+    postMetricsOnFail.checked = options.postMetricsOnFail;
+    installedOnAlias.value = options.installedOnAlias;
+    //#endregion database options
+
+    //#region general options
+    closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
+
+    //#endregion general options
     hideCursor.checked = options.hideCursor;
+    //#endregion general options
+
+    //#region recording options
     recordIncognito.checked = options.recordIncognito;
+    mouseMoveTimeout.value = mouseMoveTimeoutLookup.indexOf(options.mouseMoveTimeout);
+    mouseWheelTimeout.value = mouseWheelTimeoutLookup.indexOf(options.mouseWheelTimeout);
+    //#endregion recording options
+
+    //#region developer options
     developerMode.checked = options.developerMode;
     debugRecorder.checked = options.debugRecorder;
     autoZoomTo100.checked = options.autoZoomTo100;
-    postMetricsOnPass.checked = options.postMetricsOnPass;
-    postMetricsOnFail.checked = options.postMetricsOnFail;
-    postMetricsEndpoint.value = options.postMetricsEndpoint;
-    installedOnAlias.value = options.installedOnAlias;
+    //#region timeouts
+    verifyScreenshotTakeScreenshotRetryTimeout.value = options.verifyScreenshotTakeScreenshotRetryTimeout;
+    verifyScreenshotRetryComparisonTimeout.value = options.verifyScreenshotRetryComparisonTimeout;
+    debuggerSendCommandOnPlayRetryTimeout.value = options.debuggerSendCommandOnPlayRetryTimeout;
+    resizeViewportRetryTimeout.value = options.resizeViewportRetryTimeout;
+    captureScreenshotAsDataUrlForRecordingTimeout.value = options.captureScreenshotAsDataUrlForRecordingTimeout;
+    captureScreenshotAsDataUrlForRecordingRetryTimeout.value = options.captureScreenshotAsDataUrlForRecordingRetryTimeout;
+    //#endregion timeouts
+    //#endregion developer options
 
-    // experiements
+    //#region experiments
     includeCss.checked = options.experiment.includeCss;
-
-    closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
-
-
-    pixelMatchSenstivity.value = pixelMatchThreshholdLookup.indexOf(options.pixelMatchThreshhold);
-    numberOfRedPixelsAllowed.value = options.numberOfRedPixelsAllowed;
-    userMouseSpeed.value = userMouseDelayLookup.indexOf(options.userMouseDelay);
-    userKeypressSpeed.value = userKeypressDelayLookup.indexOf(options.userKeypressDelay);
-
-    mouseMoveTimeout.value = mouseMoveTimeoutLookup.indexOf(options.mouseMoveTimeout);
-    mouseWheelTimeout.value = mouseWheelTimeoutLookup.indexOf(options.mouseWheelTimeout);
+    //#endregion experiments
 
 }
 

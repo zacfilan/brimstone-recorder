@@ -249,8 +249,77 @@
                     </label>
                 </td>
             </tr>
-
         </table>
+        <details id="timeouts">
+            <summary>Timeouts</summary>
+            <table>
+                <tr title="In the verify screenshot function we need to take the actual screenshot
+first. There is setup to even pull this off. When this throws we sleep 
+and try again. This is that sleep amount.">
+                    <td>
+                        Verify Screenshot - Take Screenshot Retry Timeout
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000" id="verifyScreenshotTakeScreenshotRetryTimeout"></input>
+                    </td>
+                </tr>
+                <tr title="After we take that first screenshot we compare them, if they are 
+different we want to try again, but not right away. This is how 
+long to wait before we grab the actual again and compare.
+Directly affects reported user latency precision.">
+                    <td>
+                        Verify Screenshot - Retry Comprison Timeout
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000" id="verifyScreenshotRetryComparisonTimeout"></input>
+                    </td>
+                </tr>
+                <tr title="When playing we send a command via the debugger, if that
+debugger is detached, or becomes detached during the command
+we reattach and retry the command once. This happens on or right
+after a navigation. Once we reattach the debugger we wait before 
+we retry the command. This is how long to wait. It's infrequent 
+so it's jacked up a bit high.">
+                    <td>
+                        Debugger Send command On Play Retr Timeout
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000" id="debuggerSendCommandOnPlayRetryTimeout"></input>
+                    </td>
+                </tr>
+                <tr title="When resizing the viewport, it can fail because of zoom 
+or pixel scaling issues. so we retry. This is how long to
+wait before each iteration of the retry.">
+                    <td>
+                        Resize Viewport Retry Timeout
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000" id="resizeViewportRetryTimeout"></input>
+                    </td>
+                </tr>
+                <tr title="This is the total number of ms we will wait 
+to obtain a screenshot of the size we expect
+during recording.">
+                    <td>
+                        Capture Screenshot as Data Url For Recording Timeout
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000"
+                            id="captureScreenshotAsDataUrlForRecordingTimeout"></input>
+                    </td>
+                </tr>
+                <tr title="How long we wait between back-to-back attempts to capture a
+screenshot of the correct size during recording.">
+                    <td>
+                        Capture Screenshot as Data Url f Recording Retry Timeout
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000"
+                            id="captureScreenshotAsDataUrlForRecordingRetryTimeout"></input>
+                    </td>
+                </tr>
+            </table>
+        </details>
     </details>
 
     <details>

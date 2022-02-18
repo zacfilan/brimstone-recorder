@@ -717,7 +717,7 @@ export class Player {
                 console.debug(e.message + '. try again.');
                 badTab = true;
                 // give other async'ed control paths a chance to run. configureForAction above can be trying to wait for a different tab to become active.
-                await sleep(500);
+                await sleep(options.verifyScreenshotTakeScreenshotRetryTimeout);
                 continue;
             }
 
@@ -755,8 +755,7 @@ export class Player {
             }
 
             // else it didn't match so we loop. I should be able to throttle the rate at which I take screenshots, but do I NEED to?
-            let someOptionValue = 200;
-            await sleep(someOptionValue);
+            await sleep(options.verifyScreenshotRetryComparisonTimeout);
         }
 
         // The screenshots don't match
@@ -892,7 +891,7 @@ export class Player {
                     }
 
                     if (this.usedFor === 'playing') {
-                        await sleep(2000);
+                        await sleep(options.debuggerSendCommandOnPlayRetryTimeout);
                     }
                 }
                 else {

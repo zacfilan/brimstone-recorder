@@ -7,7 +7,7 @@ import { sleep, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole, enableConsole } from "./console.js";
 import { Test, PlayTree } from "../test.js";
 import { Screenshot } from "./screenshot.js";
-import { loadOptions, saveOptions } from "../options.js";
+import { loadOptions, options, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
 import { clone, brimstone, focusWorkspaceWindow } from "../utilities.js";
@@ -571,7 +571,7 @@ let installType;
     let options = await loadOptions();
     if (options.developerMode) {
         window.alert(`🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`);
-        await sleep(1000);
+        await sleep(1000); // not sure why i wait here.
         let dbg = console.debug;
         // this mreserves the caller file/line, and appends a few spaces to the message
         console.debug = Function.prototype.bind.call(dbg, console, '  ');
@@ -1746,9 +1746,8 @@ async function captureScreenshotAsDataUrlForRecording() {
     let start = performance.now();
     let lastError;
     // max time to wait for a screenshot of the correct size to be taken during recording
-    let timeout = 5; // seconds
     let startingActiveTabId = Tab.active.virtualId;
-    while (((performance.now() - start) / 1000) < timeout) {
+    while (((performance.now() - start)) < options.captureScreenshotAsDataUrlForRecordingTimeout) {
         try {
             _lastScreenshot = await player.captureScreenshotAsDataUrl();
             return _lastScreenshot;
@@ -1766,7 +1765,7 @@ async function captureScreenshotAsDataUrlForRecording() {
             if (lastError instanceof Errors.IncorrectScreenshotSize) {
                 // this can only happen during recording if the debugger banner is volatile
                 await player.tab.resizeViewport();
-                await sleep(500);
+                await sleep(options.captureScreenshotAsDataUrlForRecordingRetryTimeout);
                 continue;
             }
             throw lastError;

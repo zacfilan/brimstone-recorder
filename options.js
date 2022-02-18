@@ -104,6 +104,49 @@ export class Options {
      * @type {string}
      */
     installedOnAlias;
+
+    /**
+     * In the verify screenshot function we need to take the actual screen
+     * shot first. There is setup to even pull this off. When this throws
+     * we sleep and try again. This is that sleep amount
+     */
+    verifyScreenshotTakeScreenshotRetryTimeout = 500;
+
+    /** after we was taken that first screenshot we compare them,
+     * if they are different we want to try again, but not right
+     * away. This is how long to wait before we grab the actual 
+     * again and compare. Directly affects reported user latency precision.
+     */
+    verifyScreenshotRetryComparisonTimeout= 200;
+    
+    /**
+     * when playing we send a command via the debugger, if that
+     * debugger is detached, or becomes detached during the command
+     * we reattach and retry the command once. this happens on or right
+     * after a navigation. once we reattach the debugger we wait before 
+     * we retry this. this is how long to wait. it's infrequent so it's
+     * jacked up a bit high.
+     */
+    debuggerSendCommandOnPlayRetryTimeout = 2000;
+
+    /** when resizing the viewport, it can fail because of zoom 
+     * or pixel scaling issues. so we retry. this is how long to
+     * wait before each iteration of the retry.
+     */
+    resizeViewportRetryTimeout = 500;
+
+    /**
+     * This is the total number of ms we will wait 
+     * so obtain a screenshot of the size we expect
+     * during recording 
+     */
+    captureScreenshotAsDataUrlForRecordingTimeout = 5000;
+
+    /**
+     * How long we wait between back-to-bck attempts to capture a 
+     * screenshot of the correct size during record.
+     */
+    captureScreenshotAsDataUrlForRecordingRetryTimeout = 500;
 };
 
 export var options = new Options();
