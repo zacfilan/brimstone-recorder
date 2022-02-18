@@ -528,6 +528,9 @@ async function errorHandler(e) {
         case Errors.ReuseTestWindow:
             await brimstone.window.alert(`You are trying to record into, or play from, the middle of an existing test, but there is no current Chrome test window that matches your current test requirements.`);
             break;
+        case Errors.InvalidVersion:
+            await brimstone.window.alert(e.message);
+            break;
         default:
             await brimstone.window.error(e);
             break;
@@ -553,6 +556,11 @@ window.addEventListener("error", async function (errorEvent) {
  * https://github.com/josdejong/jsoneditor
  */
 let jsonEditor;
+let extensionInfo;
+/**
+ * @type {string}
+ *  i want to know if this was a developer version of brimstone or not */
+let installType;
 
 /**********************************************************************************************
  * Main entry point. - allow this extension in incognito please. it increases the likelyhood that a test
@@ -580,6 +588,8 @@ let jsonEditor;
 
     // let info = await (new Promise(resolve => chrome.runtime.getPlatformInfo(resolve)));
     // console.log(info, navigator.userAgent);
+    extensionInfo = await chrome.management.getSelf(); 
+    installType = extensionInfo.installType === 'development' ? '👿dev ' : '';
 
     setToolbarState();
     /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
@@ -762,7 +772,7 @@ function setInfoBarText(infobarText) {
             infobarText = 'ready';
         }
     }
-    $('#infobar').html(BDS.brimstoneVersion + ' ' + infobarText);
+    $('#infobar').html(installType + BDS.brimstoneVersion + ' ' + infobarText);
 }
 
 function setToolbarState() {
@@ -1642,7 +1652,7 @@ $('#clearButton').on('click', actions.clearWorkspace.bind(actions));
 
 function imageProcessingProgress(value, max) {
     let ib = $('#infobar');
-    ib.html(`${BDS.brimstoneVersion} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
+    ib.html(`${installType}${BDS.brimstoneVersion} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
 }
 
 async function loadNextTest() {

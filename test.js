@@ -3,7 +3,7 @@ import { Screenshot } from "./ui/screenshot.js";
 import { brimstone } from "./utilities.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
-import {clone} from "./utilities.js"
+import { clone } from "./utilities.js"
 
 /**
  * A ziptest instance is a recording of user actions that can be played back
@@ -72,6 +72,12 @@ export class Test {
          */
         this._playTree = new PlayTree();
         this._playTree._zipTest = this;
+
+        /**
+         * The version of brimstone that this test format corresponds to.
+         * @type {string}
+         */
+        this.brimstoneVersion = undefined;
     }
 
     /** 
@@ -309,28 +315,44 @@ export class Test {
         this.hideCursor = testPojo.hideCursor;
         this.incognito = testPojo.incognito;
         this.filename = fileHandle.name;
+        this.brimstoneVersion = testPojo.brimstoneVersion;
+        if (this.brimstoneVersion === undefined) {
+            this.brimstoneVersion = 'v1.0.0';
+        }
+
+        if (this.brimstoneVersion > BDS.brimstoneVersion) {
+            throw new Errors.InvalidVersion(`You must upgrade Brimstone to at least version '${this.brimstoneVersion}' to load test '${this.filename}'`);
+        }
 
         let screenshotPromises = [];
         for (let i = 0; i < actions.length; ++i) {
-            // convert old tests
             let _action = actions[i];
-            if (_action.type === 'start') {
-                _action.type = 'goto';
-            }
-            if (_action.sender) {
-                _action.tab = _action.sender;
-            }
-            else if (!_action.tab) {
-                _action.tab = {};
-            }
-            if (_action.tabWidth) {
-                _action.tab.width = _action.tabWidth;
-                _action.tab.height = _action.tabHeight;
-                delete _action.tabWidth;
-                delete _action.tabHeight;
-            }
-            if (_action.tab.virtualId === undefined) {
-                _action.tab.virtualId = 0;
+            if (this.brimstoneVersion < BDS.brimstoneVersion) {
+                this.dirty = true;
+                // convert old tests
+                if (_action.type === 'start') {
+                    _action.type = 'goto';
+                }
+                if (_action.sender) {
+                    _action.tab = _action.sender;
+                }
+                else if (!_action.tab) {
+                    _action.tab = {};
+                }
+                if (_action.tabWidth) {
+                    _action.tab.width = _action.tabWidth;
+                    _action.tab.height = _action.tabHeight;
+                    delete _action.tabWidth;
+                    delete _action.tabHeight;
+                }
+                if (_action.tab.virtualId === undefined) {
+                    _action.tab.virtualId = 0;
+                }
+                if ('v1.18.0' <= BDS.brimstoneVersion) {
+                    if (_action.type === 'wait' && _action?.event?.milliseconds === undefined) {
+                        _action.type = 'pollscreen';
+                    }
+                }
             }
 
             let action = new TestAction(_action);
@@ -601,7 +623,7 @@ export class PlayTree {
     /** return the path to the parent */
     path() {
         let p = "";
-        for (let node = this; node?._fileHandle?.name || node?._zipTest?.filename ; node = node._parent) {
+        for (let node = this; node?._fileHandle?.name || node?._zipTest?.filename; node = node._parent) {
             let old = p;
             p = node?._fileHandle?.name || node?._zipTest?.filename;
             if (old) {
@@ -673,7 +695,7 @@ export class PlayTree {
                     step.path = report.path;
                     flatReport.steps.push(step);
                 }
-                if(report.failingStep) {
+                if (report.failingStep) {
                     flatReport.errorMessage = report.errorMessage;
                     break;
                 }
