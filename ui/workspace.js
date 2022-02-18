@@ -890,12 +890,6 @@ async function _playSomething() {
             // this is used when the user fixes a failed step and wants to play from there.
             let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
 
-            // common to record then immediately hit play, so do the rewind for the user
-            if (playFrom === Test.current.steps.length - 1) {
-                playFrom = 0;
-                resume = false;
-            }
-
             if (playFrom === 0) {
                 // we are on the first step of some test in the suite. 
                 if (!await startingTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
