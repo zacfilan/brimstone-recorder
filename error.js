@@ -71,3 +71,13 @@ export class TestLoadError extends Error {
         super(msg);
     }
 }
+
+/**
+ * an error that indicates the user is loading a test from a version of brimstone older than the 
+ * version that reecorded the test
+ */
+export class InvalidVersion extends Error {
+    constructor(msg) {
+        super(msg || 'The test version is newer than the Brimstone version.');
+    }   
+}
