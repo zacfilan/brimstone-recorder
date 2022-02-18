@@ -188,26 +188,12 @@ export class Tab {
         let chromeWindow = await chrome.windows.create({
             type: "normal",
             focused: false, // keep focus off omni bar when we open a new incognito window
-            incognito: incognito // if true this will create the window "You've gone Incognito" 
+            incognito: incognito, // if true this will create the window "You've gone Incognito" 
+            url: url // this better be an URL I can attach a debugger to!
         });
 
         [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: chromeWindow.id });
-
         this.url = url;
-        // this better be a URL that I can attach a debugger to !
-        var resolveNavigationPromise;
-        let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
-        chrome.webNavigation.onCommitted.addListener(function navCommit(details) {
-            chrome.webNavigation.onCommitted.removeListener(navCommit);
-            resolveNavigationPromise(details);
-        });
-        await chrome.tabs.update(this.chromeTab.id, { url: url });
-        await navPromise; // the above nav is really done.
-
-        // give these sane defaults.
-        // I don't want to do this when recording from non-incognito to incognito. I want to preserve the original non-incognito size that I removed.
-        //this.height = this.chromeTab.height;
-        //this.width = this.chromeTab.width;
     }
 
     async fromTabId(id) {
@@ -259,8 +245,8 @@ export class Tab {
                 // this better be a URL that I can attach a debugger to !
                 var resolveNavigationPromise;
                 let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
-                chrome.webNavigation.onCommitted.addListener(function navCommit(details) {
-                    chrome.webNavigation.onCommitted.removeListener(navCommit);
+                chrome.webNavigation.onCompleted.addListener(function navCommit(details) {
+                    chrome.webNavigation.onCompleted.removeListener(navCommit);
                     resolveNavigationPromise(details);
                 });
                 await chrome.tabs.update(this.chromeTab.id, { url: url });

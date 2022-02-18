@@ -293,8 +293,8 @@ export class Player {
         // I want the navigation done before I exit here
         var resolveNavigationPromise;
         let navPromise = new Promise(resolve => { resolveNavigationPromise = resolve; });
-        chrome.webNavigation.onCommitted.addListener(function playerGotoNavCommit(details) {
-            chrome.webNavigation.onCommitted.removeListener(playerGotoNavCommit);
+        chrome.webNavigation.onCompleted.addListener(function playerGotoNavCommit(details) {
+            chrome.webNavigation.onCompleted.removeListener(playerGotoNavCommit);
             resolveNavigationPromise(details);
         });
         await chrome.tabs.update(this.tab.chromeTab.id, {
