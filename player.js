@@ -10,6 +10,7 @@ import { loadOptions } from "./options.js";
 import { Test } from "./test.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
+import { ActualCorrection, UnpredictableCorrection, Correction } from "./rectangle.js";
 
 /** cached the options before playing 
  * @type {Options}
@@ -208,7 +209,7 @@ export class Player {
             next = actions[i + 1];
             next._match = constants.match.PLAY;
             let mustVerifyScreenshot = next.expectedScreenshot && !next.shadowDOMAction;
-            if(mustVerifyScreenshot) {
+            if (mustVerifyScreenshot) {
                 next._lastTimeout = next.MAX_VERIFY_TIMEOUT || options.MAX_VERIFY_TIMEOUT;
                 document.documentElement.style.setProperty('--screenshot-timeout', `${next._lastTimeout}s`); // how long the waiting animation runs for this action
             }
@@ -216,7 +217,7 @@ export class Player {
                 await this.onBeforePlay(action); // this shows the correct step (and will start the waiting animation)
             }
 
-            if(action.breakPoint) {
+            if (action.breakPoint) {
                 return constants.match.CANCEL;
             }
 
@@ -229,7 +230,7 @@ export class Player {
             }
             else {
                 action.tab.chromeTab = this.tab.chromeTab; // just for debugging
-                if(action != 'keys' && options.userMouseDelay) {
+                if (action != 'keys' && options.userMouseDelay) {
                     console.log(`[step:${action.index + 1} tab:${action.tab.id}] wait ${options.userMouseDelay}ms before playing`);
                     await sleep(options.userMouseDelay);
                 }
@@ -245,21 +246,43 @@ export class Player {
             }
 
             start = performance.now();
-            if (!mustVerifyScreenshot) { 
+            if (!mustVerifyScreenshot) {
                 next._match = constants.view.PASS;
             }
             else {
-                await this.verifyScreenshot(next);
+                await this.verifyScreenshot({step: next});
             }
             stop = performance.now();
 
             action.latency = Math.round(stop - start); // in ms
-            
+
             // clear out old data
-            next.latency = 0; 
+            next.latency = 0;
             next.memoryUsed = 0;
 
             action._view = constants.view.EXPECTED;
+
+            next.autoCorrected = false;
+            if (next._match === constants.match.FAIL && (options.autoCorrectActual || options.autoCorrectUnpredictable)) {
+                let correctionApplied = false;
+                Correction.availableInstances.forEach(correction => {
+                    if (correction instanceof ActualCorrection && options.autoCorrectActual && correction.matches(next)) {
+                        correction.apply(next.expectedScreenshot.png);
+                        correctionApplied = true;
+                    }
+                    else if (correction instanceof UnpredictableCorrection && options.autoCorrectUnpredictable && correction.matches(next)) {
+                        correction.apply(next.acceptablePixelDifferences.png);
+                        correctionApplied = true;
+                    }
+                });
+                if (correctionApplied) {
+                    await this.verifyScreenshot({step: next, max_attempts: 1, fastFail: false}); // see if the auto-correction fixed it.
+                    if(next._match === constants.match.PASS || next._match === constants.match.ALLOW) {
+                        next.autoCorrected = true;
+                    }
+                }
+            }
+
             switch (next._match) {
                 case constants.match.PASS:
                 case constants.match.ALLOW:
@@ -357,7 +380,7 @@ export class Player {
     }
 
     async wait(action) {
-        if(action.event.milliseconds) {
+        if (action.event.milliseconds) {
             await sleep(action.event.milliseconds);
         }
     }
@@ -530,9 +553,9 @@ export class Player {
         errorMessage = frames[0].result;
 
         while (errorMessage) {
-            if(errorMessage.startsWith('attempt to change non-select element')) {
+            if (errorMessage.startsWith('attempt to change non-select element')) {
                 let retry = await brimstone.window.confirm(`${errorMessage}\n\nTranslation: The screen looks right, but the wrong DOM element received the last action. This can happen if the app uses a transparent blocking element for example. \n\nRetry?`);
-                if(retry) {
+                if (retry) {
                     frames = await chrome.scripting.executeScript({
                         target: { tabId: this.tab.chromeTab.id /*, frameIds: frameIds*/ },
                         function: _changeSelectValue,
@@ -633,10 +656,10 @@ export class Player {
      * @param {TestAction} action 
      */
     async getVersion(action) {
-        function _getText(x,y) {
+        function _getText(x, y) {
             try {
                 var element = document.elementFromPoint(x, y);
-                return {textContent: element.textContent};
+                return { textContent: element.textContent };
             }
             catch (e) {
                 return e.message;
@@ -649,16 +672,50 @@ export class Player {
             args: [action.x, action.y]
         });
         let result = frames[0].result;
-        if(!result) {
+        if (!result) {
             throw new Error("Nothing returned from getVersion");
         }
-        if(result.textContent) {
-            BDS.Test.applicationVersion = result.textContent;   
+        if (result.textContent) {
+            BDS.Test.applicationVersion = result.textContent;
         }
         else {
-            throw new Error(result);
+            throw new Error(JSON.stringify(result));
         }
     }
+
+    _pngDiff({ nextStep, fastFail }) {
+        let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng }
+            = Player.pngDiff(
+                nextStep.expectedScreenshot.png,
+                nextStep.actualScreenshot.png,
+                nextStep.acceptablePixelDifferences?.png,
+                this.pixelMatchThreshhold,
+                fastFail
+            );
+
+        // FIXME: this should be factored into the card I think
+        nextStep.numDiffPixels = numDiffPixels;
+        let UiPercentDelta = (numDiffPixels * 100) / (nextStep.expectedScreenshot.png.width * nextStep.expectedScreenshot.png.height);
+        nextStep.percentDiffPixels = UiPercentDelta.toFixed(2);
+
+        nextStep.numMaskedPixels = numMaskedPixels;
+
+        nextStep.lastVerifyScreenshotDiffPng = diffPng;
+        nextStep._match = constants.match.FAIL; // until we determine different
+
+        if (numDiffPixels <= options.numberOfRedPixelsAllowed) { // it matched
+            nextStep._match = constants.match.PASS;
+
+            nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(nextStep.lastVerifyScreenshotDiffPng).toString('base64');
+            nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
+
+            if (numMaskedPixels || numUnusedMaskedPixels) { // it matched only because of the masking we allowed
+                nextStep._view = constants.view.EXPECTED;
+                nextStep._match = constants.match.ALLOW;
+            }
+        }
+    }
+
 
     /**
      * Called after we play the current action.
@@ -666,10 +723,10 @@ export class Player {
      * Repeatedly check the expected screenshot required to start the next action
      * against the actual screenshot. 
      * 
-     * @param {TestAction} nextStep the next action. modified.
      * @returns {string} _match property in the nextStep parameter passed in
      */
-    async verifyScreenshot(nextStep) {
+    async verifyScreenshot({ step, max_attempts = 100000000, fastFail = true }) {
+        let nextStep = step;
         let start = performance.now();
 
         /** Used to display the results of applying the acceptableDifferences to the actual image. */
@@ -678,7 +735,7 @@ export class Player {
         let badTab = false;
 
         // this loop will run even if the app is in the process of navigating to the next page.
-        while (((performance.now() - start) / 1000) < nextStep._lastTimeout) {
+        while ( (((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
             if (this._stopPlaying) { // asyncronously injected
                 nextStep._view = constants.view.EXPECTED;
                 nextStep._match = constants.match.CANCEL;
@@ -722,35 +779,8 @@ export class Player {
             }
 
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
-            let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng }
-                = Player.pngDiff(
-                    nextStep.expectedScreenshot.png,
-                    nextStep.actualScreenshot.png,
-                    nextStep.acceptablePixelDifferences?.png,
-                    this.pixelMatchThreshhold
-                );
-
-            // FIXME: this should be factored into the card I think
-            nextStep.numDiffPixels = numDiffPixels;
-            let UiPercentDelta = (numDiffPixels * 100) / (nextStep.expectedScreenshot.png.width * nextStep.expectedScreenshot.png.height);
-            nextStep.percentDiffPixels = UiPercentDelta.toFixed(2);
-
-            nextStep.numMaskedPixels = numMaskedPixels;
-
-            differencesPng = diffPng;
-            if (numDiffPixels <= options.numberOfRedPixelsAllowed) { // it matched
-                nextStep._match = constants.match.PASS;
-
-                nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
-                nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
-
-                if (numMaskedPixels || numUnusedMaskedPixels) { // it matched only because of the masking we allowed
-                    nextStep._view = constants.view.EXPECTED;
-                    nextStep._match = constants.match.ALLOW;
-                }
-                let doneIn = ((performance.now() - start) / 1000).toFixed(1);
-                let avgIteration = (doneIn / i).toFixed(1);
-                console.log(`\tstep done in ${doneIn} seconds. ${i} iteration(s), average time per iteration ${avgIteration}`);
+            this._pngDiff({ nextStep, fastFail: fastFail });
+            if (nextStep._match !== constants.match.FAIL) {
                 return nextStep._match;
             }
 
@@ -759,12 +789,22 @@ export class Player {
         }
 
         // The screenshots don't match
+        if (fastFail) {
+            // do a final (complete) check to get all different data, i.e. don't fastFail out of the diff
+            this._pngDiff({ nextStep, fastFail: false });
+            if (nextStep._match !== constants.match.FAIL) {
+                // the loop timed out just as the screen got in the correct state.
+                return nextStep._match;
+            }
+        }
+
+        // The screenshots don't match
         nextStep._match = constants.match.FAIL;
         nextStep._view = constants.view.EDIT;
 
         // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing. 
-        if (differencesPng) {
-            nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(differencesPng).toString('base64');
+        if (nextStep.lastVerifyScreenshotDiffPng) {
+            nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(nextStep.lastVerifyScreenshotDiffPng).toString('base64');
             nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
         }
         else {
@@ -981,7 +1021,7 @@ Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
     return png;
 }
 
-Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThreshhold) {
+Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThreshhold, convertRedPixelsToOrange = false, fastFail = false) {
     const { width, height } = expectedPng;
 
     if (actualPng.width !== width || actualPng.height !== height) {
@@ -998,7 +1038,9 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThr
             height,
             {
                 threshold: pixelMatchThreshhold,
-                ignoreMask: maskPng?.data
+                ignoreMask: maskPng?.data,
+                convertRedPixelsToOrange: convertRedPixelsToOrange,
+                fastFail: fastFail
             }
         );
 

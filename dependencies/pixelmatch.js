@@ -10,7 +10,10 @@ const defaultOptions = {
     diffColor: [255, 0, 0], // color of different pixels in diff output (red)
     diffColorAlt: null,     // whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two
     diffMask: false,        // draw the diff over a transparent background (a mask)
-    ignoreMask: false       // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
+
+    ignoreMask: false,       // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
+    convertRedPixelsToOrange: false, // my addition. how to deal with red pixels in the mask, do they stay as errors or get turned into orange "unpredictable" pixels.
+    fastFail: false // i don't need all the points that differ, just need to know if one does.
 };
 
 
@@ -89,7 +92,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                     // found substantial difference not caused by anti-aliasing; draw it as such
                     if (output) {
                         // before i declare it's a mismatch and draw a red one in the result,
-                        //  see if that one is 'ok' due to the ignoreMask
+                        // see if that one is 'ok' due to the ignoreMask
                         // okay means the masked red pixel is 255 which matches red or orange.
                         // it will be orange, after I give a thumbs up to detected areas.
                         if (options.ignoreMask) {
@@ -97,24 +100,32 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                             let red = options.ignoreMask[pos + 0];
                             let green = options.ignoreMask[pos + 1];
                             let blue = options.ignoreMask[pos + 2];
-                            if ((red === 255 && green === 0 && blue === 0) || // red or
+                            if ( options.convertRedPixelsToOrange && (red === 255 && green === 0 && blue === 0) || // red or 
                                 (red === 255 && green === 165 && blue === 0)) { // orange
-
                                 _drawPixel(output, pos, 255, 165, 0, 255); // becomes orange
                                 masked++;
                             }
                             else {
                                 drawPixel(output, pos, ...(delta < 0 && options.diffColorAlt || options.diffColor));
                                 diff++;
+                                if(options.fastFail) {
+                                    break; // we outta here
+                                }
                             }
                         }
                         else {
                             drawPixel(output, pos, ...(delta < 0 && options.diffColorAlt || options.diffColor));
                             diff++;
+                            if(options.fastFail) {
+                                break; // we outta here
+                            }
                         }
                     }
                     else {
                         diff++;
+                        if(options.fastFail) {
+                            break; // we outta here
+                        }
                     }
                 }
 

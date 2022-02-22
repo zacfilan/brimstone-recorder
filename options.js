@@ -147,6 +147,33 @@ export class Options {
      * screenshot of the correct size during record.
      */
     captureScreenshotAsDataUrlForRecordingRetryTimeout = 500;
+
+    /**
+     * Automatically apply "actual" type corrections.
+     * Actual corrections are applicable if the expected and actual pixels
+     * (the condition) of the correction EXACTLY match the condition
+     * of the new action expected+actual screenshots.
+     * If they match, then the correction is applied, meaning the actual pixels
+     * overwrite corresponding expected pixels in the expectedScreenshot of the 
+     * current action.
+     */
+    autoCorrectActual = true;
+
+    /**
+     * Automatically apply "unpredictable" type corrections.
+     * Unpredictable corrections are applicable if there are ANY
+     * red pixels in the rectangle defining the boundary of the
+     * correction. 
+     * If applicable, the unpredictable region is added to the 
+     * acceptablePixelDifferences screenshot of the action.
+     */
+    autoCorrectUnpredictable = false;
+
+    /**
+     * Should we forget the corrections we learned when the 
+     * test we learned them from is cleared?
+     */
+     forgetCorrectionsWhenTestIsCleared = false;
 };
 
 export var options = new Options();

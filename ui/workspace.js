@@ -1,7 +1,7 @@
 import { Player } from "../player.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
-import { Rectangle } from "../rectangle.js";
+import { Correction, Rectangle } from "../rectangle.js";
 import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole, enableConsole } from "./console.js";
@@ -195,16 +195,26 @@ class Actions {
         };
     }
 
-    /** edit pixel differences - Commit any volatile rectangles or individual pixel deltas. */
-    async ignoreDelta(e) {
+    /** 
+     * edit pixel differences - Commit any volatile rectangles or individual pixel deltas. 
+     * */
+    async addCorrections(e) {
         // add a mask
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
-        await action.addMask(view);
+        await action.addMask(view, e);
         updateStepInView(Test.current.steps[action.index - 1]);
         action.test.dirty = true;
-        if(action.autoPlay) {
+        if (action.autoPlay) {
             this.callMethod(this.playSomething);
         }
+    }
+
+    async correctAsUnpredictable(e) {
+        return await this.addCorrections(e);
+    }
+
+    async correctAsActual(e) {
+        return await this.addCorrections(e);
     }
 
     /** edit pixel differences - remove the allowed differences, see the differences */
@@ -220,7 +230,7 @@ class Actions {
         action.test.dirty = true;
     }
 
-    /** edit pixel differences - when the recording is wrong */
+    /** replaces the entire expected with entire actual screenshot */
     async replaceExpectedWithActual(e) {
 
         // push the actual into the expected and be done with it.
@@ -235,13 +245,14 @@ class Actions {
         addVolatileRegions();
         action.test.dirty = true;
 
-        if(action.autoPlay) {
+        if (action.autoPlay) {
             this.callMethod(this.playSomething);
         }
     }
 
     async clearWorkspace() {
         await this.clearTest();
+        Correction.availableInstances = [];
         delete PlayTree.current;
     }
 
@@ -257,10 +268,10 @@ class Actions {
 
             let result = await actions.confirmSaveModal();
         }
-        
+
 
         Test.current.removeScreenshots();
-        
+
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
@@ -272,7 +283,9 @@ class Actions {
 
         $('#cards').empty();
         $('#step').empty();
-        TestAction.lastVolatileRegionsUsed = undefined;
+        if(options.forgetCorrectionsWhenTestIsCleared) {
+            Correction.availableInstances = [];
+        }
     }
 
     /** save the current test as a zip file */
@@ -407,7 +420,7 @@ class Actions {
      */
     async insertActionAfter() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        let next = Test.current.steps[action.index+1];
+        let next = Test.current.steps[action.index + 1];
         let newAction = await userEventToAction({
             type: 'wait',
             sender: action.sender,
@@ -416,9 +429,9 @@ class Actions {
             actualScreenshot: next?.actualScreenshot && new Screenshot(next.actualScreenshot),
             acceptablePixelDifferences: next?.acceptablePixelDifferences && new Screenshot(next.acceptablePixelDifferences),
             test: Test.current,
-            index: action.index+1
+            index: action.index + 1
         }, false);
-        if(newAction.acceptablePixelDifferences) {
+        if (newAction.acceptablePixelDifferences) {
             newAction._match === constants.match.ALLOW;
         }
         Test.current.insertAction(newAction);
@@ -581,14 +594,14 @@ let installType;
         disableConsole(); // can be reenabled in the debugger later
     }
 
-    for(let i = 0; i < 3 && !options.installedOnAlias; ++i) {
+    for (let i = 0; i < 3 && !options.installedOnAlias; ++i) {
         options.installedOnAlias = await brimstone.window.prompt('Please provide an identifier for this computer. It can be the real computer name or something else, e.g. "Zac\'s Laptop"');
         await saveOptions(options);
     }
 
     // let info = await (new Promise(resolve => chrome.runtime.getPlatformInfo(resolve)));
     // console.log(info, navigator.userAgent);
-    extensionInfo = await chrome.management.getSelf(); 
+    extensionInfo = await chrome.management.getSelf();
     installType = extensionInfo.installType === 'development' ? '👿dev ' : '';
 
     setToolbarState();
@@ -670,31 +683,65 @@ var _lastMouseMove;
  * 
 */
 
-$('#step').on('click', '#ignoreDelta', async (e) => {
+/** 
+ * Click the question mark to create unpredictable regions/corrections.
+ */
+$('#step').on('click', '#correctAsUnpredictable', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.ignoreDelta, e);
+    await actions.callMethodByUser(actions.correctAsUnpredictable, e);
 });
 
-$('#step').on('click', '#stampDelta', async (e) => {
+/** 
+ * Click the magic wand to apply the possible corrections
+ */
+$('#step').on('click', '#possibleCorrections', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.ignoreDelta, e);
+    await actions.callMethodByUser(actions.addCorrections, e);
 });
 
-$('#step').on('mouseenter', '#stampDelta', function (e) {
+/**
+ * The currently visible corrections that could be applied
+ * @type {Correction[]}
+ */
+let applicableCorrections;
+
+$('#step').on('mouseenter', '#possibleCorrections', function (e) {
+    const { action } = getCard(e.currentTarget, Test.current);
     // when the user hovers over the stamp it should show/reveal the last set of used rectangles
-    if (!TestAction.lastVolatileRegionsUsed) {
+    // We must see which ones are in fact applicable. This would've/could've have been done during the last play of this action.
+    Correction.applicableInstances = Correction.availableInstances.filter(c => c.matches(action));
+    if (!Correction.applicableInstances?.length) {
         return;
     }
-    let screenshot = $(this).closest(".card").find('.screenshot');
-    screenshot.append(TestAction.lastVolatileRegionsUsed);
+
+    let screenshot = $(this).closest(".card").find('.screenshot'); // FIXME: screenshot size != img size ??
+    screenshot.addClass('relative-position');
+    let image = screenshot.find('img')[0].getBoundingClientRect();
+    let xscale = image.width / action.expectedScreenshot.png.width;
+    let yscale = image.height / action.expectedScreenshot.png.height;
+
+    Correction.applicableInstances.forEach(c => {
+        /**
+         * append this rectangle into the given container
+        */
+        new Rectangle({
+            x0: c.bounds.x0 * xscale,
+            y0: c.bounds.y0 * yscale,
+            x1: c.bounds.x1 * xscale,
+            y1: c.bounds.y1 * yscale,
+            container: screenshot[0],
+            type: c.constructor.name
+        });
+    });
 });
 
-$('#step').on('mouseleave', '#stampDelta', function (e) {
+$('#step').on('mouseleave', '#possibleCorrections', function (e) {
     // when the user hovers over the stamp it should remove/hide the last set of 
-    if (!TestAction.lastVolatileRegionsUsed) {
+    if (!Correction.availableInstances.length) {
         return;
     }
     let screenshot = $(this).closest(".card").find('.screenshot');
+    screenshot.removeClass('relative-position');
     screenshot.find(".rectangle").remove();
 });
 
@@ -703,9 +750,9 @@ $('#step').on('click', '#undo', async (e) => {
     await actions.callMethodByUser(actions.seeDelta);
 });
 
-$("#step").on('click', '#replace', async (e) => {
+$("#step").on('click', '#correctAsActual', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.replaceExpectedWithActual, e);
+    await actions.callMethodByUser(actions.correctAsActual, e);
 });
 
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
@@ -960,10 +1007,10 @@ async function _playSomething() {
                     break;
                 case constants.match.FAIL:
                     let step = Test.current.steps[currentStepIndex()];
-                    let next = Test.current.steps[currentStepIndex()+1];
+                    let next = Test.current.steps[currentStepIndex() + 1];
                     next.autoPlay = true;
                     updateStepInView(step);
-                    
+
                     addVolatileRegions(); // you can draw right away
                     Test.current.lastRun.errorMessage = `last run failed after user action ${player.currentAction.index + 1}`;
                     Test.current.lastRun.failingStep = player.currentAction.index + 1;
@@ -1369,7 +1416,7 @@ function stopRecording() {
 
     // this is only supposed to be used when we are recording over steps in the MIDDLE of the 
     // test. FIXME: whole mechanism is a little gross.
-    if (Test.current.replacedAction?.index === Test.current.steps.length-1) {
+    if (Test.current.replacedAction?.index === Test.current.steps.length - 1) {
         // insert the action that our final useless "end-recording-noop-expected-screenshot-action" replaced.
         // insert it right after that noop. the user can delete the noop. i don't want to delete that for them.
         Test.current.replacedAction.index++;
@@ -1708,6 +1755,21 @@ var port = false;
 function setStepContent(step) {
     $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
     setToolbarState();
+    let acs = [];
+    if(step?.curr?.autoCorrected) {
+        acs.push(step.curr.index+1);
+    }
+    if(step?.next?.autoCorrected) {
+        acs.push(step.next.index+1);
+    }
+    if(acs.length) {
+        let s = '';
+        if(acs.length>1) {
+            s = 's';
+        }
+        setInfoBarText(`step${s} ${acs.join(', ')} auto-corrected.`);
+    }
+    
     updateThumb(step.curr); // this isn't the cause of the slow processing of keystokes.
 };
 
@@ -1794,7 +1856,7 @@ function addExpectedScreenshot(testAction, ss = _lastScreenshot) {
  * screenshot, annotate event and convert to TestAction;
  * 
  */
-async function userEventToAction(userEvent, insert=true) {
+async function userEventToAction(userEvent, insert = true) {
     let frameId = userEvent?.sender?.frameId;
     let frameOffset = userEvent.type === 'close' ? { left: 0, top: 0 } : await getFrameOffset(frameId);
 
@@ -1802,7 +1864,7 @@ async function userEventToAction(userEvent, insert=true) {
     testAction.tab = new Tab(Tab.active);
     // FIXME: remove this. This is here currently because addExpectedScreenshot has a ependency on the index
     // which has a dependency on this call because it can set the index
-    if(insert) {
+    if (insert) {
         Test.current.updateOrAppendAction(testAction);
     }
     let element = userEvent.boundingClientRect;
@@ -1834,10 +1896,10 @@ async function userEventToAction(userEvent, insert=true) {
     let dataUrl = '';
     switch (userEvent.type) {
         case 'wait':
-            if(!testAction.event) {
+            if (!testAction.event) {
                 testAction.event = {};
             }
-            if(testAction.event.milliseconds === undefined) {
+            if (testAction.event.milliseconds === undefined) {
                 testAction.event.milliseconds = 0;
             }
             testAction.description = `wait ${testAction.event.milliseconds}ms.`;

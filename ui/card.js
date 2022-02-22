@@ -3,7 +3,9 @@ import { Screenshot } from "./screenshot.js";
 import { loadOptions } from "../options.js";
 import { Tab } from "../tab.js";
 import { extractPngSize } from "../utilities.js";
-import {options} from "../options.js";
+import { options } from "../options.js";
+import { ActualCorrection, Correction, UnpredictableCorrection, BoundingBox } from "../rectangle.js";
+import { Test } from "./brimstoneDataService.js";
 
 const PNG = png.PNG;
 
@@ -128,6 +130,11 @@ export class TestAction {
      * acceptablePixelDifferences, 
      * */
     lastVerifyScreenshotDiffDataUrl;
+    /** 
+     * This is the raw output of the last verifyScreenshot, in a PNG. It is used to build corrections. 
+     * */
+    lastVerifyScreenshotDiffPng;
+
 
     /**
      * It is used for display in the card view of the edit screenshot.
@@ -175,23 +182,28 @@ export class TestAction {
      * if it is unset, when it is needed, it comes from the global options value.
      * @type {number}
      */
-     MAX_VERIFY_TIMEOUT;
-    
+    MAX_VERIFY_TIMEOUT;
+
     /** 
      * viewmodel variable for the time reported in the waiting title view
      * @type {number}
      */
-     _lastTimeout;
+    _lastTimeout;
 
-     /** 
-      * @type {boolean} if true playback will stop before this action is played.
+    /** 
+     * @type {boolean} if true playback will stop before this action is played.
+    */
+    breakPoint = false;
+
+    /**
+     * If the edit actions are autoplay or not
      */
-     breakPoint = false;
+    autoPlay = false;
 
-     /**
-      * If the edit actions are autoplay or not
-      */
-     autoPlay = false;
+    /**
+     * If the last time this action was played it was autocorrected or not.
+     */
+    autoCorrected = false;
 
     constructor(args) {
         Object.assign(this, args);
@@ -251,11 +263,42 @@ export class TestAction {
         return clone;
     }
 
+    /**
+     * 
+     * @param {*} $rectangle 
+     * @param {*} buttonId 
+     * @param {*} bounds 
+     * @returns {Correction} A correction
+     */
+    _applyCorrection($rectangle, buttonId, bounds) {
+        let correction;
+        switch (buttonId) {
+            case 'correctAsUnpredictable':
+                correction = new UnpredictableCorrection({ bounds: bounds });
+                Correction.availableInstances.push(correction);
+                correction.apply(this.acceptablePixelDifferences.png); // update the mask that has unpredictable pixels
+                break;
+            case 'correctAsActual':
+                correction = (new ActualCorrection({ bounds: bounds }))
+                    .setCondition(this.expectedScreenshot.png, this.actualScreenshot.png, this.lastVerifyScreenshotDiffPng);
+                Correction.availableInstances.push(correction);
+                correction.apply(this.expectedScreenshot.png); // update the expected with the actual
+                break;
+            case 'possibleCorrections':
+                Correction.applicableInstances.forEach(correction => {
+                    correction.apply(this.expectedScreenshot.png); // update the expected with the actual
+                });
+                break;
+            default:
+                throw new Error("internal error");
+        }
+    }
+
     /** 
-    * When the user clicks the button, I want the current red pixels to all turn green, and the step to pass.
+    * When the user clicks the button, I want the current red pixels to all turn orange, and the step to pass.
     * 
     */
-    async addMask($card) { // FIMXE: don't pass the card in...
+    async addMask($card, e) { // FIMXE: don't pass the card in...
         if (!this.acceptablePixelDifferences) {
             this.acceptablePixelDifferences = new Screenshot();
         }
@@ -267,38 +310,49 @@ export class TestAction {
             await this.acceptablePixelDifferences.createPngFromDataUrl();
             delete this.lastVerifyScreenshotDiffDataUrl;
         }
-        // else we use whatever is already in acceptablePixelDifferences (editing before playing)
 
+        // else we use whatever is already in acceptablePixelDifferences (editing before playing)
         // manipulate the PNG
         let volatileRegions = $card.find('.rectangle');
-        
+        let convertRedPixelsToOrange = false; // leave em alone by default
         if (volatileRegions.length) {
-            // save them!
-            TestAction.lastVolatileRegionsUsed = volatileRegions;
+            // this is scaled
             let $image = $card.find('img');
             let image = $image[0].getBoundingClientRect();
 
-            // this is scaled
+            // this is scaled, need to be able to get at the actual unscaled pixels
             let xscale = this.acceptablePixelDifferences.png.width / image.width;
             let yscale = this.acceptablePixelDifferences.png.height / image.height;
-
             volatileRegions.each((index, rectangle) => {
                 // viewport relative measurements with scaled lengths
                 let rec = rectangle.getBoundingClientRect();
-
-                // make them image relative measurements with lengths scaled to the PNG
-                let pngRectangle = {
+                let bounds = new BoundingBox({
                     x0: Math.floor((rec.left - image.left) * xscale),
                     y0: Math.floor((rec.top - image.top) * yscale),
                     width: Math.floor(rec.width * xscale),
                     height: Math.floor(rec.height * yscale)
-                };
+                });
 
-                addRectangle.call(this.acceptablePixelDifferences.png, pngRectangle);
+                this._applyCorrection(rectangle, e.currentTarget.id, bounds);
             });
         }
+        else {
+            // the user poked a button without any rectangles showing, in this case the operation applies to the whole screen
+            if (e.currentTarget.id === 'correctAsUnpredictable') {
+                convertRedPixelsToOrange = true;
+            }
+            else if (e.currentTarget.id === 'correctAsActual') {
+                // push the actual into the expected and be done with it.
+                this.expectedScreenshot.png = this.actualScreenshot.png;
+                this.expectedScreenshot.dataUrl = this.actualScreenshot.dataUrl;
+                this.acceptablePixelDifferences = new Screenshot();
+                delete this.lastVerifyScreenshotDiffDataUrl;
+                delete this.lastVerifyScreenshotDiffPng;
+                this.test.dirty = true;
+            }
+        }
 
-        return await this.pixelDiff();
+        return await this.pixelDiff({ convertRedPixelsToOrange: convertRedPixelsToOrange });
     }
 
     /** (Re)calculate the difference between the expected screenshot
@@ -306,7 +360,7 @@ export class TestAction {
     * this is called via the path when we add changes, or are planning to.
     * so this.acceptablePixelDifferences, must exist
     */
-    async pixelDiff() {
+    async pixelDiff(args = {}) {
         let options = await loadOptions();
 
         let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng }
@@ -314,7 +368,8 @@ export class TestAction {
                 this.expectedScreenshot.png,
                 this.actualScreenshot.png,
                 this.acceptablePixelDifferences?.png,
-                options.pixelMatchThreshhold // should I store match threshholds per card?
+                options.pixelMatchThreshhold, // should I store match threshholds per card?
+                args.convertRedPixelsToOrange
             );
         this.acceptablePixelDifferences.dataUrl = 'data:image/png;base64,' + PNG.sync.write(diffPng).toString('base64');
         this.acceptablePixelDifferences.png = diffPng;
@@ -477,12 +532,6 @@ export class TestAction {
     }
 }
 
-/** 
- * The last set of rectangles that were actually used. 
- * JQuery Object: array of rectangles
-*/
-TestAction.lastVolatileRegionsUsed;
-
 /**
  * An action followed by the next expected screen: action, expected screen
  * i.e expected screen, input, expected screen. These are used in the UI mainly.
@@ -562,12 +611,12 @@ export class Step {
 
 
             if (this.next._match === constants.match.PLAY) {
-                title.text += `Wait ${this.next._lastTimeout} second${this.next._lastTimeout>1? 's': ''} for actual screen to match this.`;
+                title.text += `Wait ${this.next._lastTimeout} second${this.next._lastTimeout > 1 ? 's' : ''} for actual screen to match this.`;
             }
             else {
 
                 if (this.next._match === constants.match.FAIL) {
-                    title.text += `Failed to match in ${this.next._lastTimeout} second${this.next._lastTimeout>1? 's': ''}. `;
+                    title.text += `Failed to match in ${this.next._lastTimeout} second${this.next._lastTimeout > 1 ? 's' : ''}. `;
                 }
 
                 switch (this.next._view) {
@@ -587,23 +636,19 @@ export class Step {
                         break;
                     case constants.view.EDIT:
                         title.text += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
-                        // <button title="Repeat last added rectangle(s)" id="stampDelta">
-                        //     <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="stamp" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-stamp fa-w-16 fa-7x"><path fill="currentColor" d="M416 256h-66.56c-16.26 0-29.44-13.18-29.44-29.44v-9.46c0-27.37 8.88-53.42 21.46-77.73 9.11-17.61 12.9-38.38 9.05-60.42-6.77-38.78-38.47-70.7-77.26-77.45C267.41.49 261.65 0 256 0c-53.02 0-96 42.98-96 96 0 14.16 3.12 27.54 8.68 39.57C182.02 164.43 192 194.71 192 226.5v.06c0 16.26-13.18 29.44-29.44 29.44H96c-53.02 0-96 42.98-96 96v48c0 8.84 7.16 16 16 16h16v64c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-64h16c8.84 0 16-7.16 16-16v-48c0-53.02-42.98-96-96-96zM48 352c0-26.47 21.53-48 48-48h66.56c42.7 0 77.44-34.74 77.44-77.5 0-34.82-8.82-70.11-27.74-111.06-2.83-6.12-4.26-12.66-4.26-19.44 0-26.47 21.53-48 48-48 2.96 0 6 .27 9.02.79 18.82 3.28 34.89 19.43 38.2 38.42 1.87 10.71.39 20.85-4.4 30.11C280.78 152.21 272 184.85 272 217.1v9.46c0 42.7 34.74 77.44 77.44 77.44H416c26.47 0 48 21.53 48 48v16H48v-16zm384 112H80v-48h352v48z" class=""></path></svg>
-                        // </button>
-                        let bclass = this.next.autoPlay ? 'class="autoPlay"': '';
-                        let titleSuffix = this.next.autoPlay ? '. Autoplay.':'';
+                        let bclass = this.next.autoPlay ? 'class="autoPlay"' : '';
+                        let titleSuffix = this.next.autoPlay ? '. Autoplay.' : '';
                         title.actions = `
-                        <button title="Use Last Rectangles${titleSuffix}" id="stampDelta" ${bclass}>
-                            <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="stamp" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-stamp fa-w-16 fa-7x"><path fill="currentColor" d="M416 256h-66.56c-16.26 0-29.44-13.18-29.44-29.44v-9.46c0-27.37 8.88-53.42 21.46-77.73 9.11-17.61 12.9-38.38 9.05-60.42-6.77-38.78-38.47-70.7-77.26-77.45C267.41.49 261.65 0 256 0c-53.02 0-96 42.98-96 96 0 14.16 3.12 27.54 8.68 39.57C182.02 164.43 192 194.71 192 226.5v.06c0 16.26-13.18 29.44-29.44 29.44H96c-53.02 0-96 42.98-96 96v48c0 8.84 7.16 16 16 16h16v64c0 17.67 14.33 32 32 32h384c17.67 0 32-14.33 32-32v-64h16c8.84 0 16-7.16 16-16v-48c0-53.02-42.98-96-96-96zM48 352c0-26.47 21.53-48 48-48h66.56c42.7 0 77.44-34.74 77.44-77.5 0-34.82-8.82-70.11-27.74-111.06-2.83-6.12-4.26-12.66-4.26-19.44 0-26.47 21.53-48 48-48 2.96 0 6 .27 9.02.79 18.82 3.28 34.89 19.43 38.2 38.42 1.87 10.71.39 20.85-4.4 30.11C280.78 152.21 272 184.85 272 217.1v9.46c0 42.7 34.74 77.44 77.44 77.44H416c26.47 0 48 21.53 48 48v16H48v-16zm384 112H80v-48h352v48z" class=""></path></svg>
+                        <button title="Possible corrections${titleSuffix}" id="possibleCorrections" ${bclass}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M3.682 149.1L53.32 170.7L74.02 220.3c1.016 2.043 3.698 3.696 5.977 3.696c.0078 0-.0078 0 0 0c2.271-.0156 4.934-1.661 5.946-3.696l20.72-49.63l49.62-20.71c2.023-1.008 3.68-3.681 3.691-5.947C159.1 141.7 158.3 139 156.3 138L106.9 117.4L106.5 117L85.94 67.7C84.93 65.66 82.27 64.02 80 64c-.0078 0 .0078 0 0 0c-2.279 0-4.966 1.649-5.981 3.692L53.32 117.3L3.682 138C1.652 139.1 0 141.7 0 144C0 146.3 1.652 148.9 3.682 149.1zM511.1 368c-.0039-2.273-1.658-4.95-3.687-5.966l-49.57-20.67l-20.77-49.67C436.9 289.7 434.3 288 432 288c-2.281 0-4.948 1.652-5.964 3.695l-20.7 49.63l-49.64 20.71c-2.027 1.016-3.684 3.683-3.687 5.956c.0039 2.262 1.662 4.954 3.687 5.966l49.57 20.67l20.77 49.67C427.1 446.3 429.7 448 432 448c2.277 0 4.944-1.656 5.96-3.699l20.69-49.63l49.65-20.71C510.3 372.9 511.1 370.3 511.1 368zM207.1 64l12.42 29.78C221 95.01 222.6 96 223.1 96s2.965-.9922 3.575-2.219L239.1 64l29.78-12.42c1.219-.6094 2.215-2.219 2.215-3.578c0-1.367-.996-2.969-2.215-3.578L239.1 32L227.6 2.219C226.1 .9922 225.4 0 223.1 0S221 .9922 220.4 2.219L207.1 32L178.2 44.42C176.1 45.03 176 46.63 176 48c0 1.359 .9928 2.969 2.21 3.578L207.1 64zM399.1 191.1c8.875 0 15.1-7.127 15.1-16v-28l91.87-101.7c5.75-6.371 5.5-15.1-.4999-22.12L487.8 4.774c-6.125-6.125-15.75-6.375-22.12-.625L186.6 255.1H144c-8.875 0-15.1 7.125-15.1 15.1v36.88l-117.5 106c-13.5 12.25-14.14 33.34-1.145 46.34l41.4 41.41c12.1 12.1 34.13 12.36 46.37-1.133l279.2-309.5H399.1z"/></svg>
                         </button>
 
-                        <button title="Accept Unpredictable Pixels${titleSuffix}" id="ignoreDelta" ${bclass}>
+                        <button title="Mark red pixels/rectangles as unpredictable${titleSuffix}" id="correctAsUnpredictable" ${bclass}>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
                         </button>
 
-                        <button title="Replace Expected with Actual${titleSuffix}" id="replace" ${bclass}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M211.8 339.8C200.9 350.7 183.1 350.7 172.2 339.8L108.2 275.8C97.27 264.9 97.27 247.1 108.2 236.2C119.1 225.3 136.9 225.3 147.8 236.2L192 280.4L300.2 172.2C311.1 161.3 328.9 161.3 339.8 172.2C350.7 183.1 350.7 200.9 339.8 211.8L211.8 339.8zM0 96C0 60.65 28.65 32 64 32H384C419.3 32 448 60.65 448 96V416C448 451.3 419.3 480 384 480H64C28.65 480 0 451.3 0 416V96zM48 96V416C48 424.8 55.16 432 64 432H384C392.8 432 400 424.8 400 416V96C400 87.16 392.8 80 384 80H64C55.16 80 48 87.16 48 96z"/></svg>
-                        </button>
+                        <button title="Mark red pixels/rectangles as correct${titleSuffix}" id="correctAsActual" ${bclass}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M438.6 105.4C451.1 117.9 451.1 138.1 438.6 150.6L182.6 406.6C170.1 419.1 149.9 419.1 137.4 406.6L9.372 278.6C-3.124 266.1-3.124 245.9 9.372 233.4C21.87 220.9 42.13 220.9 54.63 233.4L159.1 338.7L393.4 105.4C405.9 92.88 426.1 92.88 438.6 105.4H438.6z"/></svg>                        </button>
 
                         <button title="Clear Unpredictable Pixels" id="undo">
                           <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"
@@ -624,7 +669,7 @@ export class Step {
                 title.text += ` <span id='unpredictable-pixels'>&nbspHas unpredictable pixels.</span>`;
             }
             // only show the has allowed red pixels if there are some and the option is on. cap the number
-            if(options.numberOfRedPixelsAllowed && this.next.numDiffPixels) {
+            if (options.numberOfRedPixelsAllowed && this.next.numDiffPixels) {
                 let count = Math.min(options.numberOfRedPixelsAllowed, this.next.numDiffPixels);
                 title.text += ` <span id='error-pixels'>&nbspHas ${count} allowed red pixels.</span>`;
             }
@@ -638,24 +683,6 @@ export class Step {
         return html;
     }
 
-}
-
-/**
- * Color in a rectangle in the given PNG data
- */
-function addRectangle({ x0, y0, width, height }) {
-    let ymax = y0 + height;
-    let xmax = x0 + width;
-    for (var y = y0; y <= ymax; y++) {
-        for (var x = x0; x <= xmax; x++) {
-            var idx = (this.width * y + x) << 2;
-            // [255, 165, 0, 255] // orange
-            this.data[idx] = 255;
-            this.data[idx + 1] = 165;
-            this.data[idx + 2] = 0;
-            this.data[idx + 3] = 255; // fully opaque
-        }
-    }
 }
 
 export function getStep(element) {

@@ -12,6 +12,12 @@
   background: rgba(128, 128, 128, 0.75);
 }
 
+.rectangle {
+  position: absolute;
+  background: rgba(241, 160, 160, 0.6);
+  border: 1px dashed red;
+}
+
 #confirmSave {
   display: -webkit-box;
   display: -ms-flexbox;
@@ -547,6 +553,10 @@ button img {
 #content .card.waiting.edit .screenshot {
   cursor: crosshair;
   position: unset;
+}
+
+#content .card.waiting.edit .screenshot.relative-position {
+  position: relative;
 }
 
 #content .card.waiting.edit.fail .meter {

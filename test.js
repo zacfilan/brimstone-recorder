@@ -445,6 +445,7 @@ export class Test {
             delete step.acceptablePixelDifferences;
             delete step.lastVerifyScreenshotDiffDataUrl;
             delete step.editViewDataUrl;
+            delete step.lastVerifyScreenshotDiffPng;
         });
     }
 }

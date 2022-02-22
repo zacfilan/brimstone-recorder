@@ -27,7 +27,8 @@ async function save_options() {
     //#region checking options
     options.MAX_VERIFY_TIMEOUT = parseInt(matchTimeout.value, 10);
     options.pixelMatchThreshhold = pixelMatchThreshholdLookup[parseFloat(pixelMatchSenstivity.value)];
-    options.numberOfRedPixelsAllowed = parseInt(numberOfRedPixelsAllowed.value, 10);
+    options.autoCorrectActual = autoCorrectActual.checked;
+    options.autoCorrectUnpredictable = autoCorrectUnpredictable.checked;
     //#endregion checking option
 
     //#region playback options
@@ -57,6 +58,8 @@ async function save_options() {
     options.developerMode = developerMode.checked;
     options.debugRecorder = debugRecorder.checked;
     options.autoZoomTo100 = autoZoomTo100.checked;
+    options.numberOfRedPixelsAllowed = parseInt(numberOfRedPixelsAllowed.value, 10);
+    options.forgetCorrectionsWhenTestIsCleared = forgetCorrectionsWhenTestIsCleared.checked;
     //#region timeouts
     options.verifyScreenshotRetryComparisonTimeout = parseInt(verifyScreenshotRetryComparisonTimeout.value);
     options.verifyScreenshotTakeScreenshotRetryTimeout = parseInt(verifyScreenshotTakeScreenshotRetryTimeout.value);
@@ -92,7 +95,8 @@ async function restore_options() {
     //#region checking options
     matchTimeout.value = options.MAX_VERIFY_TIMEOUT;
     pixelMatchSenstivity.value = pixelMatchThreshholdLookup.indexOf(options.pixelMatchThreshhold);
-    numberOfRedPixelsAllowed.value = options.numberOfRedPixelsAllowed;
+    autoCorrectActual.checked = options.autoCorrectActual;
+    autoCorrectUnpredictable.checked = options.autoCorrectUnpredictable;
     //#endregion checking options
 
     //#region playback options
@@ -124,6 +128,8 @@ async function restore_options() {
     developerMode.checked = options.developerMode;
     debugRecorder.checked = options.debugRecorder;
     autoZoomTo100.checked = options.autoZoomTo100;
+    numberOfRedPixelsAllowed.value = options.numberOfRedPixelsAllowed;
+    forgetCorrectionsWhenTestIsCleared.checked = options.forgetCorrectionsWhenTestIsCleared;
     //#region timeouts
     verifyScreenshotTakeScreenshotRetryTimeout.value = options.verifyScreenshotTakeScreenshotRetryTimeout;
     verifyScreenshotRetryComparisonTimeout.value = options.verifyScreenshotRetryComparisonTimeout;

@@ -12,6 +12,14 @@
 }
 ////
 
+/// for the edit rectangles
+.rectangle {
+    position: absolute;
+    background: rgba(241, 160, 160, 0.6);
+    border: 1px dashed red;
+}
+///
+
 #confirmSave {
     display: flex;
     font-size: 14px;
@@ -441,7 +449,10 @@ button {
         &.edit {
             .screenshot {
                 cursor: crosshair;
-                position: unset;
+                position: unset; // for some reason when drawing rectangles I need this
+                &.relative-position {
+                    position: relative; // but when displaying possible corrections for example I need this.
+                }
             }
 
             /** hide that one */

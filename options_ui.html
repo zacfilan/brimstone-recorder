@@ -38,12 +38,25 @@
                     </div>
                 </td>
             </tr>
+            <td>
+                Auto correct matching actual corrections
+            </td>
+            <td>
+                <label class="switch">
+                    <input type="checkbox" id="autoCorrectActual"></input>
+                    <span class="slider round"></span>
+                </label>
+            </td>
+            </tr>
             <tr>
                 <td>
-                    Max number of red pixels allowed before failing
+                    Auto correct unpredictable corrections
                 </td>
                 <td>
-                    <input type="number" min="0" max="50" id="numberOfRedPixelsAllowed"></input>
+                    <label class="switch">
+                        <input type="checkbox" id="autoCorrectUnpredictable"></input>
+                        <span class="slider round"></span>
+                    </label>
                 </td>
             </tr>
         </table>
@@ -245,6 +258,25 @@
                 <td>
                     <label class="switch">
                         <input type="checkbox" id="autoZoomTo100"></input>
+                        <span class="slider round"></span>
+                    </label>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Max number of red pixels allowed before failing
+                </td>
+                <td>
+                    <input type="number" min="0" max="50" id="numberOfRedPixelsAllowed"></input>
+                </td>
+            <tr>
+            <tr>
+                <td>
+                    Forgot corrections when test is cleared
+                </td>
+                <td>
+                    <label class="switch">
+                        <input type="checkbox" id="forgetCorrectionsWhenTestIsCleared"></input>
                         <span class="slider round"></span>
                     </label>
                 </td>
