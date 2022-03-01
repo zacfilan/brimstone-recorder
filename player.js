@@ -1,21 +1,17 @@
+'use strict';
+
 import { pixelmatch } from "./dependencies/pixelmatch.js";
 import { Screenshot } from "./ui/screenshot.js";
 
 const PNG = png.PNG;
-const Buffer = buffer.Buffer; // pngjs uses Buffer
 import { Tab } from "./tab.js"
-import { sleep, extractPngSize, brimstone } from "./utilities.js";
+import { sleep, brimstone } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
-import { loadOptions } from "./options.js";
+import { options, loadOptions } from "./options.js";
 import { Test } from "./test.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
-import { ActualCorrection, UnpredictableCorrection, Correction } from "./rectangle.js";
-
-/** cached the options before playing 
- * @type {Options}
-*/
-var options;
+import { UnpredictableCorrection, Correction, SparseApplyCorrection } from "./rectangle.js";
 
 /**
  * This function is injected and run in the app
@@ -23,27 +19,6 @@ var options;
  * Scroll the element that matches the css to the given value
  */
 function _scroll(x, y, top, left) {
-    // https://stackoverflow.com/questions/35939886/find-first-scrollable-parent
-    // function getScrollParent(element, includeHidden) {
-    //     var style = getComputedStyle(element);
-    //     var excludeStaticParent = style.position === "absolute";
-    //     var overflowRegex = includeHidden ? /(auto|scroll|hidden)/ : /(auto|scroll)/;
-
-    //     if (style.position === "fixed") return document.body;
-    //     for (var parent = element; (parent = parent.parentElement);) {
-    //         style = getComputedStyle(parent);
-    //         if (excludeStaticParent && style.position === "static") {
-    //             continue;
-    //         }
-    //         if (overflowRegex.test(style.overflow + style.overflowY + style.overflowX)) return parent;
-    //     }
-
-    //     return document.body;
-    // }
-    // debugger;
-    //var elem = getScrollParent(document.elementFromPoint(x, y)); // will this work in a frame ?
-
-    // This is sufficient if you perform the scroll over the scrollbars.
     var elem = document.elementFromPoint(x, y); // will this work in a frame ?
     if (top !== null) {
         elem.scrollTop = top;
@@ -106,9 +81,6 @@ export class Player {
 
     /** Know if there are navigations in flight. */
     _navigationsInFlight = 0;
-
-    /** sensatively parameter to pixelmatch, lower is stricter */
-    pixelMatchThreshhold = .1;
 
     /** 
      * The last known mouselocation during playback. This is used during a resume
@@ -193,8 +165,7 @@ export class Player {
         this._actions = test.steps;
         this._stopPlaying = false;
 
-        options = await loadOptions();
-        this.pixelMatchThreshhold = options.pixelMatchThreshhold;
+        await loadOptions();
         let actions = this._actions;
 
         // start timer
@@ -250,7 +221,7 @@ export class Player {
                 next._match = constants.view.PASS;
             }
             else {
-                await this.verifyScreenshot({step: next});
+                await this.verifyScreenshot({ step: next });
             }
             stop = performance.now();
 
@@ -266,18 +237,18 @@ export class Player {
             if (next._match === constants.match.FAIL && (options.autoCorrectActual || options.autoCorrectUnpredictable)) {
                 let correctionApplied = false;
                 Correction.availableInstances.forEach(correction => {
-                    if (correction instanceof ActualCorrection && options.autoCorrectActual && correction.matches(next)) {
-                        correction.apply(next.expectedScreenshot.png);
+                    if (correction instanceof SparseApplyCorrection && options.autoCorrectActual && correction.matches(next)) {
+                        correction.apply(next);
                         correctionApplied = true;
                     }
                     else if (correction instanceof UnpredictableCorrection && options.autoCorrectUnpredictable && correction.matches(next)) {
-                        correction.apply(next.acceptablePixelDifferences.png);
+                        correction.apply(next);
                         correctionApplied = true;
                     }
                 });
                 if (correctionApplied) {
-                    await this.verifyScreenshot({step: next, max_attempts: 1, fastFail: false}); // see if the auto-correction fixed it.
-                    if(next._match === constants.match.PASS || next._match === constants.match.ALLOW) {
+                    await this.verifyScreenshot({ step: next, max_attempts: 1, fastFail: false }); // see if the auto-correction fixed it.
+                    if (next._match === constants.match.PASS || next._match === constants.match.ALLOW) {
                         next.autoCorrected = true;
                     }
                 }
@@ -292,6 +263,7 @@ export class Player {
                     break;// keep on chugging
                 case constants.match.FAIL:
                     console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
+                    next._view = constants.view.EDIT;
                     return next._match; // bail early
                     break;
                 case constants.match.CANCEL:
@@ -578,6 +550,7 @@ export class Player {
         });
     }
 
+    // FIXME: I don't think I ever record this event, so no need to play it
     async scroll(action) {
         // FIXME: I need to run this in the correct frame!
         let frames = await chrome.scripting.executeScript({
@@ -683,59 +656,27 @@ export class Player {
         }
     }
 
-    _pngDiff({ nextStep, fastFail }) {
-        let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng }
-            = Player.pngDiff(
-                nextStep.expectedScreenshot.png,
-                nextStep.actualScreenshot.png,
-                nextStep.acceptablePixelDifferences?.png,
-                this.pixelMatchThreshhold,
-                fastFail
-            );
-
-        // FIXME: this should be factored into the card I think
-        nextStep.numDiffPixels = numDiffPixels;
-        let UiPercentDelta = (numDiffPixels * 100) / (nextStep.expectedScreenshot.png.width * nextStep.expectedScreenshot.png.height);
-        nextStep.percentDiffPixels = UiPercentDelta.toFixed(2);
-
-        nextStep.numMaskedPixels = numMaskedPixels;
-
-        nextStep.lastVerifyScreenshotDiffPng = diffPng;
-        nextStep._match = constants.match.FAIL; // until we determine different
-
-        if (numDiffPixels <= options.numberOfRedPixelsAllowed) { // it matched
-            nextStep._match = constants.match.PASS;
-
-            nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(nextStep.lastVerifyScreenshotDiffPng).toString('base64');
-            nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
-
-            if (numMaskedPixels || numUnusedMaskedPixels) { // it matched only because of the masking we allowed
-                nextStep._view = constants.view.EXPECTED;
-                nextStep._match = constants.match.ALLOW;
-            }
-        }
-    }
-
-
     /**
      * Called after we play the current action.
      * 
      * Repeatedly check the expected screenshot required to start the next action
      * against the actual screenshot. 
      * 
+     * @param {object} args Destructured arguments
+     * @param {TestAction} args.step The step
+     * @param {number} args.max_attempts The max number of iterations to check the screenshot
+     * @param {boolean} args.fastFail Should the pixelmatch fail on the first mismatching pixel? 
      * @returns {string} _match property in the nextStep parameter passed in
      */
     async verifyScreenshot({ step, max_attempts = 100000000, fastFail = true }) {
         let nextStep = step;
         let start = performance.now();
 
-        /** Used to display the results of applying the acceptableDifferences to the actual image. */
-        let differencesPng = false;
         let i = 0;
         let badTab = false;
 
         // this loop will run even if the app is in the process of navigating to the next page.
-        while ( (((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
+        while ((((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
             if (this._stopPlaying) { // asyncronously injected
                 nextStep._view = constants.view.EXPECTED;
                 nextStep._match = constants.match.CANCEL;
@@ -743,7 +684,7 @@ export class Player {
             }
             ++i;
 
-            differencesPng = false; // if the last time through we were able to take a screenshot or not
+            delete step.actualScreenshot; // if the last time through we were able to take a screenshot or not
 
             // FIXME: why can this.tab.height != nextStep.expectedScreenshot.png.height ??
             // 1. The debugger attach banner is in flux during a navigation. expected to be handled this way.
@@ -771,7 +712,7 @@ export class Player {
                 nextStep.actualScreenshot = await this._takeScreenshot();
             }
             catch (e) {
-                console.debug(e.message + '. try again.');
+                console.debug(e);
                 badTab = true;
                 // give other async'ed control paths a chance to run. configureForAction above can be trying to wait for a different tab to become active.
                 await sleep(options.verifyScreenshotTakeScreenshotRetryTimeout);
@@ -779,7 +720,7 @@ export class Player {
             }
 
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
-            this._pngDiff({ nextStep, fastFail: fastFail });
+            nextStep.calculatePixelDiff({ fastFail: fastFail });
             if (nextStep._match !== constants.match.FAIL) {
                 return nextStep._match;
             }
@@ -788,30 +729,21 @@ export class Player {
             await sleep(options.verifyScreenshotRetryComparisonTimeout);
         }
 
-        // The screenshots don't match
+        // The screenshots apparently don't match
         if (fastFail) {
             // do a final (complete) check to get all different data, i.e. don't fastFail out of the diff
-            this._pngDiff({ nextStep, fastFail: false });
+            nextStep.calculatePixelDiff({ fastFail: false });
             if (nextStep._match !== constants.match.FAIL) {
                 // the loop timed out just as the screen got in the correct state.
                 return nextStep._match;
             }
         }
 
-        // The screenshots don't match
+        // The screenshots really don't match. 
         nextStep._match = constants.match.FAIL;
-        nextStep._view = constants.view.EDIT;
 
         // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing. 
-        if (nextStep.lastVerifyScreenshotDiffPng) {
-            nextStep.lastVerifyScreenshotDiffDataUrl = 'data:image/png;base64,' + PNG.sync.write(nextStep.lastVerifyScreenshotDiffPng).toString('base64');
-            nextStep.editViewDataUrl = nextStep.lastVerifyScreenshotDiffDataUrl;
-        }
-        else {
-            // else we can't update the actual nor the diff
-            delete nextStep.actualScreenshot;
-            delete nextStep.lastVerifyScreenshotDiffDataUrl;
-            delete nextStep.editViewDataUrl;
+        if (!nextStep.actualScreenshot) {
             throw new Error('Unable to create screenshot');
         }
 
@@ -820,7 +752,7 @@ export class Player {
 
     /** 
      * Uses the debugger API to capture a screenshot.
-     * Returns the dataurl on success. Most calls are 
+     * Returns a Screenshot on success. Most calls are 
      * to update the expected screen during recording,
      * but is also called in one path for playback inside
      * of verifyScreenshot. 
@@ -829,32 +761,27 @@ export class Player {
      * @throws {IncorrectScreenshotSize} on failure.
      * @throws {Error} on unknown errors
      */
-    async captureScreenshotAsDataUrl() {
+    async captureScreenshot() {
         let result = await this.debuggerSendCommand('Page.captureScreenshot', {
             format: 'png'
         });
         // result can come back undefined/null. (e.g. debugger not attached, or can detach while the command is in flight)
-        let dataUrl = 'data:image/png;base64,' + result.data; // in which case this will throw.
-
-        // else we got *some* dataUrl back
-        let size = extractPngSize(result.data);
+        let ss = new Screenshot({
+            dataBase64: result.data,
+            tab: this.tab
+        })
 
         if (this.tab.blessed) {
             // since the tab size was blessed by the user we need to check the screenshot size
             let expectedWidth = this.tab.width;
             let expectedHeight = this.tab.height;
-            if (expectedWidth && (expectedWidth !== size.width || expectedHeight !== size.height)) {
+            if (expectedWidth && (expectedWidth !== ss.dataUrlWidth || expectedHeight !== ss.dataUrlHeight)) {
                 throw new Errors.IncorrectScreenshotSize(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${size.width}x${size.height}.`);
             }
         }
 
         // else we got a screenshot of the size we require (or we don't care about the size)
-        return new Screenshot({
-            dataUrl: dataUrl,
-            tab: this.tab,
-            dataUrlWidth: size.width,
-            dataUrlHeight: size.height
-        });
+        return ss;
     }
 
     /**
@@ -872,15 +799,10 @@ export class Player {
     */
     async _takeScreenshot() {
         // unthrottled. 
-        let partialSS = await this.captureScreenshotAsDataUrl();
-        let png = await Player.dataUrlToPNG(partialSS.dataUrl);
-        console.debug(`took screenshot ${png.width}x${png.height}`);
-
-        return new Screenshot({
-            png: png,
-            dataUrl: partialSS.dataUrl,
-            tab: partialSS.tab
-        });
+        let ss = await this.captureScreenshot();
+        ss.png; // build the PNG too in this case, right now.
+        console.debug(`took screenshot ${ss.dataUrlWidth}x${ss.dataUrlHeight}`);
+        return ss;
     }
 
     /** 
@@ -1008,20 +930,14 @@ export class Player {
     }
 }
 
-/** 
- * Given a data URL we return a PNG from it.
- */
-Player.dataUrlToPNG = async function dataUrlToPNG(dataUrl) {
-    if (!dataUrl) {
-        throw new Error('cannot create a png from a null dataUrl');
-    }
-    let response = await fetch(dataUrl);
-    let buffer = Buffer.from(await response.arrayBuffer());
-    let png = PNG.sync.read(buffer); // FIXME: slower than a string compare on the base64
-    return png;
-}
+Player.pngDiff = function pngDiff(
+    expectedPng, 
+    actualPng, 
+    maskPng,
 
-Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThreshhold, convertRedPixelsToOrange = false, fastFail = false) {
+    pixelMatchThreshhold,
+    fastFail = false) {
+
     const { width, height } = expectedPng;
 
     if (actualPng.width !== width || actualPng.height !== height) {
@@ -1039,7 +955,6 @@ Player.pngDiff = function pngDiff(expectedPng, actualPng, maskPng, pixelMatchThr
             {
                 threshold: pixelMatchThreshhold,
                 ignoreMask: maskPng?.data,
-                convertRedPixelsToOrange: convertRedPixelsToOrange,
                 fastFail: fastFail
             }
         );
