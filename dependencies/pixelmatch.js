@@ -3,20 +3,45 @@
 ///module.exports = pixelmatch;
 
 const defaultOptions = {
-    threshold: 0.1,         // matching threshold (0 to 1); smaller is more sensitive
-    includeAA: false,       // whether to skip anti-aliasing detection
-    alpha: 0.2,             // opacity of original image in diff ouput
-    aaColor: [255, 165, 0], // color of anti-aliased pixels in diff output (orange)
-    diffColor: [255, 0, 0], // color of different pixels in diff output (red)
-    diffColorAlt: null,     // whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two
-    diffMask: false,        // draw the diff over a transparent background (a mask)
+    /** matching threshold (0 to 1); smaller is more sensitive*/
+    threshold: 0.1,          
+    /** whether to skip anti-aliasing detection*/
+    includeAA: false,        
+    /** opacity of original image in diff ouput */
+    alpha: 0.2,              
+    /** color of anti-aliased pixels in diff output (orange) */
+    aaColor: [255, 165, 0],  
+    /** color of different pixels in diff output (red) */
+    diffColor: [255, 0, 0],  
+    /** whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two*/
+    diffColorAlt: null,      
+    /** draw the diff over a transparent background (a mask) */
+    diffMask: false,       
 
+    /**
+     * A 3rd image passed in that uses orange or yellow to communicate something about that
+     * pixel and greyscale otherwise. Orange or yellow mean that the pixel is allowed to be 
+     * differnt so is not counted as a difference. 
+     */
     ignoreMask: false,       // my addition. before we say a pixel mismatches check if there is an entry (pure red pixel) in the ignoreMask at this pixel position.
-    convertRedPixelsToOrange: false, // my addition. how to deal with red pixels in the mask, do they stay as errors or get turned into orange "unpredictable" pixels.
-    fastFail: false // i don't need all the points that differ, just need to know if one does.
+    
+    /**
+     * If we just want to know if the images differ we can bail early,
+     * as soon as we see one different pixel.
+     */
+    fastFail: false 
 };
 
-
+/**
+ * 
+ * @param {PNG} img1 expected PNG
+ * @param {PNG} img2 actual PNG
+ * @param {PNG} output the result PNG
+ * @param {number} width 
+ * @param {number} height 
+ * @param {defaultOptions} options 
+ * @returns 
+ */
 export function pixelmatch(img1, img2, output, width, height, options) {
     let numUnusedMaskedPixels = 0;
 
@@ -73,7 +98,6 @@ export function pixelmatch(img1, img2, output, width, height, options) {
     // compare each pixel of one image against the other one
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-
             const pos = (y * width + x) * 4;
 
             // squared YUV distance between colors at this pixel position, negative if the img2 pixel is darker
@@ -100,8 +124,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                             let red = options.ignoreMask[pos + 0];
                             let green = options.ignoreMask[pos + 1];
                             let blue = options.ignoreMask[pos + 2];
-                            if ( options.convertRedPixelsToOrange && (red === 255 && green === 0 && blue === 0) || // red or 
-                                (red === 255 && green === 165 && blue === 0)) { // orange
+                            if (red === 255 && green === 165 && blue === 0) { // orange
                                 _drawPixel(output, pos, 255, 165, 0, 255); // becomes orange
                                 masked++;
                             }
@@ -138,7 +161,7 @@ export function pixelmatch(img1, img2, output, width, height, options) {
                         let green = options.ignoreMask[pos + 1];
                         let blue = options.ignoreMask[pos + 2];
                         // const orange = [255, 165, 0];
-                        if ((red === 255 && green === 165 && blue === 0)) {
+                        if (red === 255 && green === 165 && blue === 0) {
                             // it was an ignorable pixel, but didn't need to be, so lighten it to indicate that.
                             _drawPixel(output, pos, 255, 165, 0, 128);
                             ++numUnusedMaskedPixels;

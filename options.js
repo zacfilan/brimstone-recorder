@@ -176,6 +176,10 @@ export class Options {
      forgetCorrectionsWhenTestIsCleared = false;
 };
 
+/**
+ * Cached version of options. This is updated everytime {@link loadOptions}
+ * or {@link saveOptions} is called.
+ */
 export var options = new Options();
 
 /** load the user settable options from chrome storage

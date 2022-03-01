@@ -1,3 +1,5 @@
+'use strict';
+
 import { Player } from "../player.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
@@ -23,6 +25,7 @@ keycode2modifier[ALT_KEYCODE] = 1;
 keycode2modifier[CTRL_KEYCODE] = 2;
 keycode2modifier[META_KEYCODE] = 4;
 keycode2modifier[SHIFT_KEYCODE] = 8;
+const PNG = png.PNG;
 
 /**
  * Used to remember what tabs are open, and the order they opened. 
@@ -196,58 +199,43 @@ class Actions {
     }
 
     /** 
-     * edit pixel differences - Commit any volatile rectangles or individual pixel deltas. 
+     * User clicked a button to apply their corrections that are
+     * pending on the EDIT view.
+     * @param {Event} e - the button clicked is avaiable in here 
      * */
-    async addCorrections(e) {
-        // add a mask
+    async applyCorrections(e) {
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
-        await action.addMask(view, e);
+        await action.applyCorrections(view, e);
         updateStepInView(Test.current.steps[action.index - 1]);
         action.test.dirty = true;
         if (action.autoPlay) {
             this.callMethod(this.playSomething);
         }
+        else {
+            addVolatileRegions();
+        }
     }
 
-    async correctAsUnpredictable(e) {
-        return await this.addCorrections(e);
-    }
-
-    async correctAsActual(e) {
-        return await this.addCorrections(e);
-    }
-
-    /** edit pixel differences - remove the allowed differences, see the differences */
-    async seeDelta() {
+    /** 
+     * Called when we want to "start over".
+     * All acceptable pixel differences are removed, and we recalculate the
+     * pixel differences.
+     *  */
+    async undo() {
         // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
         const { view, action } = getCard('#content .waiting', Test.current);
         action.autoPlay = false;
-        action.acceptablePixelDifferences = new Screenshot();
-        await action.pixelDiff();
+        action.acceptablePixelDifferences = new Screenshot({
+            png: new PNG({
+                width: action.pixelDiffScreenshot.png.width,
+                height: action.pixelDiffScreenshot.png.height
+            })
+        }); // chuck whatever we got out.
+        action.calculatePixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);
 
         addVolatileRegions();
         action.test.dirty = true;
-    }
-
-    /** replaces the entire expected with entire actual screenshot */
-    async replaceExpectedWithActual(e) {
-
-        // push the actual into the expected and be done with it.
-        const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
-        action.expectedScreenshot.png = action.actualScreenshot.png;
-        action.expectedScreenshot.dataUrl = action.actualScreenshot.dataUrl;
-        action.acceptablePixelDifferences = new Screenshot();
-        delete action.lastVerifyScreenshotDiffDataUrl;
-
-        await action.pixelDiff();
-        updateStepInView(Test.current.steps[action.index - 1]);
-        addVolatileRegions();
-        action.test.dirty = true;
-
-        if (action.autoPlay) {
-            this.callMethod(this.playSomething);
-        }
     }
 
     async clearWorkspace() {
@@ -268,7 +256,6 @@ class Actions {
 
             let result = await actions.confirmSaveModal();
         }
-
 
         Test.current.removeScreenshots();
 
@@ -447,15 +434,10 @@ class Actions {
             case constants.view.EXPECTED: // expected -> actual
                 action._view = constants.view.ACTUAL;
                 if (!action.actualScreenshot) {
-                    action.actualScreenshot = new Screenshot({
-                        fileName: '',
-                        dataUrl: action.expectedScreenshot.dataUrl,
-                        png: action.expectedScreenshot.png
-                    });
+                    action.actualScreenshot = new Screenshot(action.expectedScreenshot);
+                    action.actualScreenshot.fileName = '';
                     if (action.acceptablePixelDifferences) {
-                        action._view = constants.view.EDIT;
                         await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
-                        action.editViewDataUrl = action.acceptablePixelDifferences.dataUrl;
                     }
                 }
                 else {
@@ -465,15 +447,10 @@ class Actions {
                 break;
             case constants.view.ACTUAL: // actual -> edit
                 action._view = constants.view.EDIT;
-                if (!action.editViewDataUrl) {
-                    if (!action.acceptablePixelDifferences) {
-                        action.acceptablePixelDifferences = new Screenshot();
-                    }
-                    else {
-                        await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
-                    }
-                    await action.pixelDiff();
+                if(action.acceptablePixelDifferences) {
+                    await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
                 }
+                action.calculatePixelDiff();
                 updateStepInView(Test.current.steps[action.index - 1]);
                 /** Add rectangles where we don't care about pixel differences. */
                 addVolatileRegions();
@@ -688,15 +665,42 @@ var _lastMouseMove;
  */
 $('#step').on('click', '#correctAsUnpredictable', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.correctAsUnpredictable, e);
+    await actions.callMethodByUser(actions.applyCorrections, e);
+});
+
+/** 
+ * Click the question mark to create unpredictable regions/corrections.
+ */
+ $('#step').on('click', '#correctAsAntiAlias', async (e) => {
+    e.stopPropagation();
+    await actions.callMethodByUser(actions.applyCorrections, e);
+});
+
+$("#step").on('click', '#correctAsActual', async (e) => {
+    e.stopPropagation();
+    await actions.callMethodByUser(actions.applyCorrections, e);
 });
 
 /** 
  * Click the magic wand to apply the possible corrections
  */
-$('#step').on('click', '#possibleCorrections', async (e) => {
+ $('#step').on('click', '#possibleCorrections', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.addCorrections, e);
+    await actions.callMethodByUser(actions.applyCorrections, e);
+});
+
+// color the rectangles when we are about to commit them
+$('#step').on('mouseenter', '#correctAsUnpredictable', (e) => {
+    $('.rectangle').attr('type', 'UnpredictableCorrection');
+});
+$('#step').on('mouseenter', '#correctAsActual', (e) => {
+    $('.rectangle').attr('type', 'ActualCorrection');
+});
+$('#step').on('mouseenter', '#correctAsAntiAlias', (e) => {
+    $('.rectangle').attr('type', 'AntiAliasCorrection');
+});
+$('#step').on('mouseleave', '#correctAsUnpredictable, #correctAsActual', (e) => {
+    $('.rectangle').removeAttr('type');
 });
 
 /**
@@ -747,12 +751,7 @@ $('#step').on('mouseleave', '#possibleCorrections', function (e) {
 
 $('#step').on('click', '#undo', async (e) => {
     e.stopPropagation();
-    await actions.callMethodByUser(actions.seeDelta);
-});
-
-$("#step").on('click', '#correctAsActual', async (e) => {
-    e.stopPropagation();
-    await actions.callMethodByUser(actions.correctAsActual, e);
+    await actions.callMethodByUser(actions.undo);
 });
 
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
@@ -774,13 +773,27 @@ $('#cards').on('click', '.thumb',
 
 let diffPromise = false;
 
-/** Enable the ability to draw rectangles on the screenshot. */
+/** 
+ * (Try to) 
+ * enable the ability to draw rectangles on the screenshot. */
 function addVolatileRegions() {
-    const { view } = getCard($('#content .card.waiting')[0], Test.current);
+    const { view, action } = getCard($('#content .card.waiting')[0], Test.current);
+
+    // can't add rectangles unless there are red pixels
+    if(!action.numDiffPixels) {
+        return;
+    }
+
     let screenshot = view.find('.screenshot');
+    // you can only draw rectangles if there are red pixels.
+
     Rectangle.setContainer(screenshot[0],
         () => {
-            console.debug('rectangle added');
+            // if control gets here there are red pixels      
+            // and there is an untyped rectangle showing.
+            $('#possibleCorrections').attr('disabled', true); // wand
+            $('#correctAsUnpredictable').attr('disabled', false); // question mark
+            $('#correctAsAntiAlias').attr('disabled', false); // iron
         },
         () => {
             console.debug('rectangle deleted');
@@ -850,6 +863,7 @@ function setToolbarState() {
         else {
             pb.prop('title', "Click to play.");
             // not playing, not recoding
+
             $('[data-action="openZip"]').attr('disabled', false);
             $('[data-action="loadLibrary"]').attr('disabled', false);
             $('[data-action="recordActiveTab"]').attr('disabled', false);
@@ -964,6 +978,14 @@ async function _playSomething() {
                 if (!await startingTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
                     throw new Errors.ReuseTestWindow(); // if you can't then there is no way to resume
                 }
+
+                // if we never played anything but start in the middle I guess the
+                // best we can do is assume one tab exists.
+                if(! Tab.getByVirtualId(0)) {
+                    Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
+                    startingTab.trackCreated();
+                }
+                
             }
 
             startingTab.width = actions[0].tab.width;
@@ -1811,7 +1833,7 @@ async function captureScreenshotAsDataUrlForRecording() {
     let startingActiveTabId = Tab.active.virtualId;
     while (((performance.now() - start)) < options.captureScreenshotAsDataUrlForRecordingTimeout) {
         try {
-            _lastScreenshot = await player.captureScreenshotAsDataUrl();
+            _lastScreenshot = await player.captureScreenshot();
             return _lastScreenshot;
         }
         catch (e) {

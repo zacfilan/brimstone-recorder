@@ -8,38 +8,51 @@
     }
 }
 .blocker {
-    background: rgba(128,128,128,0.75);
+    background: rgba(128, 128, 128, 0.75);
 }
 ////
 
 /// for the edit rectangles
 .rectangle {
     position: absolute;
-    background: rgba(241, 160, 160, 0.6);
-    border: 1px dashed red;
+    border: 1px dashed black;
+
+    &[type="ActualCorrection"] {
+        background: rgba(255, 255, 255, 0.9);
+
+        //these make grey scale but I lose the border
+        //background: white;
+        //mix-blend-mode: hue; // turns the contents to grey scale
+    }
+    &[type="UnpredictableCorrection"] {
+        background: rgba(255, 165, 0, 0.9);
+    }
+    &[type="AntiAliasCorrection"] {
+        background: rgba(0, 255, 0, 0.9);
+    }
 }
 ///
 
 #confirmSave {
     display: flex;
     font-size: 14px;
-    #title{
+    #title {
         font-size: 15px;
         margin-bottom: 12px;
     }
     #message {
-        margin-bottom: .6em;
+        margin-bottom: 0.6em;
     }
-    #buttons{
+    #buttons {
         display: flex;
         justify-content: end;
         margin-top: 2em;
     }
     a.button {
         margin-left: 1em;
-        background-color: #1a73e8; 
+        background-color: #1a73e8;
         border: 1px solid white;
-        outline: 2px solid #1a73e8 ;
+        outline: 2px solid #1a73e8;
         border-radius: 5px;
         color: white;
         padding: 10px;
@@ -50,14 +63,13 @@
         //margin: 4px 2px;
         cursor: pointer;
         &:hover {
-            opacity: .5;
+            opacity: 0.5;
         }
     }
     #confirmDiscardChangesButton {
         background-color: white;
         color: #1a73e8;
     }
-    
 }
 
 html {
@@ -152,8 +164,6 @@ html {
         #playButton.active {
             background: green;
         }
-
-
     }
     button:hover {
         background: rgb(75, 75, 75);
@@ -447,7 +457,7 @@ button {
     .card.waiting {
         //in the edit state
         &.edit {
-            .screenshot {
+            .screenshot.hasRedPixels {
                 cursor: crosshair;
                 position: unset; // for some reason when drawing rectangles I need this
                 &.relative-position {
@@ -510,12 +520,17 @@ button {
             animation: progressBar var(--screenshot-timeout) ease-in-out;
             animation-fill-mode: both;
         }
-    }
-    .autoPlay svg path {
-        fill: green
+
+        .actions {
+            button {
+                border: 1px solid transparent;
+                &.autoPlay {
+                    border: 1px solid green;
+                }
+            }
+        }
     }
 }
-
 /** only show the meter on the next card when playing back */
 #step {
     height: calc(100% - 172px);
@@ -637,7 +652,7 @@ button {
 progress {
     -webkit-appearance: none;
     width: 25%;
-    
+
     &::-webkit-progress-bar {
         border-radius: 1em;
         padding: 1px;
@@ -647,6 +662,5 @@ progress {
     &::-webkit-progress-value {
         background-color: green;
         border-radius: 1em;
-   }
+    }
 }
-

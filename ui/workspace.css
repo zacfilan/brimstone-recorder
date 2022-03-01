@@ -14,8 +14,19 @@
 
 .rectangle {
   position: absolute;
-  background: rgba(241, 160, 160, 0.6);
-  border: 1px dashed red;
+  border: 1px dashed black;
+}
+
+.rectangle[type="ActualCorrection"] {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.rectangle[type="UnpredictableCorrection"] {
+  background: rgba(255, 165, 0, 0.9);
+}
+
+.rectangle[type="AntiAliasCorrection"] {
+  background: rgba(0, 255, 0, 0.9);
 }
 
 #confirmSave {
@@ -31,7 +42,7 @@
 }
 
 #confirmSave #message {
-  margin-bottom: .6em;
+  margin-bottom: 0.6em;
 }
 
 #confirmSave #buttons {
@@ -60,7 +71,7 @@
 }
 
 #confirmSave a.button:hover {
-  opacity: .5;
+  opacity: 0.5;
 }
 
 #confirmSave #confirmDiscardChangesButton {
@@ -550,12 +561,12 @@ button img {
   /** hide that one */
 }
 
-#content .card.waiting.edit .screenshot {
+#content .card.waiting.edit .screenshot.hasRedPixels {
   cursor: crosshair;
   position: unset;
 }
 
-#content .card.waiting.edit .screenshot.relative-position {
+#content .card.waiting.edit .screenshot.hasRedPixels.relative-position {
   position: relative;
 }
 
@@ -614,8 +625,12 @@ button img {
           animation-fill-mode: both;
 }
 
-#content .autoPlay svg path {
-  fill: green;
+#content .card.waiting .actions button {
+  border: 1px solid transparent;
+}
+
+#content .card.waiting .actions button.autoPlay {
+  border: 1px solid green;
 }
 
 /** only show the meter on the next card when playing back */

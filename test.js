@@ -1,3 +1,5 @@
+'use strict';
+
 import { TestAction, constants } from "./ui/card.js";
 import { Screenshot } from "./ui/screenshot.js";
 import { brimstone } from "./utilities.js";
@@ -398,7 +400,7 @@ export class Test {
         return this;
     }
 
-    /** schedules some code to set the pngs for expected screnshots
+    /** schedules some code to set the pngs for expected screenshots
      * and the dataurl+pngs for actions with allowed differences.
      * this sets a promise that can be sampled with getHydratedForPlayPromise()
      * @param {Test} test The test we need to hydrate
@@ -422,9 +424,7 @@ export class Test {
                         await action.acceptablePixelDifferences.hydrate(screenshots);
                     }
                 }
-                if (action.expectedScreenshot && !action.expectedScreenshot.png) {
-                    await action.expectedScreenshot.createPngFromDataUrl();
-                }
+                action.expectedScreenshot?.png; 
             }
             if (progressCallback) {
                 clearInterval(id);
@@ -443,9 +443,6 @@ export class Test {
             delete step.actualScreenshot;
             delete step.expectedScreenshot;
             delete step.acceptablePixelDifferences;
-            delete step.lastVerifyScreenshotDiffDataUrl;
-            delete step.editViewDataUrl;
-            delete step.lastVerifyScreenshotDiffPng;
         });
     }
 }
