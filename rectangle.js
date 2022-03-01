@@ -185,10 +185,10 @@ export class UnpredictableCorrection extends Correction {
                 png: new PNG({
                     width: action.pixelDiffScreenshot.png.width,
                     height: action.pixelDiffScreenshot.png.height
-                })
+                }),
+                fileName: `step${action.index}_acceptablePixelDifferences.png`
             });
         }
-        action.acceptablePixelDifferences.fileName = `step${action.index}_acceptablePixelDifferences.png`;
 
         let png = action.acceptablePixelDifferences.png;
         let ymax = this.bounds.y0 + this.bounds.height;
@@ -487,7 +487,8 @@ export class AntiAliasCorrection extends SparseApplyCorrection {
                 png: new PNG({
                     width: action.pixelDiffScreenshot.png.width,
                     height: action.pixelDiffScreenshot.png.height
-                })
+                }),
+                fileName: `step${action.index}_acceptablePixelDifferences.png`
             });
         }
 

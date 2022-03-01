@@ -378,7 +378,7 @@ export class TestAction {
         this.percentDiffPixels = UiPercentDelta.toFixed(2);
 
         this._match = constants.match.FAIL; // until we determine different
-        if (numDiffPixels <= options.numberOfRedPixelsAllowed) { // it matched
+        if (numDiffPixels === 0) { // it matched
             this._match = constants.match.PASS;
             if (numMaskedPixels || numUnusedMaskedPixels) { // it matched only because of the masking we allowed
                 this._match = constants.match.ALLOW;
@@ -677,11 +677,6 @@ export class Step {
 
             if (this.next._match === constants.match.ALLOW) {
                 title.text += ` <span id='unpredictable-pixels'>&nbspHas unpredictable pixels.</span>`;
-            }
-            // only show the has allowed red pixels if there are some and the option is on. cap the number
-            if (options.numberOfRedPixelsAllowed && this.next.numDiffPixels) {
-                let count = Math.min(options.numberOfRedPixelsAllowed, this.next.numDiffPixels);
-                title.text += ` <span id='error-pixels'>&nbspHas ${count} allowed red pixels.</span>`;
             }
 
             let classes = 'waiting';

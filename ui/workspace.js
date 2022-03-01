@@ -229,7 +229,8 @@ class Actions {
             png: new PNG({
                 width: action.pixelDiffScreenshot.png.width,
                 height: action.pixelDiffScreenshot.png.height
-            })
+            }),
+            fileName: `step${action.index}_acceptablePixelDifferences.png`
         }); // chuck whatever we got out.
         action.calculatePixelDiff();
         updateStepInView(Test.current.steps[action.index - 1]);

@@ -93,11 +93,6 @@ export class Options {
     postMetricsOnFail = false;
 
     /**
-     * Allow another knob for fixing bad pixels globally. This is easy to abuse!
-     */
-    numberOfRedPixelsAllowed = 0;
-
-    /**
      * Allow the user to identify the machine that this instance of brimstone-recorder 
      * is installed on. can be used to classify application test run persisted performance 
      * based on which machine was running the test app.

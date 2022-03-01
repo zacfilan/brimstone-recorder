@@ -233,27 +233,6 @@ export class Player {
 
             action._view = constants.view.EXPECTED;
 
-            next.autoCorrected = false;
-            if (next._match === constants.match.FAIL && (options.autoCorrectActual || options.autoCorrectUnpredictable)) {
-                let correctionApplied = false;
-                Correction.availableInstances.forEach(correction => {
-                    if (correction instanceof SparseApplyCorrection && options.autoCorrectActual && correction.matches(next)) {
-                        correction.apply(next);
-                        correctionApplied = true;
-                    }
-                    else if (correction instanceof UnpredictableCorrection && options.autoCorrectUnpredictable && correction.matches(next)) {
-                        correction.apply(next);
-                        correctionApplied = true;
-                    }
-                });
-                if (correctionApplied) {
-                    await this.verifyScreenshot({ step: next, max_attempts: 1, fastFail: false }); // see if the auto-correction fixed it.
-                    if (next._match === constants.match.PASS || next._match === constants.match.ALLOW) {
-                        next.autoCorrected = true;
-                    }
-                }
-            }
-
             switch (next._match) {
                 case constants.match.PASS:
                 case constants.match.ALLOW:
@@ -668,13 +647,15 @@ export class Player {
      * @param {boolean} args.fastFail Should the pixelmatch fail on the first mismatching pixel? 
      * @returns {string} _match property in the nextStep parameter passed in
      */
-    async verifyScreenshot({ step, max_attempts = 100000000, fastFail = true }) {
+    async verifyScreenshot({ step, max_attempts = 100000000 }) {
         let nextStep = step;
         let start = performance.now();
 
         let i = 0;
         let badTab = false;
 
+        let attemptAutocorrect = ( Correction.availableInstances.length && (options.autoCorrectActual || options.autoCorrectUnpredictable ));
+        
         // this loop will run even if the app is in the process of navigating to the next page.
         while ((((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
             if (this._stopPlaying) { // asyncronously injected
@@ -720,17 +701,41 @@ export class Player {
             }
 
             nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
-            nextStep.calculatePixelDiff({ fastFail: fastFail });
+            nextStep.calculatePixelDiff({ fastFail: !attemptAutocorrect }); // can't fast fail if auto correct because we use the whole diffPng in checking applicability of the correction
             if (nextStep._match !== constants.match.FAIL) {
                 return nextStep._match;
             }
 
-            // else it didn't match so we loop. I should be able to throttle the rate at which I take screenshots, but do I NEED to?
+            // if it failed and auto correct is on - auto correct it right now if possible.
+            nextStep.autoCorrected = false;
+            if (attemptAutocorrect) {
+                let correctionApplied = false;
+                Correction.availableInstances.forEach(correction => {
+                    if (correction instanceof SparseApplyCorrection && options.autoCorrectActual && correction.matches(nextStep)) {
+                        correction.apply(nextStep);
+                        correctionApplied = true;
+                    }
+                    else if (correction instanceof UnpredictableCorrection && options.autoCorrectUnpredictable && correction.matches(nextStep)) {
+                        correction.apply(nextStep);
+                        correctionApplied = true;
+                    }
+                });
+                if (correctionApplied) {
+                    nextStep.calculatePixelDiff({ fastFail: false });
+                    if (nextStep._match !== constants.match.FAIL) {
+                        nextStep.autoCorrected = true;
+                        return nextStep._match; // auto correct fixed it for us
+                    }
+                    // else - it didn't fix it all.
+                }
+            }
+
+            // it didn't match so we loop. I should be able to throttle the rate at which I take screenshots, but do I NEED to?
             await sleep(options.verifyScreenshotRetryComparisonTimeout);
         }
 
         // The screenshots apparently don't match
-        if (fastFail) {
+        if (!attemptAutocorrect) {
             // do a final (complete) check to get all different data, i.e. don't fastFail out of the diff
             nextStep.calculatePixelDiff({ fastFail: false });
             if (nextStep._match !== constants.match.FAIL) {
