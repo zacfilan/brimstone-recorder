@@ -209,6 +209,7 @@ export class Player {
                 await this[action.type](action); // really perform this in the browser (this action may start some navigations)
                 console.log(`[step:${action.index + 1} tab:${action.tab.id}] end   play "${action.description}"`);
             }
+            delete action.pixelDiffScreenshot; // save a lttle memory. I don't need to hang onto calculatable previous step data
 
             // grep for FOCUS ISSUE for details
             if (i === startIndex && action.type === 'goto') {

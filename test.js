@@ -24,6 +24,11 @@ export class Test {
         this.dirty = false;
 
         /**
+         * Like dirty, but only because the version is older.
+         */
+        this.oldVersion = false;
+
+        /**
          * These are the individual actions of the test.
          * @type {TestAction[]}
          */
@@ -80,6 +85,11 @@ export class Test {
          * @type {string}
          */
         this.brimstoneVersion = undefined;
+
+        /**
+        * If the edit actions are autoplay or not
+        */
+        this.autoPlay = false;
     }
 
     /** 
@@ -323,14 +333,19 @@ export class Test {
         }
 
         if (this.brimstoneVersion > BDS.brimstoneVersion) {
-            throw new Errors.InvalidVersion(`You must upgrade Brimstone to at least version '${this.brimstoneVersion}' to load test '${this.filename}'`);
+            let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with a newer version of Brimstone than you are currently using. This test mght misbehave unless you upgrade Brimstone to at least version '${this.brimstoneVersion}', but that's up to you.
+            
+Continue to load this newer test with your older version of Brimstone?`);
+            if(!tryAnyway) {
+                return false; // bail
+            }
         }
 
         let screenshotPromises = [];
         for (let i = 0; i < actions.length; ++i) {
             let _action = actions[i];
             if (this.brimstoneVersion < BDS.brimstoneVersion) {
-                this.dirty = true;
+                this.oldVersion = true; 
                 // convert old tests
                 if (_action.type === 'start') {
                     _action.type = 'goto';
@@ -439,11 +454,7 @@ export class Test {
      * A better approach is to refactor the PlayTree, Test, TestAction, BDS.Test BDS.step classes.
      */
     removeScreenshots() {
-        this.steps.forEach(step => {
-            delete step.actualScreenshot;
-            delete step.expectedScreenshot;
-            delete step.acceptablePixelDifferences;
-        });
+        delete this.steps;
     }
 }
 

@@ -208,7 +208,7 @@ class Actions {
         await action.applyCorrections(view, e);
         updateStepInView(Test.current.steps[action.index - 1]);
         action.test.dirty = true;
-        if (action.autoPlay) {
+        if (Test.current.autoPlay) {
             this.callMethod(this.playSomething);
         }
         else {
@@ -224,7 +224,7 @@ class Actions {
     async undo() {
         // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
         const { view, action } = getCard('#content .waiting', Test.current);
-        action.autoPlay = false;
+        Test.current.autoPlay = false;
         action.acceptablePixelDifferences = new Screenshot({
             png: new PNG({
                 width: action.pixelDiffScreenshot.png.width,
@@ -255,7 +255,7 @@ class Actions {
             //     await actions.saveZip();
             // }
 
-            let result = await actions.confirmSaveModal();
+            let result = await actions.confirmSaveModal(`🙋❓ File '${Test.current.filename}' has unsaved changes.`);
         }
 
         Test.current.removeScreenshots();
@@ -477,14 +477,14 @@ class Actions {
         await _stopPlaying();
     }
 
-    async confirmSaveModal() {
+    async confirmSaveModal(message) {
         Test.current.filename
         let userButtonPress = new Promise(resolve => {
             this._modalClosed = resolve;
         });
 
         let cs = $('#confirmSave');
-        cs.find("#message").text(`🙋❓ File '${Test.current.filename}' has unsaved changes.`);
+        cs.find("#message").text(message);
         cs.modal();
         return userButtonPress;
     }
@@ -1031,7 +1031,7 @@ async function _playSomething() {
                 case constants.match.FAIL:
                     let step = Test.current.steps[currentStepIndex()];
                     let next = Test.current.steps[currentStepIndex() + 1];
-                    next.autoPlay = true;
+                    Test.current.autoPlay = true;
                     updateStepInView(step);
 
                     addVolatileRegions(); // you can draw right away

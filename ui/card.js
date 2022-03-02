@@ -200,11 +200,6 @@ export class TestAction {
     breakPoint = false;
 
     /**
-     * If the edit actions are autoplay or not
-     */
-    autoPlay = false;
-
-    /**
      * If the last time this action was played it was autocorrected or not.
      */
     autoCorrected = false;
@@ -626,8 +621,8 @@ export class Step {
                         break;
                     case constants.view.EDIT:
                         title.text += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
-                        let autoplay = this.next.autoPlay ? "autoPlay" : '';
-                        let titleSuffix = this.next.autoPlay ? '. Autoplay.' : '';
+                        let autoplay = this.next.test.autoPlay ? "autoPlay" : '';
+                        let titleSuffix = autoplay ? '. Autoplay.' : '';
 
                         // at this point there can be NO untyped rectangles. But there *might* be red pixels or not.
                         let noRedPixels = !this.next.numDiffPixels;
