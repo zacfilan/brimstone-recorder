@@ -1,3 +1,5 @@
+@import "../switch.scss";
+
 //// for any modal
 .modal {
     color: black;
@@ -11,6 +13,23 @@
     background: rgba(128, 128, 128, 0.75);
 }
 ////
+
+#right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+
+    .toggle {
+        display: flex;
+        cursor: pointer;
+        border: 1px solid white;
+        border-radius: 3px;
+        padding: 0 5px;
+        .label {
+            line-height: 16px; // center the text
+        }
+    }
+}
 
 /// for the edit rectangles
 .rectangle {
@@ -233,6 +252,7 @@ button {
         height: 20px;
         width: 20px;
         fill: white;
+        vertical-align: bottom;
     }
 
     img {
@@ -522,12 +542,17 @@ button {
         }
 
         .actions {
+            .hide {
+                display: none;
+            }
             button {
                 border: 1px solid transparent;
-                &.autoPlay {
+                &[autoplay="true"]:not([disabled]) {
                     border: 1px solid green;
                 }
             }
+            display: flex;
+            flex-direction: row;
         }
     }
 }

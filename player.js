@@ -655,7 +655,7 @@ export class Player {
         let i = 0;
         let badTab = false;
 
-        let attemptAutocorrect = ( Correction.availableInstances.length && (options.autoCorrectActual || options.autoCorrectUnpredictable ));
+        let attemptAutocorrect = ( Correction.availableInstances.length && options.autoCorrect);
         
         // this loop will run even if the app is in the process of navigating to the next page.
         while ((((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
@@ -712,11 +712,7 @@ export class Player {
             if (attemptAutocorrect) {
                 let correctionApplied = false;
                 Correction.availableInstances.forEach(correction => {
-                    if (correction instanceof SparseApplyCorrection && options.autoCorrectActual && correction.matches(nextStep)) {
-                        correction.apply(nextStep);
-                        correctionApplied = true;
-                    }
-                    else if (correction instanceof UnpredictableCorrection && options.autoCorrectUnpredictable && correction.matches(nextStep)) {
+                    if (options.autoCorrect && correction.matches(nextStep)) {
                         correction.apply(nextStep);
                         correctionApplied = true;
                     }

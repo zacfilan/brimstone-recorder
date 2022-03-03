@@ -208,7 +208,7 @@ class Actions {
         await action.applyCorrections(view, e);
         updateStepInView(Test.current.steps[action.index - 1]);
         action.test.dirty = true;
-        if (Test.current.autoPlay) {
+        if (enableAutoPlayCheckbox.checked) {
             this.callMethod(this.playSomething);
         }
         else {
@@ -224,7 +224,6 @@ class Actions {
     async undo() {
         // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
         const { view, action } = getCard('#content .waiting', Test.current);
-        Test.current.autoPlay = false;
         action.acceptablePixelDifferences = new Screenshot({
             png: new PNG({
                 width: action.pixelDiffScreenshot.png.width,
@@ -488,6 +487,27 @@ class Actions {
         cs.modal();
         return userButtonPress;
     }
+
+    async enableAutoPlayCheckbox(e) {
+        $('.card.edit').find('button[autoplay]').each( (index, button) => {
+            button.setAttribute('autoplay', enableAutoPlayCheckbox.checked ? 'true' : 'false');
+            let title = button.getAttribute('title');
+            title = title.replace(' Autoplay.', '');
+            if(enableAutoPlayCheckbox.checked) {
+                title += ' Autoplay.';
+            }
+
+            button.setAttribute('title', title);
+        }); // .attr() didn't work for me
+        options.autoPlay = enableAutoPlayCheckbox.checked; // save it. note that changing this from the options page will not change the UI!
+        await saveOptions(options);
+    }
+
+    async enableAutoCorrectCheckbox(e) {
+        $('#possibleCorrections').toggleClass('hide', !!enableAutoCorrectCheckbox.checked);
+        options.autoCorrect = !!enableAutoCorrectCheckbox.checked;
+        await saveOptions(options);
+    }
     //#endregion userActions
 
 }
@@ -571,6 +591,9 @@ let installType;
     else {
         disableConsole(); // can be reenabled in the debugger later
     }
+
+    enableAutoCorrectCheckbox.checked = options.autoCorrect;
+    enableAutoPlayCheckbox.checked = options.autoPlay;
 
     for (let i = 0; i < 3 && !options.installedOnAlias; ++i) {
         options.installedOnAlias = await brimstone.window.prompt('Please provide an identifier for this computer. It can be the real computer name or something else, e.g. "Zac\'s Laptop"');
@@ -716,7 +739,8 @@ $('#step').on('mouseenter', '#possibleCorrections', function (e) {
     // We must see which ones are in fact applicable. This would've/could've have been done during the last play of this action.
     Correction.applicableInstances = Correction.availableInstances.filter(c => c.matches(action));
     if (!Correction.applicableInstances?.length) {
-        return;
+        possibleCorrections.disabled = true;
+        possibleCorrections.parentNode.setAttribute('title', 'None of the available corrections\nmatch this screen.');
     }
 
     let screenshot = $(this).closest(".card").find('.screenshot'); // FIXME: screenshot size != img size ??
@@ -750,10 +774,25 @@ $('#step').on('mouseleave', '#possibleCorrections', function (e) {
     screenshot.find(".rectangle").remove();
 });
 
+$('#autoPlaySwitch').on('click', async (e) => {
+    e.stopPropagation();
+    await actions.callMethodByUser(actions.enableAutoPlayCheckbox, e);
+});
+
+$('#autoCorrectSwitch').on('click', async (e) => {
+    e.stopPropagation();
+    await actions.callMethodByUser(actions.enableAutoCorrectCheckbox, e);
+});
+
 $('#step').on('click', '#undo', async (e) => {
     e.stopPropagation();
     await actions.callMethodByUser(actions.undo);
 });
+
+$('#step').on('click', '.stopPropagation', async (e) => {
+    e.stopPropagation();
+});
+
 
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
     e.stopPropagation();
@@ -790,8 +829,8 @@ function addVolatileRegions() {
 
     Rectangle.setContainer(screenshot[0],
         () => {
-            // if control gets here there are red pixels      
-            // and there is an untyped rectangle showing.
+            // if control gets here, we added an untyped rectangle, which can only happen if there are red pixels.      
+            // so, there are red pixels and an untyped rectangle is showing.
             $('#possibleCorrections').attr('disabled', true); // wand
             $('#correctAsUnpredictable').attr('disabled', false); // question mark
             $('#correctAsAntiAlias').attr('disabled', false); // iron
@@ -1031,7 +1070,6 @@ async function _playSomething() {
                 case constants.match.FAIL:
                     let step = Test.current.steps[currentStepIndex()];
                     let next = Test.current.steps[currentStepIndex() + 1];
-                    Test.current.autoPlay = true;
                     updateStepInView(step);
 
                     addVolatileRegions(); // you can draw right away

@@ -85,11 +85,6 @@ export class Test {
          * @type {string}
          */
         this.brimstoneVersion = undefined;
-
-        /**
-        * If the edit actions are autoplay or not
-        */
-        this.autoPlay = false;
     }
 
     /** 

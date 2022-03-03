@@ -60,47 +60,4 @@
 .switch .slider.round:before {
   border-radius: 50%;
 }
-
-table {
-  margin: 1em;
-}
-
-table td input {
-  cursor: pointer;
-}
-
-details summary {
-  font-size: 14px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-details summary:hover {
-  background-color: lightblue;
-}
-
-.slider {
-  border: 1px solid darkslategrey;
-  padding: 0 1em;
-}
-
-.slider label {
-  vertical-align: super;
-  color: darkslategrey;
-  font-style: italic;
-}
-
-svg {
-  width: 24px;
-  height: 24px;
-  color: lightblue;
-}
-
-#postMetricsEndpoint {
-  width: 500px;
-}
-
-#timeouts {
-  margin-left: 1em;
-}
-/*# sourceMappingURL=options.css.map */
+/*# sourceMappingURL=switch.css.map */

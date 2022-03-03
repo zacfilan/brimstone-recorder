@@ -151,10 +151,7 @@ export class Options {
      * If they match, then the correction is applied, meaning the actual pixels
      * overwrite corresponding expected pixels in the expectedScreenshot of the 
      * current action.
-     */
-    autoCorrectActual = true;
-
-    /**
+     * 
      * Automatically apply "unpredictable" type corrections.
      * Unpredictable corrections are applicable if there are ANY
      * red pixels in the rectangle defining the boundary of the
@@ -162,7 +159,13 @@ export class Options {
      * If applicable, the unpredictable region is added to the 
      * acceptablePixelDifferences screenshot of the action.
      */
-    autoCorrectUnpredictable = false;
+    autoCorrect = true;
+
+    /**
+     * Automatically resume playing after applying a 
+     * correction.
+     */
+    autoPlay = true;
 
     /**
      * Should we forget the corrections we learned when the 

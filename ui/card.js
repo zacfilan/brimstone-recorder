@@ -621,8 +621,7 @@ export class Step {
                         break;
                     case constants.view.EDIT:
                         title.text += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
-                        let autoplay = this.next.test.autoPlay ? "autoPlay" : '';
-                        let titleSuffix = autoplay ? '. Autoplay.' : '';
+                        let titleSuffix = enableAutoPlayCheckbox.checked ? ' Autoplay.' : '';
 
                         // at this point there can be NO untyped rectangles. But there *might* be red pixels or not.
                         let noRedPixels = !this.next.numDiffPixels;
@@ -630,17 +629,23 @@ export class Step {
                         let questionMarkDisabled = true; // there is no untyped rectangle
                         let ironDisabled = true; // there is no untyped rectangle
                         let checkDisabled = noRedPixels; // disabled if there are no red pixels
+                        let autoplay = options.autoPlay ? 'autoplay="true"' : "autoplay='false'";
 
                         title.actions = `
-                        <button ${wandDisabled ? 'disabled': ''} title="Possible corrections${titleSuffix}" id="possibleCorrections" class="${autoplay}">
+                        <div class="stopPropagation" title="Enabled when there are red pixels,\navailable corrections, and you have\nnot drawn a selecting rectangle.">
+                         <button class="${options.autoCorrect ? "hide" : ""}"${wandDisabled ? 'disabled': ''} title="Possible corrections.${titleSuffix}" id="possibleCorrections" ${autoplay}>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M3.682 149.1L53.32 170.7L74.02 220.3c1.016 2.043 3.698 3.696 5.977 3.696c.0078 0-.0078 0 0 0c2.271-.0156 4.934-1.661 5.946-3.696l20.72-49.63l49.62-20.71c2.023-1.008 3.68-3.681 3.691-5.947C159.1 141.7 158.3 139 156.3 138L106.9 117.4L106.5 117L85.94 67.7C84.93 65.66 82.27 64.02 80 64c-.0078 0 .0078 0 0 0c-2.279 0-4.966 1.649-5.981 3.692L53.32 117.3L3.682 138C1.652 139.1 0 141.7 0 144C0 146.3 1.652 148.9 3.682 149.1zM511.1 368c-.0039-2.273-1.658-4.95-3.687-5.966l-49.57-20.67l-20.77-49.67C436.9 289.7 434.3 288 432 288c-2.281 0-4.948 1.652-5.964 3.695l-20.7 49.63l-49.64 20.71c-2.027 1.016-3.684 3.683-3.687 5.956c.0039 2.262 1.662 4.954 3.687 5.966l49.57 20.67l20.77 49.67C427.1 446.3 429.7 448 432 448c2.277 0 4.944-1.656 5.96-3.699l20.69-49.63l49.65-20.71C510.3 372.9 511.1 370.3 511.1 368zM207.1 64l12.42 29.78C221 95.01 222.6 96 223.1 96s2.965-.9922 3.575-2.219L239.1 64l29.78-12.42c1.219-.6094 2.215-2.219 2.215-3.578c0-1.367-.996-2.969-2.215-3.578L239.1 32L227.6 2.219C226.1 .9922 225.4 0 223.1 0S221 .9922 220.4 2.219L207.1 32L178.2 44.42C176.1 45.03 176 46.63 176 48c0 1.359 .9928 2.969 2.21 3.578L207.1 64zM399.1 191.1c8.875 0 15.1-7.127 15.1-16v-28l91.87-101.7c5.75-6.371 5.5-15.1-.4999-22.12L487.8 4.774c-6.125-6.125-15.75-6.375-22.12-.625L186.6 255.1H144c-8.875 0-15.1 7.125-15.1 15.1v36.88l-117.5 106c-13.5 12.25-14.14 33.34-1.145 46.34l41.4 41.41c12.1 12.1 34.13 12.36 46.37-1.133l279.2-309.5H399.1z"/></svg>
                         </button>
+                        </div>
 
-                        <button ${questionMarkDisabled ? 'disabled': ''} title="Mark red pixels in rectangle(s) as unpredictable${titleSuffix}" id="correctAsUnpredictable" class="${autoplay}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
-                        </button>
+                        <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
+                            <button ${questionMarkDisabled ? 'disabled': ''} title="Mark red pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsUnpredictable" ${autoplay}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
+                            </button>
+                        </div>
 
-                        <button ${ironDisabled ? 'disabled': ''} title="Mark red pixels in rectangle(s) as anti-alias differences${titleSuffix}" id="correctAsAntiAlias" class="${autoplay}">
+                        <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
+                        <button ${ironDisabled ? 'disabled': ''} title="Mark red pixels in rectangle(s) as anti-alias differences.${titleSuffix}" id="correctAsAntiAlias" ${autoplay}>
                             <svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
                                 viewBox="0 0 489.962 489.962" style="enable-background:new 0 0 489.962 489.962;" xml:space="preserve">
                                     <path d="M486.8,248.733c-15.9-14.8-22.6-38.9-16.3-59.9c0.8-2.3,23.9-54.7-17.5-71.5c-31.7-7.8-52.5,5.4-57.9,10.9l-2-4.2
@@ -651,10 +656,13 @@ export class Step {
                             
                             </svg>
                         </button>
+                        </div>
 
-                        <button ${checkDisabled ? 'disabled': ''} title="Mark red pixels/rectangles as correct${titleSuffix}" id="correctAsActual" class=" ${autoplay}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M438.6 105.4C451.1 117.9 451.1 138.1 438.6 150.6L182.6 406.6C170.1 419.1 149.9 419.1 137.4 406.6L9.372 278.6C-3.124 266.1-3.124 245.9 9.372 233.4C21.87 220.9 42.13 220.9 54.63 233.4L159.1 338.7L393.4 105.4C405.9 92.88 426.1 92.88 438.6 105.4H438.6z"/></svg>
-                        </button>
+                        <div class='stopPropagation' title="Enabled when red pixels exist.">
+                            <button ${checkDisabled ? 'disabled': ''} title="Mark red pixels/rectangles as correct.${titleSuffix}" id="correctAsActual" ${autoplay}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M438.6 105.4C451.1 117.9 451.1 138.1 438.6 150.6L182.6 406.6C170.1 419.1 149.9 419.1 137.4 406.6L9.372 278.6C-3.124 266.1-3.124 245.9 9.372 233.4C21.87 220.9 42.13 220.9 54.63 233.4L159.1 338.7L393.4 105.4C405.9 92.88 426.1 92.88 438.6 105.4H438.6z"/></svg>
+                            </button>
+                        </div>
 
                         <button title="Clear Unpredictable Pixels" id="undo">
                             <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"

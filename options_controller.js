@@ -27,8 +27,8 @@ async function save_options() {
     //#region checking options
     options.MAX_VERIFY_TIMEOUT = parseInt(matchTimeout.value, 10);
     options.pixelMatchThreshhold = pixelMatchThreshholdLookup[parseFloat(pixelMatchSenstivity.value)];
-    options.autoCorrectActual = autoCorrectActual.checked;
-    options.autoCorrectUnpredictable = autoCorrectUnpredictable.checked;
+    options.autoCorrect = autoCorrect.checked;
+    options.autoPlay = autoPlay.checked;
     //#endregion checking option
 
     //#region playback options
@@ -94,8 +94,8 @@ async function restore_options() {
     //#region checking options
     matchTimeout.value = options.MAX_VERIFY_TIMEOUT;
     pixelMatchSenstivity.value = pixelMatchThreshholdLookup.indexOf(options.pixelMatchThreshhold);
-    autoCorrectActual.checked = options.autoCorrectActual;
-    autoCorrectUnpredictable.checked = options.autoCorrectUnpredictable;
+    autoCorrect.checked = options.autoCorrect;
+    autoPlay.checked = options.autoPlay;
     //#endregion checking options
 
     //#region playback options
