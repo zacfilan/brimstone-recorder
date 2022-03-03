@@ -523,8 +523,8 @@ export class ActualCorrection extends SparseApplyCorrection {
     }
 
     /**
-    * Poke the actual pixels from this correction into the expected
-    * pixels screenshot.
+    * Poke all the pixels from the rectangle in the actual screenshot
+    * into the the expected pixels screenshot.
     * @param {TestAction} action the action to apply this correction to.
     */
     apply(action) {
@@ -532,13 +532,21 @@ export class ActualCorrection extends SparseApplyCorrection {
             throw new Error("Bad width");
         }
 
-        this._forEachPixel((pixelCondition, flatIndex) => {
-            for (let b = 0; b < 4; ++b) {
-                action.expectedScreenshot.png.data[flatIndex + b] = pixelCondition.actual._bytes[b];
+        let expected = action.expectedScreenshot.png.data;
+        let actual = action.actualScreenshot.png.data
+        let ymax = this.bounds.y0 + this.bounds.height;
+        let xmax = this.bounds.x0 + this.bounds.width;
+        for (var y = this.bounds.y0; y <= ymax; y++) {
+            for (var x = this.bounds.x0; x <= xmax; x++) {
+                var idx = (this.applicablePngSize.width * y + x) << 2;
+                expected[idx + 0] = actual[idx + 0];
+                expected[idx + 1] = actual[idx + 1];
+                expected[idx + 2] = actual[idx + 2];
+                expected[idx + 3] = actual[idx + 3];
             }
-            return action.expectedScreenshot;
-        });
-    }
+        }
+        return action.expectedScreenshot;
+   }
 }
 
 export class Rectangle {
