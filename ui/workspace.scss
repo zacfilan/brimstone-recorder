@@ -606,6 +606,12 @@ button {
         height: 12px;
         padding: 5px;
         line-height: 1em;
+        display: flex;
+
+        svg {
+            animation: opacity2 3s infinite;
+            margin-left: .6em;
+        }
     }
 }
 
@@ -677,6 +683,7 @@ button {
 progress {
     -webkit-appearance: none;
     width: 25%;
+    margin-left: .6em;
 
     &::-webkit-progress-bar {
         border-radius: 1em;

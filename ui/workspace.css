@@ -815,6 +815,15 @@ button img {
   height: 12px;
   padding: 5px;
   line-height: 1em;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+#footer #infobar svg {
+  -webkit-animation: opacity2 3s infinite;
+          animation: opacity2 3s infinite;
+  margin-left: .6em;
 }
 
 .error-dialog {
@@ -908,6 +917,7 @@ button img {
 progress {
   -webkit-appearance: none;
   width: 25%;
+  margin-left: .6em;
 }
 
 progress::-webkit-progress-bar {
