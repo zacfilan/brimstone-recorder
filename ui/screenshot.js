@@ -30,46 +30,30 @@ export class Screenshot {
      * */
     get dataUrl() {
         if (!this._dataUrl) {
-            let data = this.dataBase64;
-            if (data) {
-                this._dataUrl = 'data:image/png;base64,' + this._dataBase64;
+            if (this._png) {
+                this._dataUrl = 'data:image/png;base64,' + PNG.sync.write(this._png).toString('base64');
             }
         }
-
         return this._dataUrl;
     }
+
+    set dataUrl(to) {
+        this._dataUrl = to;
+    }
+
     /**
      * backing variable for dataUrl. private.
+     * e.g. 'data:image/png;base64,...'
+     * @type {string}
      */
     _dataUrl;
 
-    /** 
-     * The raw base64 data returned, can autovivify 
-     * from internal png data. 
-     */
-    get dataBase64() {
-        if (!this._dataBase64) {
-            if (this._png) {
-                this._dataBase64 = PNG.sync.write(this._png).toString('base64');
-            }
-        }
-        return this._dataBase64;
-    }
-
     /**
-     * When the png data changes the base64 data and 
-     * dataurl are invalidated.
+     * When the png data changes the dataUrl is invalid
      */
     pngDataChanged() {
-        this._dataBase64 = null;
         this._dataUrl = null;
     }
-
-    /**
-     * backing data variable for dataBase64. private.
-     * @type {string}
-     */
-    _dataBase64;
 
     /** 
      * Return the PNG for this screenshot.
@@ -77,15 +61,20 @@ export class Screenshot {
      */
     get png() {
         if (!this._png) {
-            if (this._dataBase64) {
-                let buffer = Buffer.from(this._dataBase64, 'base64');
-                this._png = PNG.sync.read(buffer);
+            if (this._dataUrl) {
+                let buffer = Buffer.from(this._dataUrl.slice(22), 'base64');
+                this._png = PNG.sync.read(buffer); // S-L-O-W and F-A-T
                 console.debug(`built png for ${this.fileName}`);
             }
         }
         return this._png;
     }
 
+    set png(to) {
+        this._png = to;
+        this._dataUrl = null;
+    }
+    
     /**
      * The backing data for property png. private.
      * @type {PNG}
@@ -124,6 +113,12 @@ export class Screenshot {
     fileName;
 
     /**
+     * A zipfile entry datastructure that can be used to hydrate this
+     * screenshot at will.
+     */
+    zipEntry;
+
+    /**
      * 
      * @param {Screenshot | {dataBase64?: string, png?: PNG}} args
      */
@@ -133,23 +128,24 @@ export class Screenshot {
             this.fileName = args.fileName;
             this.tab = args.tab;
 
-            this._dataBase64 = args.dataBase64;
+            this.dataUrl = args.dataUrl;
             this._extractSize();
         }
         else {
             // you should contruct this from one or the other but not both
-            if (args.dataBase64 && args.png) {
+            if (args.dataUrl && args.png) {
                 throw new Error("png and dataBase64 cannot both be specified");
             }
-            if (args.dataBase64) {
-                this._dataBase64 = args.dataBase64;
+            if (args.dataUrl) {
+                this.dataUrl = args.dataUrl;
                 this._extractSize();
             }
             if (args.png) {
-                this._png = args.png;
+                this.png = args.png;
             }
 
             this.fileName = args.fileName;
+            this.zipEntry = args.zipEntry;
             this.tab = args.tab;
         }
     }
@@ -164,30 +160,40 @@ export class Screenshot {
      * create the dataUrl property by reading the zipfile
      * @returns string
      */
-    async loadDataUrlFromZipDir(screenshots) {
+    async loadDataUrlFromZip() {
         let that = this;
         this._dataUrlPromise =
-            screenshots.file(this.fileName).async('base64')
+            this.zipEntry.getData(new zip.Data64URIWriter('image/png'))
                 .then(data => {
-                    that._dataBase64 = data;
+                    that.dataUrl = data;
                     this._extractSize();
                 });
         return this._dataUrlPromise;
     }
 
     /**
-     * populate the dataUrl and the png fields if they are not already
+     * If the dataUrl is empty populate it from zip 
+     * (if possible). Once/if we have a dataUrl, build 
+     * the expensive PNG from it.
      * 
      * @returns 
      */
-    async hydrate(screenshots) {
+    async hydrate() {
         if (!this.dataUrl && this.fileName) {
-            return this.loadDataUrlFromZipDir(screenshots)
+            return this.loadDataUrlFromZip()
                 .then(() => this.png);
         }
         this.png;
     }
 
+    /**
+    * free up screenshot memory. only on steps that are NOT dirty
+    */
+    dehydrate() {
+        delete this._png;     // this is the large one, chuck it.
+        delete this._dataUrl; // smaller to keep around, than the PNG object, but clean them up anyway. (dirty actions will not dehydrate their screenshots)
+    }
+    
     /**
      * Grab the size from the data url w/o a complete PNG conversion,
      * for speed.
@@ -202,8 +208,8 @@ export class Screenshot {
         // so sequential 16 bytes of base64 encode sequential 12 bytes of real data
 
         // read out 24 real bytes that contain words [3], [4], [5] from the base64
-        if (this._dataBase64) {
-            let binaryString = atob(this._dataBase64.substring(16, 16 + 16));
+        if (this._dataUrl) {
+            let binaryString = atob(this._dataUrl.substring(22 + 16, 22 + 16 + 16));
             let dv = binaryStringToDataView(binaryString);
 
             // the width and height are in (bigendian) words [1] and [2] from the words pulled out

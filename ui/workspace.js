@@ -12,8 +12,9 @@ import { Screenshot } from "./screenshot.js";
 import { loadOptions, options, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
-import { clone, brimstone, focusWorkspaceWindow } from "../utilities.js";
+import { clone, brimstone } from "../utilities.js";
 import * as BDS from "./brimstoneDataService.js";
+import {infobar} from "./infobar.js";
 
 const ALT_KEYCODE = 18;
 const META_KEYCODE = 91;
@@ -128,8 +129,10 @@ class Actions {
         await focusOrCreateTab('https://github.com/zacfilan/brimstone-recorder/issues');
     }
 
-    /** Let the user open a test (zip or json playlist file) */
-    async openZip() {
+    /** 
+     * Prompt the user to select tests from the filesystem.
+     * This will build, among other data structures {@link zipNodes}. */
+    async loadTests() {
         zipNodes = [];
         currentTestNumber = 0;
         try {
@@ -206,8 +209,7 @@ class Actions {
     async applyCorrections(e) {
         const { action, view } = getCard($('#content .card:nth-of-type(2)')[0], Test.current);
         await action.applyCorrections(view, e);
-        updateStepInView(Test.current.steps[action.index - 1]);
-        action.test.dirty = true;
+        await updateStepInView(Test.current.steps[action.index - 1]);
         if (enableAutoPlayCheckbox.checked) {
             this.callMethod(this.playSomething);
         }
@@ -232,19 +234,19 @@ class Actions {
             fileName: `step${action.index}_acceptablePixelDifferences.png`
         }); // chuck whatever we got out.
         action.calculatePixelDiff();
-        updateStepInView(Test.current.steps[action.index - 1]);
+        await updateStepInView(Test.current.steps[action.index - 1]);
 
         addVolatileRegions();
-        action.test.dirty = true;
-    }
-
-    async clearWorkspace() {
-        await this.clearTest();
-        Correction.availableInstances = [];
-        delete PlayTree.current;
     }
 
     /** discard everytihing in the current workspace*/
+    async clearWorkspace() {
+        await this.clearTest();
+        Correction.availableInstances = [];
+        delete PlayTree.complete;
+    }
+
+    /** one zipnode has completed */
     async clearTest() {
         if (Test.current.dirty) {
             // the dreaded "user gesture required"
@@ -257,8 +259,13 @@ class Actions {
             let result = await actions.confirmSaveModal(`🙋❓ File '${Test.current.filename}' has unsaved changes.`);
         }
 
+        // The test instance is still linked to by the playtree, for reporting stuff, so free up what memory I can.
         Test.current.removeScreenshots();
+        delete Test.current.actionCache;
+        delete zipNodes[currentTestNumber-1]; // remove this link to memory
+        ////
 
+        
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
@@ -266,6 +273,7 @@ class Actions {
         lastRunMetrics = undefined;
 
         setToolbarState();
+        infobar.setText();
         window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
 
         $('#cards').empty();
@@ -291,7 +299,7 @@ class Actions {
         let name = prompt('What would you like to name this step?', action.name || 'User action');
         if (name && name !== 'User action') {
             action.name = name;
-            updateStepInView(Test.current.steps[action.index]);
+            await updateStepInView(Test.current.steps[action.index]);
         }
     }
 
@@ -381,24 +389,24 @@ class Actions {
     }
 
     /** Delete the currently displayed user action */
-    deleteAction() {
+    async deleteAction() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
         Test.current.deleteAction(action);
-        updateStepInView(Test.current.steps[action.index]);
+        await updateStepInView(Test.current.steps[action.index]);
     }
 
     /** Delete all actions before this one. This one becomes index 0. */
-    deleteActionsBefore() {
+    async deleteActionsBefore() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
         Test.current.deleteActionsBefore(action);
-        updateStepInView(Test.current.steps[0]);
+        await updateStepInView(Test.current.steps[0]);
     }
 
     /** Delete all actions after this one. We keep one past this since it is the ending action.*/
-    deleteActionsAfter() {
+    async deleteActionsAfter() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
         Test.current.deleteActionsAfter(action);
-        updateStepInView(Test.current.steps[action.index]);
+        await updateStepInView(Test.current.steps[action.index]);
     }
 
     /**
@@ -422,7 +430,7 @@ class Actions {
             newAction._match === constants.match.ALLOW;
         }
         Test.current.insertAction(newAction);
-        updateStepInView(newAction);
+        await updateStepInView(newAction);
     }
 
     /** When clicking on an editable action, cycle through expected, actual, and difference views. */
@@ -443,7 +451,7 @@ class Actions {
                 else {
                     await action.actualScreenshot.hydrate(Test.current.zip?.folder("screenshots"));
                 }
-                updateStepInView(Test.current.steps[action.index - 1]);
+                await updateStepInView(Test.current.steps[action.index - 1]);
                 break;
             case constants.view.ACTUAL: // actual -> edit
                 action._view = constants.view.EDIT;
@@ -451,7 +459,7 @@ class Actions {
                     await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
                 }
                 action.calculatePixelDiff();
-                updateStepInView(Test.current.steps[action.index - 1]);
+                await updateStepInView(Test.current.steps[action.index - 1]);
                 /** Add rectangles where we don't care about pixel differences. */
                 addVolatileRegions();
                 break;
@@ -542,6 +550,12 @@ async function errorHandler(e) {
         case Errors.InvalidVersion:
             await brimstone.window.alert(e.message);
             break;
+        case Errors.DebuggerAttachError:
+            if(e.message ==='Cannot access a chrome:// URL') {
+                await brimstone.window.alert(`Brimstone can't attach to chrome:// URLs by default. See chrome://flags/#extensions-on-chrome-urls if you really want to try.\n\nLast operation was cancelled.`);
+                break;               
+            }
+            // else fall thru
         default:
             await brimstone.window.error(e);
             break;
@@ -563,6 +577,7 @@ window.addEventListener("error", async function (errorEvent) {
     return false;
 });
 
+
 /** the jsoneditor instance used in the modal
  * https://github.com/josdejong/jsoneditor
  */
@@ -570,8 +585,6 @@ let jsonEditor;
 let extensionInfo;
 /**
  * @type {string}
- *  i want to know if this was a developer version of brimstone or not */
-let installType;
 
 /**********************************************************************************************
  * Main entry point. - allow this extension in incognito please. it increases the likelyhood that a test
@@ -603,7 +616,7 @@ let installType;
     // let info = await (new Promise(resolve => chrome.runtime.getPlatformInfo(resolve)));
     // console.log(info, navigator.userAgent);
     extensionInfo = await chrome.management.getSelf();
-    installType = extensionInfo.installType === 'development' ? '👿dev ' : '';
+    infobar.installType = extensionInfo.installType === 'development' ? '👿dev ' : '';
 
     setToolbarState();
     /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
@@ -634,11 +647,11 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
 async function countDown(seconds, action) {
     for (let i = seconds; i; --i) {
         action.overlay.html = i;
-        updateStepInView(Test.current.steps[action.index - 1]);
+        await updateStepInView(Test.current.steps[action.index - 1]);
         await sleep(1000);
     }
     delete action.overlay;
-    updateStepInView(Test.current.steps[action.index - 1]);
+    await updateStepInView(Test.current.steps[action.index - 1]);
 }
 
 /** The index of the first card showing in big step area */
@@ -807,7 +820,7 @@ $('#cards').on('click', '.thumb',
     async function gotoStepFromThumb(e) {
         const { action } = getCard(e.currentTarget, Test.current);
         let step = new Step({ curr: action, test: Test.current });
-        setStepContent(step);
+        await setStepContent(step);
     }
 );
 
@@ -860,20 +873,6 @@ $('#confirmDiscardChangesButton').click(() => {
     actions._modalClosed('Discard Changes');
 });
 
-function setInfoBarText(infobarText) {
-    if (!infobarText) {
-        if ($('#recordButton').hasClass('active')) {
-            infobarText = '<span class="pulse">🔴</span> recording...';
-        }
-        else if ($('#playButton').hasClass('active')) {
-            infobarText = '🟢 playing...';
-        }
-        else {
-            infobarText = 'ready';
-        }
-    }
-    $('#infobar').html(installType + BDS.brimstoneVersion + ' ' + infobarText);
-}
 
 function setToolbarState() {
     $('[data-action]').attr('disabled', true);
@@ -904,7 +903,7 @@ function setToolbarState() {
             pb.prop('title', "Click to play.");
             // not playing, not recoding
 
-            $('[data-action="openZip"]').attr('disabled', false);
+            $('[data-action="loadTests"]').attr('disabled', false);
             $('[data-action="loadLibrary"]').attr('disabled', false);
             $('[data-action="recordActiveTab"]').attr('disabled', false);
             $('#menu>.option').attr('disabled', false);
@@ -938,19 +937,18 @@ function setToolbarState() {
             iconState.Ready();
         }
     }
-    setInfoBarText();
 }
 
 $('[data-action="openOptions"]').on('click', actions.openOptions);
-$('#first').on('click', function (e) {
-    updateStepInView(Test.current.steps[0]);
+$('#first').on('click', async function (e) {
+    await updateStepInView(Test.current.steps[0]);
 });
 
-$('#previous').on('click', function (e) {
+$('#previous').on('click', async function (e) {
     playMatchStatus = constants.match.PASS;
     let index = currentStepIndex();
     if (index > 0) {
-        updateStepInView(Test.current.steps[index - 1]);
+        await updateStepInView(Test.current.steps[index - 1]);
     }
 });
 
@@ -983,7 +981,6 @@ async function _playSomething() {
             nextTest = false;
             $('#playButton').addClass('active');
             setToolbarState();
-            await Test.current.imageProcessing(imageProcessingProgress);
             Test.current.lastRun = new BDS.Test();
             Test.current.lastRun.startDate = Date.now();
             Test.current.lastRun.name = Test.current.filename;
@@ -1002,7 +999,10 @@ async function _playSomething() {
             let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
 
             if (playFrom === 0) {
-                // we are on the first step of some test in the suite. 
+                // we are on the first step of some test in the suite. there are two cases.
+                // either way we need to attach the debugger to a tab and get going.
+                // case 1: first step is a goto some url (common case)
+                // case 2: first step isn't a goto (uncommon case. e.g. middle chunk of a larger test)
                 if (!await startingTab.reuse({ incognito: Test.current.incognito })) { // reuse if you can
                     await startingTab.create({ url: "about:blank", incognito: Test.current.incognito });   // if not create
                 }
@@ -1035,13 +1035,19 @@ async function _playSomething() {
             Tab.active = startingTab;
 
             if (await player.attachDebugger({ tab: Tab.active })) {
-                if (Tab.active.url !== 'about:blank') {
-                    await Tab.active.resizeViewport();
+                if (Tab.active.url !== 'about:blank') { // it will not let me inject the script to tell the size into this - yet.
+                    await Tab.active.resizeViewport(); 
                 }
             }
             await playTab();
+            if (Tab.active.url !== 'about:blank') { // it will not let send a message to this tab either - yet.
+                hideCursor();
+            }
 
-            playMatchStatus = await player.play(Test.current, playFrom, resume); // players gotta play...
+            let indexOfNext  = await player.play(Test.current, playFrom, resume); // players gotta play...
+            let nextAction = Test.current.steps[indexOfNext];
+            playMatchStatus = nextAction._match;
+
             Test.current.lastRun.endDate = Date.now();
             Test.current.lastRun.status = playMatchStatus;
             Test.current.lastRun.steps = Test.current.steps.map(testAction => {
@@ -1063,26 +1069,21 @@ async function _playSomething() {
                 case constants.match.ALLOW:
                     nextTest = await loadNextTest();
                     if (!nextTest) {
-                        setInfoBarText('✅ last run passed');
+                        infobar.setText('✅ last run passed');
                         alert('✅ Test passed.');
                     }
                     break;
                 case constants.match.FAIL:
-                    let step = Test.current.steps[currentStepIndex()];
-                    let next = Test.current.steps[currentStepIndex() + 1];
-                    updateStepInView(step);
-
                     addVolatileRegions(); // you can draw right away
-                    Test.current.lastRun.errorMessage = `last run failed after user action ${player.currentAction.index + 1}`;
-                    Test.current.lastRun.failingStep = player.currentAction.index + 1;
-                    setInfoBarText(`❌ ${Test.current.lastRun.errorMessage}`);
+                    Test.current.lastRun.errorMessage = `last run failed after user action ${indexOfNext}`;
+                    Test.current.lastRun.failingStep = indexOfNext;
+                    infobar.setText(`❌ ${Test.current.lastRun.errorMessage}`);
                     break;
                 case constants.match.CANCEL:
-                    updateStepInView(Test.current.steps[currentStepIndex()]);
-                    setInfoBarText(`✋ last run canceled after user action ${player.currentAction.index + 1}`);
+                    infobar.setText(`✋ last run canceled after user action ${indexOfNext}`);
                     break;
                 default:
-                    setInfoBarText(`💀 unnown status reported '${playMatchStatus}'`);
+                    infobar.setText(`💀 unnown status reported '${playMatchStatus}'`);
                     break;
             }
         } while (nextTest);
@@ -1094,28 +1095,29 @@ async function _playSomething() {
         }
     }
     catch (e) {
+        let msg = e?.message ?? e ?? '';
         actions.callMethod(actions.stopPlaying);
         if (e instanceof Errors.NoActiveTab) {
-            setInfoBarText(`❌ play canceled - ${e?.message ?? ''}`);
+            infobar.setText(`❌ play canceled - ${msg}`);
         }
         else {
-            setInfoBarText('💀 aborted! ' + e?.message ?? '');
+            infobar.setText('💀 aborted! ' + msg);
             throw e;
         }
     }
 }
 
-$('#next').on('click', function (e) {
+$('#next').on('click', async function (e) {
     playMatchStatus = constants.match.PASS;
     let index = currentStepIndex();
     if (index < Test.current.steps.length - 1) {
-        updateStepInView(Test.current.steps[index + 1]);
+        await updateStepInView(Test.current.steps[index + 1]);
     }
 });
 
-$('#last').on('click', function (e) {
+$('#last').on('click', async function (e) {
     playMatchStatus = constants.match.PASS;
-    updateStepInView(Test.current.steps[Test.current.steps.length - 1]);
+    await updateStepInView(Test.current.steps[Test.current.steps.length - 1]);
 });
 
 // we have a handler for when the debugger detaches, if there was a command in flight when the debugger deattached
@@ -1483,8 +1485,6 @@ function stopRecording() {
         Test.current.replacedAction.index++;
         Test.current.insertAction(Test.current.replacedAction);
     }
-
-    Test.current.startImageProcessing(imageProcessingProgress); // just kick it off again
 }
 
 async function focusTab() {
@@ -1620,13 +1620,13 @@ async function recordSomething(promptForUrl) {
                     html: '&nbsp;'
                 };
 
-                updateStepInView(Test.current.steps[index]);
+                await updateStepInView(Test.current.steps[index]);
                 await sleep(10); // update the ui please
 
                 // allow recording over the current steps (not insert, but overwriting them)
                 if (!await brimstone.window.confirm(`Recording from here will overwrite existing actions, starting with action ${index + 2}, until you stop.`)) {
                     action.overlay = old.overlay;
-                    updateStepInView(Test.current.steps[index]);
+                    await updateStepInView(Test.current.steps[index]);
                     return;
                 }
                 Test.current.recordIndex = index + 1;
@@ -1711,7 +1711,7 @@ async function recordSomething(promptForUrl) {
     catch (e) {
         stopRecording();
         if (e instanceof Errors.NoActiveTab) {
-            setInfoBarText(`❌ recording canceled - ${e?.message ?? ''}`);
+            infobar.setText(`❌ recording canceled - ${e?.message ?? ''}`);
         }
         else {
             throw e;
@@ -1730,11 +1730,10 @@ $('#recordButton').on('click', (e) => {
     recordSomething(promptForUrl);
 });
 
-function _stopPlaying() {
+async function _stopPlaying() {
     $('#playButton').removeClass('active');
-    setToolbarState();
-    removeEventHandlers();
     player.stopPlaying();
+    removeEventHandlers();
 }
 
 /**
@@ -1754,35 +1753,32 @@ function postMessage(msg) {
     }
 }
 
-$('#loadButton').on('click', actions.openZip.bind(actions));
+$('#loadButton').on('click', actions.loadTests.bind(actions));
 $('#saveButton').on('click', actions.saveZip);
 $('#clearButton').on('click', actions.clearWorkspace.bind(actions));
 
-function imageProcessingProgress(value, max) {
-    let ib = $('#infobar');
-    ib.html(`${installType}${BDS.brimstoneVersion} processing image ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
-}
 
 async function loadNextTest() {
     let numberOfTestsInSuite = zipNodes.length;
-    if (++currentTestNumber > numberOfTestsInSuite) {
+    if (currentTestNumber >= numberOfTestsInSuite) {
         return false;
     }
+    await actions.clearTest(); // any previous test is cleared out
+    currentTestNumber++;
+
     let options = await loadOptions();
     let suite = numberOfTestsInSuite > 1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})` : '';
     //let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
 
-    await actions.clearTest();
-
     // This load is just super fast.
     Test.current = await (new Test()).fromPlayTree(zipNodes[currentTestNumber - 1]);
-    Test.current.startingServer = Test.current.steps[0].url || zipNodes[0]._zipTest.startingServer || null;
 
-    // kick off without waiting for this. 
-    Test.current.startImageProcessing(imageProcessingProgress);
+    if(currentTestNumber === 1) {
+      Test.current.startingServer = Test.current.steps[0].url || zipNodes[0]._zipTest.startingServer || null;
+    }
 
     window.document.title = `Brimstone - ${Test.current._playTree.path()}${suite}`;
-    updateStepInView(Test.current.steps[0]);
+    await updateStepInView(Test.current.steps[0]);
     // for (let i = 1; i < Test.current.steps.length; ++i) {
     //      let action = Test.current.steps[i];
     //      updateThumb(action);
@@ -1791,17 +1787,24 @@ async function loadNextTest() {
     return true;
 }
 
+
 /** The filehandles of the tests the user loaded. Used for playing back 1 or more tests.
+ * This flat list may be larger than 1 if the user multiselected tests and/or selected
+ * a playlist. This flattens that all into a sequence of zips tat are to be played.
+ * The current zipNode being played is in {@link currentTestNumber}-1.
  * @type {PlayTree[]}
  */
 let zipNodes = [];
-/** The 1-based index of the current test. */
+
+/** The 1-based index of the current test. This -1 is the 
+ * index into {@link zipNodes}.
+*/
 let currentTestNumber = 0;
 
-function updateStepInView(action) {
+async function updateStepInView(action) {
     // immediately show if there is nothing pending
     let step = new Step({ curr: action, test: Test.current });
-    setStepContent(step);
+    await setStepContent(step);
 }
 
 /** The recording channel port. This port connects to (broadcasts to) 
@@ -1813,7 +1816,12 @@ var port = false;
  * 
  * @param {Step} step the step
  */
-function setStepContent(step) {
+async function setStepContent(step) {
+    await Promise.all([
+        step.curr.hydrateScreenshots(),
+        step?.next?.hydrateScreenshots()
+    ]);
+
     $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
     setToolbarState();
     let acs = [];
@@ -1828,7 +1836,7 @@ function setStepContent(step) {
         if(acs.length>1) {
             s = 's';
         }
-        setInfoBarText(`step${s} ${acs.join(', ')} auto-corrected.`);
+        infobar.setText(`step${s} ${acs.join(', ')} auto-corrected.`);
     }
     
     updateThumb(step.curr); // this isn't the cause of the slow processing of keystokes.
@@ -1923,10 +1931,11 @@ async function userEventToAction(userEvent, insert = true) {
 
     let testAction = new TestAction(userEvent);
     testAction.tab = new Tab(Tab.active);
-    // FIXME: remove this. This is here currently because addExpectedScreenshot has a ependency on the index
+    // FIXME: remove this. This is here currently because addExpectedScreenshot has a dependency on the index
     // which has a dependency on this call because it can set the index
     if (insert) {
         Test.current.updateOrAppendAction(testAction);
+        testAction.dirty = true;
     }
     let element = userEvent.boundingClientRect;
 
@@ -2130,7 +2139,7 @@ async function recordUserAction(userEvent) {
     }
     // else we assigned Tab.active to wait.tab.
 
-    updateStepInView(action); // update the UI
+    await updateStepInView(action); // update the UI
     return action;
 }
 
@@ -2178,9 +2187,9 @@ async function onMessageHandler(message, _port) {
             lastAction.sender = {
                 href: _lastScreenshot.tab.url
             };
-            lastAction.tab = _lastScreenshot.tab; // this is only for the cas where the last action is a close of a tab and we need to show some other active screenshot.
+            lastAction.tab = _lastScreenshot.tab; // this is only for the case where the last action is a close of a tab and we need to show some other active screenshot.
 
-            updateStepInView(Test.current.steps[ci]);
+            await updateStepInView(Test.current.steps[ci]);
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
         case 'mouseover':
@@ -2216,7 +2225,7 @@ async function onMessageHandler(message, _port) {
                 _lastSavedScreenshot = _lastScreenshot;
             }
 
-            // in this case the uesrEvent is essentially shaped like an action
+            // in this case the userEvent is essentially shaped like an action
             // by the recorder
             if (userEvent.handler?.simulate) {
                 await player[userEvent.type](userEvent); // this can result in a navigation to another page.
@@ -2248,7 +2257,7 @@ async function onMessageHandler(message, _port) {
             wait._view = constants.view.DYNAMIC;
             wait.shadowDOMAction = true;
 
-            updateStepInView(action); // update the UI
+            await updateStepInView(action); // update the UI
 
             postMessage({ type: 'complete', args: userEvent.type, to: userEvent.sender.frameId }); // ack
             break;
@@ -2325,7 +2334,6 @@ async function playTab() {
 
     player.usedFor = 'playing';
     addEventHandlers();
-    await hideCursor();
 }
 
 /** Used to wait for all frameoffsets to be reported */

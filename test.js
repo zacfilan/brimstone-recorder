@@ -2,27 +2,31 @@
 
 import { TestAction, constants } from "./ui/card.js";
 import { Screenshot } from "./ui/screenshot.js";
-import { brimstone } from "./utilities.js";
+import { brimstone, progressIndicator } from "./utilities.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
 import { clone } from "./utilities.js"
+import { infobar } from "./ui/infobar.js";
 
 /**
  * A ziptest instance is a recording of user actions that can be played back
  * and verified.
  */
 export class Test {
+    get dirty() {
+        for (let i = 0; i < this.steps.length; ++i) {
+            if (this.steps[i].dirty) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * reset state
      * @param {Test} test
      */
     _reset() {
-        /**
-         * If the current test has been edited so that the user can be given a 
-         * chance to record before leaving the test.
-         */
-        this.dirty = false;
-
         /**
          * Like dirty, but only because the version is older.
          */
@@ -55,8 +59,6 @@ export class Test {
          */
         this.recordIndex = 0;
 
-        this._imageProcessingPromise = null;
-
         /**
          * The last action we *overwrote* during a recording
          * @type {TestAction}
@@ -88,32 +90,27 @@ export class Test {
     }
 
     /** 
-     * Returns a promise that completes when the test images are al processed.
-     * 
-     * All dataurls and PNGs are ready in the test. 
-     * this is S-L-O-W because of the way I create PNG objects. Try to speed up!
-     * 
-     * https://www.npmjs.com/package/pngjs#example
-     * 
-     * https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams
-     */
-    async imageProcessing() {
-        await this._imageProcessingPromise;
-    }
-
-    /** 
-     * Sets a promise completes when the image processing is done.
-     * await this.imageProcessing() somewhere else to wait for it to complete.
-     * 
-     * All dataurls and PNGs are ready in the test. 
-     * this is S-L-O-W because of the way I create PNG objects. Try to speed up!
-     * 
-     * https://www.npmjs.com/package/pngjs#example
-     * 
-     * https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams
-     */
-    startImageProcessing(progressCallback) {
-        this._imageProcessingPromise = this._hydrateForPlay(progressCallback, this.zip)
+     * Hydrates the dataurl for expected and acceptable screenshots in all steps in this
+     * test, that are not currently hydrated. Dirty steps should always remain hydrated
+     * so they should not be overwritten by this.
+     * */
+    hydrateStepsDataUrls() {
+        console.debug('hydrating step dataurls');
+        return progressIndicator({
+            progressCallback: infobar.setProgress.bind(infobar, 'hydrate', 'hydrated'),
+            items: this.steps, 
+            itemProcessor: async action => {
+            if (action.expectedScreenshot && !action.expectedScreenshot.dataUrl) {
+                if (action.expectedScreenshot?.fileName) { // protect against possible bad save
+                    await action.expectedScreenshot.loadDataUrlFromZip();
+                }
+            }
+            if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.dataUrl) {
+                if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
+                    await action.acceptablePixelDifferences.loadDataUrlFromZip();
+                }
+            }
+        }});
     }
 
     /**
@@ -154,7 +151,8 @@ export class Test {
      * Delete the specified action from the test. This changes the indexes of all subsequent actions, but that isn't
      * persisted until a save. 
      * @param {TestAction} action */
-    deleteAction(action) {
+    async deleteAction(action) {
+        await this.hydrateStepsDataUrls(); // this is required to save correctly now
         this.dirty = true;
         let removeIndex = action.index;
         for (let i = action.index + 1; i < this.steps.length; ++i) {
@@ -169,7 +167,8 @@ export class Test {
      * The passed in one becomes index .
      * @param {TestAction} action 
      */
-    deleteActionsBefore(action) {
+    async deleteActionsBefore(action) {
+        await this.hydrateStepsDataUrls(); // this is required to save correctly now
         this.dirty = true;
         this.steps.splice(0, action.index);
         this.reindex();
@@ -187,7 +186,8 @@ export class Test {
      * Update the last to just contain the expected screenshot.
      * @param {TestAction} action 
      */
-    deleteActionsAfter(action) {
+    async deleteActionsAfter(action) {
+        await this.hydrateStepsDataUrls(); // this is required to save correctly now
         this.dirty = true;
         this.steps.splice(action.index + 2);
         this.reindex();
@@ -198,10 +198,11 @@ export class Test {
      *  insert (splice in) the action at the index specified in the action
      *  @param {TestAction} newAction The action to insert
      */
-    insertAction(newAction) {
+    async insertAction(newAction) {
+        await this.hydrateStepsDataUrls(); // this is required to save correctly now
         newAction.test = this;
         newAction.tab = clone(this.steps[newAction.index].tab);
-        this.dirty = true;
+        newAction.dirty = true;
         this.steps.splice(newAction.index, 0, newAction);
         this.reindex();
     }
@@ -216,45 +217,46 @@ export class Test {
     }
 
     /**
+     * create a zipfile.
+     */
+    async createZip() {
+        console.debug('create zip');
+        const blobWriter = new zip.BlobWriter("application/zip");
+        const writer = new zip.ZipWriter(blobWriter);
+        await writer.add('test.json', new zip.TextReader(
+            JSON.stringify(
+                this,
+                null,
+                2
+            ))); // add the test.json file to archive
+        await writer.add('screenshots', null, { directory: true }); // directory
+
+        await this.hydrateStepsDataUrls();
+
+        // write the dataUrl for expected and acceptable screenshots in all steps of this test into the zip.
+        await progressIndicator({
+            progressCallback: infobar.setProgress.bind(infobar, 'write zip step', 'wrote zip steps'), 
+            items: this.steps, 
+            itemProcessor: async card => {
+            if (card.expectedScreenshot?.dataUrl) {
+                await writer.add(`screenshots/${card.expectedScreenshot.fileName}`, new zip.Data64URIReader(card.expectedScreenshot.dataUrl));
+            }
+            if (card.acceptablePixelDifferences?.dataUrl) {
+                await writer.add(`screenshots/${card.acceptablePixelDifferences.fileName}`, new zip.Data64URIReader(card.acceptablePixelDifferences.dataUrl));
+            }
+        }});
+        await writer.close();
+        return blobWriter.getData();
+    }
+
+    /**
      * save the current state to a zip file 
      */
     async saveFile() {
-        console.debug('create zip');
-        this.zip = new JSZip();
-        this.zip.file('test.json', JSON.stringify(
-            this,
-            null,
-            2
-        )); // add the test.json file to archive
-
-        let screenshots = this.zip.folder("screenshots"); // add a screenshots folder to the archive
-        // add all the expected screenshots to the screenshots directory in the archive
-        for (let i = 0; i < this.steps.length; ++i) {
-            console.log(`saving files for ${i}`);
-            let card = this.steps[i];
-            if (card.expectedScreenshot?.dataUrl) {
-                let response = await fetch(card.expectedScreenshot.dataUrl);
-                let blob = await response.blob();
-                screenshots.file(card.expectedScreenshot.fileName, blob, { base64: true });
-            }
-
-            // only save the actual screenshot if it didn't match the expected, before checking for acceptable pixel differences
-            // in other words don't save the same image twice.
-            if (card.actualScreenshot && card.numDiffPixels && card.actualScreenshot.fileName && card.actualScreenshot.dataUrl) {
-                let response = await fetch(card.actualScreenshot.dataUrl);
-                let blob = await response.blob();
-                screenshots.file(card.actualScreenshot.fileName, blob, { base64: true });
-            }
-
-            if (card.acceptablePixelDifferences?.dataUrl) {
-                let response = await fetch(card.acceptablePixelDifferences.dataUrl);
-                let blob = await response.blob();
-                screenshots.file(card.acceptablePixelDifferences.fileName, blob, { base64: true });
-            }
-        }
+        // FIXME: this will NOT work if you insert or delete items !!
+        let blobPromise = this.createZip();
 
         console.debug('save zip to disk');
-        let blobpromise = this.zip.generateAsync({ type: "blob" });
         try {
             const handle = await window.showSaveFilePicker({
                 suggestedName: this.filename,
@@ -266,11 +268,15 @@ export class Test {
                 ]
             });
             const writable = await handle.createWritable();
-            let blob = await blobpromise;
+
+            // get the zip file as a Blob
+            let blob = await blobPromise;
             await writable.write(blob);  // Write the contents of the file to the stream.    
             await writable.close(); // Close the file and write the contents to disk.
             this.filename = handle.name;
-            this.dirty = false;
+            for (let i = 0; i < this.steps.length; ++i) {
+                this.steps[i].dirty = false;
+            }
             return handle;
         }
         catch (e) {
@@ -307,10 +313,14 @@ export class Test {
         this._reset();
 
         const blob = await fileHandle.getFile();
-        this.zip = await (new JSZip()).loadAsync(blob);
-        let screenshots = this.zip.folder("screenshots"); // access screenshots folder from the archive
+        let blobReader = new zip.BlobReader(blob); // construct a blob reader
+        let zipReader = new zip.ZipReader(blobReader); // construct a zip reader
+        let entries = await zipReader.getEntries(); // get the entries
 
-        let testPojo = JSON.parse(await this.zip.file("test.json").async("string"));
+        let testJsonEntry = entries.find(e => e.filename === 'test.json');
+        let testJson = await testJsonEntry.getData(new zip.TextWriter()); // The type of Writer determines the return type.
+
+        let testPojo = JSON.parse(testJson);
         let actions = testPojo.steps;
 
         // convert older tests
@@ -331,7 +341,7 @@ export class Test {
             let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with a newer version of Brimstone than you are currently using. This test mght misbehave unless you upgrade Brimstone to at least version '${this.brimstoneVersion}', but that's up to you.
             
 Continue to load this newer test with your older version of Brimstone?`);
-            if(!tryAnyway) {
+            if (!tryAnyway) {
                 return false; // bail
             }
         }
@@ -340,7 +350,7 @@ Continue to load this newer test with your older version of Brimstone?`);
         for (let i = 0; i < actions.length; ++i) {
             let _action = actions[i];
             if (this.brimstoneVersion < BDS.brimstoneVersion) {
-                this.oldVersion = true; 
+                this.oldVersion = true;
                 // convert old tests
                 if (_action.type === 'start') {
                     _action.type = 'goto';
@@ -369,13 +379,15 @@ Continue to load this newer test with your older version of Brimstone?`);
 
             let action = new TestAction(_action);
             this.updateOrAppendAction(action);
-            let screenshotPromise;
 
             if (action.expectedScreenshot?.fileName) {
+                console.debug(`attach expected zipEntry for step ${i}`);
                 action.expectedScreenshot = new Screenshot(action.expectedScreenshot);
+                action.expectedScreenshot.zipEntry = entries.find(e => e.filename === `screenshots/${action.expectedScreenshot.fileName}`);
                 action._view = constants.view.EXPECTED;
-                screenshotPromise = action.expectedScreenshot.loadDataUrlFromZipDir(screenshots);
-                screenshotPromises.push(screenshotPromise); // needed to see any image during loading
+                if (!action.expectedScreenshot.zipEntry) {
+                    throw new Error("can't find entry")
+                }
             }
             else {
                 action.expectedScreenshot = undefined; // whack any bad data
@@ -383,65 +395,39 @@ Continue to load this newer test with your older version of Brimstone?`);
 
             // create the container for the other screenshots to be hydrated, 
             // thus, if these props exist on the action, they def have a fileName
-            // but may not be hydrated. if they don't exist, they weren't in the file, nor has this action been played
+            // but may not be hydrated. if they don't exist, they weren't in the zip.
+            // These can be hydrated later 
             if (action.acceptablePixelDifferences?.fileName) {
+                console.debug(`attach acceptable zipEntry for step ${i}`);
                 action._match = constants.match.ALLOW;
                 action.acceptablePixelDifferences = new Screenshot(action.acceptablePixelDifferences);
+                action.acceptablePixelDifferences.zipEntry = entries.find(e => e.filename === `screenshots/${action.acceptablePixelDifferences.fileName}`);
+                if (!action.acceptablePixelDifferences.zipEntry) {
+                    throw new Error("can't find entry")
+                }
+
             }
             else {
                 action.acceptablePixelDifferences = undefined; // whack any bad data
             }
+
             if (action.actualScreenshot?.fileName) {
                 action._match = constants.match.FAIL; // if it failed, do I really care to know there are allowed differences too?
-                // if you have an actual one to load it means that the last time this was run it failed.
+                // if you have an actual one to load it means that the last time this was run it failed. 
+                // I only store these in old tests. Newer tests will not store these.
                 action.actualScreenshot = new Screenshot(action.actualScreenshot);
+                action.actualScreenshot.zipEntry = entries.find(e => e.filename === `screenshots/${action.actualScreenshot.fileName}`);
+                if (!action.actualScreenshot.zipEntry) {
+                    throw new Error("can't find entry")
+                }
             }
             else {
                 action.actualScreenshot = undefined; // whack any bad data
             }
-        }
-        if (screenshotPromises.length) {
-            // FIXME: in truth I don't need to wait for all of these. 
-            // I only need these dataurls if the user looks at them (navigates to them to manually or because of playing)
-            // but this is PLENTY fast, so don't sweat it!
-            await Promise.all(screenshotPromises);
+
         }
 
         return this;
-    }
-
-    /** schedules some code to set the pngs for expected screenshots
-     * and the dataurl+pngs for actions with allowed differences.
-     * this sets a promise that can be sampled with getHydratedForPlayPromise()
-     * @param {Test} test The test we need to hydrate
-     */
-    async _hydrateForPlay(progressCallback) {
-        return new Promise(async (resolve) => {
-            let screenshots = this.zip?.folder("screenshots");
-            let i = 0;
-            let id;
-            if (progressCallback) {
-                id = setInterval(
-                    () => {
-                        progressCallback(i + 1, this.steps.length);
-                    },
-                    1000);
-            }
-            for (i = 0; i < this.steps.length; ++i) {
-                let action = this.steps[i];
-                if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.png) {
-                    if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
-                        await action.acceptablePixelDifferences.hydrate(screenshots);
-                    }
-                }
-                action.expectedScreenshot?.png; 
-            }
-            if (progressCallback) {
-                clearInterval(id);
-                progressCallback(this.steps.length, this.steps.length);
-            }
-            resolve(true);
-        });
     }
 
     /**

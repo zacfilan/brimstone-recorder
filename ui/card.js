@@ -6,6 +6,7 @@ import { options } from "../options.js";
 import { Tab } from "../tab.js";
 import { ActualCorrection, Correction, UnpredictableCorrection, BoundingBox, AntiAliasCorrection } from "../rectangle.js";
 import { Test } from "./brimstoneDataService.js";
+import { uuidv4 } from "../utilities.js";
 
 const PNG = png.PNG;
 
@@ -204,9 +205,31 @@ export class TestAction {
      */
     autoCorrected = false;
 
+    /**
+     * The last time this action was accessed. Used for runtime memory
+     * savings.
+     * @type {number}
+     */
+    _accessTime = Number.MAX_SAFE_INTEGER; // sometime long after I am dead
+
+    /**
+     * A temporary uid for this action this session.
+     * @type {string}
+     */
+    _uid;
+
+    /**
+     * Was this test action modified? Used to 
+     * suggest saving. 
+     */
+    dirty = false;
+
     constructor(args) {
         Object.assign(this, args);
         this.tab = new Tab(this.tab);
+        if(!this._uid) {
+            this._uid = uuidv4();
+        }
     }
 
     /**
@@ -307,8 +330,7 @@ export class TestAction {
     * what effect the corrections had.
     *  */
     async applyCorrections($card, e) { // FIMXE: don't pass the card in...
-        // else we use whatever is already in acceptablePixelDifferences (editing before playing)
-        // manipulate the PNG
+        this.dirty = true;
         let volatileRegions = $card.find('.rectangle');
         if (volatileRegions.length) {
             // this is scaled
@@ -337,8 +359,8 @@ export class TestAction {
                 // push the actual into the expected and be done with it.
                 this.expectedScreenshot._png = this.actualScreenshot.png;
                 this.expectedScreenshot.pngDataChanged();
+                this.dirty = true;
                 delete this.acceptablePixelDifferences;
-                this.test.dirty = true;
             }
         }
 
@@ -515,6 +537,32 @@ export class TestAction {
             this.actualScreenshot.fileName = this.actualScreenshot.fileName.replace(/\d+/, to);
         }
     }
+
+    /**
+     * For expected, acceptable and actual screenshots,
+     * populate the dataUrl from disk if possible, then 
+     * build the expensive PNG field. (PNGs are only
+     * required to play this action.)
+     */
+    async hydrateScreenshots() {
+        await Promise.all([
+            this.expectedScreenshot?.hydrate(),
+            this.acceptablePixelDifferences?.hydrate(),
+            this.actualScreenshot?.hydrate() // this should not persist at all
+        ]);
+    }
+
+    /**
+     * dehydrate, expected, acceptable, and actual screenshots.
+     * delete pixelDiffScreenshot.
+     */
+    dehydrateScreenshots() {
+        console.debug(`dehydrating screenshots for step[${this.index+1}]`);
+        this.expectedScreenshot?.dehydrate();
+        this.acceptablePixelDifferences?.dehydrate();
+        this.actualScreenshot?.dehydrate();
+        delete this.pixelDiffScreenshot;
+    }
 }
 
 /**
@@ -682,7 +730,6 @@ export class Step {
                 title.text += ` <span id='unpredictable-pixels'>&nbspHas unpredictable pixels.</span>`;
             }
 
-            let classes = 'waiting';
             let screenshot = this.next.numDiffPixels && ({class: 'hasRedPixels'});
             html += this.next.toHtml({ 
                 title: title, 

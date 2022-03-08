@@ -165,13 +165,24 @@ export class Options {
      * Automatically resume playing after applying a 
      * correction.
      */
-    autoPlay = true;
+    autoPlay = false;
 
     /**
      * Should we forget the corrections we learned when the 
      * test we learned them from is cleared?
      */
      forgetCorrectionsWhenTestIsCleared = false;
+
+     /**
+      * Use more memory for faster performance,
+      * at the expense of, well, using more memory. :)
+      * 
+      * This many actions will be prehydrated before
+      * playing. 
+      * 
+      * Higher numbers, speed up playback. 
+    */
+      maxNumberOfActionsToPrehydrate = 100;
 };
 
 /**

@@ -61,3 +61,55 @@ export var brimstone = {
         }
     }
 }
+
+/**
+ * Process a list asynchronously and get a callback 
+ * every second with a percent done.
+ * @param {object} args destructured arguments
+ * @param {function} args.progressCallback 
+ * @param {[]} args.items 
+ * @param {function} args.itemProcessor 
+ * @param {number?} startIndex start index defaults to 0
+ * @param {number?} endIndex (not included. defaults to items.length)
+ * @returns 
+ */
+export function progressIndicator({
+    progressCallback, 
+    items, 
+    startIndex = undefined,
+    endIndex = undefined,
+    itemProcessor
+    }) {
+    if(startIndex === undefined) {
+        startIndex = 0;
+    }
+    if(startIndex < 0) {
+        startIndex = 0;
+    }
+    if(endIndex === undefined) {
+        endIndex = items.length;
+    }
+    if(endIndex > items.length) {
+        endIndex = items.length;
+    }
+    return new Promise(async (resolve) => {
+        let i = startIndex;
+        let id;
+        if (progressCallback) {
+            id = setInterval(
+                () => {
+                    progressCallback(i + 1, endIndex);
+                },
+                1000);
+        }
+        for (i = startIndex; i < endIndex; ++i) {
+            let item = items[i];
+            await itemProcessor.call(item, item);
+        }
+        if (progressCallback) {
+            clearInterval(id);
+            progressCallback(endIndex, endIndex);
+        }
+        resolve(true);
+    });  
+}

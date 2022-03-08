@@ -5,14 +5,14 @@ import { Screenshot } from "./ui/screenshot.js";
 
 const PNG = png.PNG;
 import { Tab } from "./tab.js"
-import { sleep, brimstone } from "./utilities.js";
+import { sleep, brimstone, progressIndicator } from "./utilities.js";
 import { constants, TestAction } from "./ui/card.js";
-import { options, loadOptions } from "./options.js";
+import { options, loadOptions, Options } from "./options.js";
 import { Test } from "./test.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
-import { UnpredictableCorrection, Correction, SparseApplyCorrection } from "./rectangle.js";
-
+import { Correction } from "./rectangle.js";
+import {infobar} from "./ui/infobar.js";
 /**
  * This function is injected and run in the app
  * 
@@ -71,26 +71,11 @@ export class Player {
     /** The currently executing step. */
     actionStep;
 
-    /** The last actual screenshot taken. It will hold the error state when an 
-    * actions expectedScreenshot doesn't match the actualScreenshot
-    */
-    actualScreenshotBuffer;
-
     /** mode switch either 'playing' or 'recording', something of a hack. */
     usedFor;
 
     /** Know if there are navigations in flight. */
     _navigationsInFlight = 0;
-
-    /** 
-     * The last known mouselocation during playback. This is used during a resume
-     * playback operation to put the mouse back to where it was prior to 
-     * rechecking the screenshots. 
-     */
-    // mouseLocation = {
-    //     x: -1,
-    //     y: -1
-    // };
 
     /** asynchronously injectable switch to stop the player from playing */
     _stopPlaying = false;
@@ -151,6 +136,23 @@ export class Player {
         // else it is on the same tab, so we don't need to switch.
     }
 
+    /**
+     * Prepare the PNGs for use starting from this index
+     * bounded by {@link Options.maxNumberOfActionsToPrehydrate}.
+     * @param {TestAction[]} actions the test actions
+     * @param {number} startIndex the index we are playing from
+     * @param {number} endIndex one past the last index to include
+     */
+    async _hydrate(actions, startIndex, endIndex) {
+        await progressIndicator({
+            progressCallback: infobar.setProgress.bind(infobar, 'prefetch', 'prefetched'), 
+            items: actions,
+            startIndex: startIndex,
+            endIndex: endIndex,
+            itemProcessor: (new TestAction()).hydrateScreenshots
+        });
+    }
+
     /** 
      * Play the current set of actions. This allows actions to be played one
      * at a time or in chunks. 
@@ -162,11 +164,13 @@ export class Player {
      * @param {boolean} resume if true we do not drive this step, just check it
      * */
     async play(test, startIndex = 0, resume = false) {
-        this._actions = test.steps;
         this._stopPlaying = false;
 
         await loadOptions();
-        let actions = this._actions;
+        let actions = test.steps; // short alias
+
+        if(options.maxNumberOfActionsToPrehydrate)
+            await this._hydrate(actions, startIndex, startIndex + options.maxNumberOfActionsToPrehydrate);
 
         // start timer
         let start;
@@ -174,8 +178,12 @@ export class Player {
         let next;
         for (let i = startIndex; i < actions.length - 1; ++i) {
             let action = actions[i];
-            this.currentAction = action;
             action._view = constants.view.EXPECTED;
+
+            // free up memory from clean steps we've played.
+            if(i>0 && !actions[i-1].dirty) {
+                actions[i-1].dehydrateScreenshots();
+            }
 
             next = actions[i + 1];
             next._match = constants.match.PLAY;
@@ -189,7 +197,9 @@ export class Player {
             }
 
             if (action.breakPoint) {
-                return constants.match.CANCEL;
+                next._match = constants.match.CANCEL;
+                next._view = constants.view.EXPECTED;
+                return next.index;
             }
 
             // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
@@ -233,7 +243,7 @@ export class Player {
             next.memoryUsed = 0;
 
             action._view = constants.view.EXPECTED;
-
+            let bailEarly = false;
             switch (next._match) {
                 case constants.match.PASS:
                 case constants.match.ALLOW:
@@ -244,19 +254,25 @@ export class Player {
                 case constants.match.FAIL:
                     console.debug(`\t\tscreenshots still unmatched after ${stop - start}ms`);
                     next._view = constants.view.EDIT;
-                    return next._match; // bail early
+                    bailEarly = true;
                     break;
                 case constants.match.CANCEL:
                     this._stopPlaying = false;
-                    return next._match; // bail early
+                    next._match = constants.match.CANCEL;
+                    next._view = constants.view.EXPECTED; 
+                    bailEarly = true;
+                    break;
             }
 
             if (this.onAfterPlay) {
                 await this.onAfterPlay(action);
             }
+            if(bailEarly) {
+                 break;
+            }
         }
 
-        return next._match; // should be pass!
+        return next.index; 
     }
 
     async goto(action) {
@@ -646,7 +662,6 @@ export class Player {
      * @param {TestAction} args.step The step
      * @param {number} args.max_attempts The max number of iterations to check the screenshot
      * @param {boolean} args.fastFail Should the pixelmatch fail on the first mismatching pixel? 
-     * @returns {string} _match property in the nextStep parameter passed in
      */
     async verifyScreenshot({ step, max_attempts = 100000000 }) {
         let nextStep = step;
@@ -660,9 +675,8 @@ export class Player {
         // this loop will run even if the app is in the process of navigating to the next page.
         while ((((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
             if (this._stopPlaying) { // asyncronously injected
-                nextStep._view = constants.view.EXPECTED;
                 nextStep._match = constants.match.CANCEL;
-                return nextStep._match;
+                return;
             }
             ++i;
 
@@ -701,10 +715,9 @@ export class Player {
                 continue;
             }
 
-            nextStep.actualScreenshot.fileName = `step${nextStep.index}_actual.png`;
             nextStep.calculatePixelDiff({ fastFail: !attemptAutocorrect }); // can't fast fail if auto correct because we use the whole diffPng in checking applicability of the correction
             if (nextStep._match !== constants.match.FAIL) {
-                return nextStep._match;
+                return;
             }
 
             // if it failed and auto correct is on - auto correct it right now if possible.
@@ -714,6 +727,7 @@ export class Player {
                 Correction.availableInstances.forEach(correction => {
                     if (options.autoCorrect && correction.matches(nextStep)) {
                         correction.apply(nextStep);
+                        nextStep.dirty = true;
                         correctionApplied = true;
                     }
                 });
@@ -721,7 +735,7 @@ export class Player {
                     nextStep.calculatePixelDiff({ fastFail: false });
                     if (nextStep._match !== constants.match.FAIL) {
                         nextStep.autoCorrected = true;
-                        return nextStep._match; // auto correct fixed it for us
+                        return; // auto correct fixed it for us
                     }
                     // else - it didn't fix it all.
                 }
@@ -737,7 +751,7 @@ export class Player {
             nextStep.calculatePixelDiff({ fastFail: false });
             if (nextStep._match !== constants.match.FAIL) {
                 // the loop timed out just as the screen got in the correct state.
-                return nextStep._match;
+                return;
             }
         }
 
@@ -748,8 +762,6 @@ export class Player {
         if (!nextStep.actualScreenshot) {
             throw new Error('Unable to create screenshot');
         }
-
-        return nextStep._match;
     }
 
     /** 
@@ -769,7 +781,7 @@ export class Player {
         });
         // result can come back undefined/null. (e.g. debugger not attached, or can detach while the command is in flight)
         let ss = new Screenshot({
-            dataBase64: result.data,
+            dataUrl: 'data:image/png;base64,' + result.data,
             tab: this.tab
         })
 
@@ -778,7 +790,7 @@ export class Player {
             let expectedWidth = this.tab.width;
             let expectedHeight = this.tab.height;
             if (expectedWidth && (expectedWidth !== ss.dataUrlWidth || expectedHeight !== ss.dataUrlHeight)) {
-                throw new Errors.IncorrectScreenshotSize(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${size.width}x${size.height}.`);
+                throw new Errors.IncorrectScreenshotSize(`wrong screenshot size taken. required ${expectedWidth}x${expectedHeight} got ${ss.dataUrlWidth}x${ss.dataUrlHeight}.`);
             }
         }
 
@@ -880,7 +892,7 @@ export class Player {
             await (new Promise(_resolve => chrome.debugger.attach({ tabId: tab.chromeTab.id }, "1.3", _resolve)));
             if (chrome.runtime.lastError?.message) {
                 if (!chrome.runtime.lastError.message.startsWith('Another debugger is already attached')) {
-                    reject(chrome.runtime.lastError.message); // not sure how to handle that.
+                    reject(new Errors.DebuggerAttachError(chrome.runtime.lastError.message)); // not sure how to handle that.
                     return;
                 }
                 // else we can ignore that, that's what we want, we are already attached

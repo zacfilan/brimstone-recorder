@@ -8,7 +8,7 @@
 
   <!-- load the libraries I depend on -->
   <script src="../dependencies/jquery.min.js"></script>
-  <script src="../dependencies/jszip.min.js"></script>
+  <script type="text/javascript" src="../dependencies/zip-full.min.js"></script>
 
   <!-- This is a browserfied version of pngjs, that exposes the PNG module in global variable png -->
   <script src="../dependencies/pngjs.js"></script>
@@ -55,7 +55,7 @@
 
       <div class="file option">File
         <div class="options">
-          <div class="option" data-action="openZip">
+          <div class="option" data-action="loadTests">
             <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="file-import" role="img"
               xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
               class="svg-inline--fa fa-file-import fa-w-16 fa-9x">
@@ -326,7 +326,7 @@
 
     <div class="verticalToolBar">
       <div class="verticalToolBar">
-        <button title="Load Test(s)" id="loadButton" data-action="openZip">
+        <button title="Load Test(s)" id="loadButton" data-action="loadTests">
           <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="file-import" role="img"
             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
             class="svg-inline--fa fa-file-import fa-w-16 fa-9x">

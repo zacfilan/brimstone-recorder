@@ -54,7 +54,8 @@ async function save_options() {
     options.mouseWheelTimeout = mouseWheelTimeoutLookup[parseInt(mouseWheelTimeout.value, 10)];
     //#endregion recording options
 
-    //#region developer options
+    //#region developer options   
+    options.maxNumberOfActionsToPrehydrate = parseInt(maxNumberOfActionsToPrehydrate.value, 10);
     options.developerMode = developerMode.checked;
     options.debugRecorder = debugRecorder.checked;
     options.autoZoomTo100 = autoZoomTo100.checked;
@@ -124,6 +125,7 @@ async function restore_options() {
     //#endregion recording options
 
     //#region developer options
+    maxNumberOfActionsToPrehydrate.value = options.maxNumberOfActionsToPrehydrate;
     developerMode.checked = options.developerMode;
     debugRecorder.checked = options.debugRecorder;
     autoZoomTo100.checked = options.autoZoomTo100;

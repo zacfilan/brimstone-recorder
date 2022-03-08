@@ -407,36 +407,6 @@ export class SparseApplyCorrection extends Correction {
         throw new Error("call dervied method!");
     }
 
-
-    /**
-    * This function is exected on each PixelCondition in this
-    * correction.
-    * @callback pixelCorrectionFunction
-    * @param {PixelCondition} pixelCondition The of the current pixel.
-    * @param {number} flatIndex The flat PNG data index of this pixel.
-    * @returns {Screenshot} The screenshot that was altered.
-    */
-
-    /**
-     * 
-     * @param {pixelCorrectionFunction} foo the function that is applied to each pixel
-     */
-    _forEachPixel(foo) {
-        /** @type {Screenshot} */
-        let pngChanged = null;
-        // Array.foEach will not call the callback on undefined
-        // elements an array. Hence efficient, for sparse martrix.
-        this.pixelCondition.forEach((vline, x_index) => {
-            vline.forEach((pixel, y_index) => {
-                var idx = (this.applicablePngSize.width * y_index + x_index) << 2;
-                pngChanged = foo(pixel, idx);
-            });
-        });
-        if(pngChanged) {
-            pngChanged.pngDataChanged();
-        }
-    }
-
     /**
      * mostly for debug, but this counts the number of pixels in the sparse array
      */
@@ -492,12 +462,22 @@ export class AntiAliasCorrection extends SparseApplyCorrection {
             });
         }
 
-        this._forEachPixel((pixelCondition, flatIndex) => {
-            for (let b = 0; b < 4; ++b) {
-                action.acceptablePixelDifferences.png.data[flatIndex + b] = orangePixel._bytes[b];
-            }
-            return action.acceptablePixelDifferences; // the png i am changing
+        let pngChanged = false;
+        // Array.forEach will not call the callback on undefined
+        // elements an array. Hence efficient, for sparse martrix.
+        this.pixelCondition.forEach((vline, x_index) => {
+            vline.forEach((pixel, y_index) => {
+                var idx = (this.applicablePngSize.width * y_index + x_index) << 2;
+                for (let b = 0; b < 4; ++b) {
+                    action.acceptablePixelDifferences.png.data[idx + b] = orangePixel._bytes[b];
+                }
+                pngChanged = true;
+            });
         });
+        if (pngChanged) {
+            action.acceptablePixelDifferences.pngDataChanged();
+            action.dirty = true;
+        }
     }
 }
 
@@ -509,7 +489,7 @@ export class ActualCorrection extends SparseApplyCorrection {
     /**
     * @param {object} args named arguments 
     * @param {TestAction} args.action the action this correction was constructed from
-    * /
+    */
     constructor({ bounds, action }) {
         let applicablePngSize = new BoundingBox({
             width: action.expectedScreenshot.png.width,
@@ -545,8 +525,11 @@ export class ActualCorrection extends SparseApplyCorrection {
                 expected[idx + 3] = actual[idx + 3];
             }
         }
-        return action.expectedScreenshot;
-   }
+        if (this.bounds.y0 <= ymax && this.bounds.x0 <= xmax) {
+            // we did poke some data.
+            action.expectedScreenshot.pngDataChanged();
+        }
+    }
 }
 
 export class Rectangle {

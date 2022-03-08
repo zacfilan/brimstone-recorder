@@ -81,3 +81,9 @@ export class InvalidVersion extends Error {
         super(msg || 'The test version is newer than the Brimstone version.');
     }   
 }
+
+export class DebuggerAttachError extends Error {
+    constructor(msg) {
+        super(msg || 'Cannot attach the debugger.');
+    }   
+}
