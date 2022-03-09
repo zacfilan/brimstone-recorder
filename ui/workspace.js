@@ -582,7 +582,6 @@ window.addEventListener("error", async function (errorEvent) {
  * https://github.com/josdejong/jsoneditor
  */
 let jsonEditor;
-let extensionInfo;
 /**
  * @type {string}
 
@@ -612,11 +611,6 @@ let extensionInfo;
         options.installedOnAlias = await brimstone.window.prompt('Please provide an identifier for this computer. It can be the real computer name or something else, e.g. "Zac\'s Laptop"');
         await saveOptions(options);
     }
-
-    // let info = await (new Promise(resolve => chrome.runtime.getPlatformInfo(resolve)));
-    // console.log(info, navigator.userAgent);
-    extensionInfo = await chrome.management.getSelf();
-    infobar.installType = extensionInfo.installType === 'development' ? '👿dev ' : '';
 
     setToolbarState();
     /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
@@ -985,7 +979,7 @@ async function _playSomething() {
             Test.current.lastRun.startDate = Date.now();
             Test.current.lastRun.name = Test.current.filename;
             Test.current.lastRun.startingServer = Test.current.startingServer || Test.current.steps[0].url;
-            Test.current.lastRun.brimstoneVersion = BDS.brimstoneVersion;
+            Test.current.lastRun.brimstoneVersion = BDS.extensionInfo.version;
             Test.current.lastRun.chromeVersion = BDS.chromeVersion;
 
             let actions = Test.current.steps;

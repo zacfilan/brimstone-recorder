@@ -1,11 +1,36 @@
 import {options} from "../options.js";
 import {constants} from "./card.js";
 
-/** This version of brimstone-recorder, this may be diferent that the version a test was recorded by. */
-export const brimstoneVersion = 'v' + chrome.runtime.getManifest().version;
 
-/** The chrome version comes from the useragent string */
-export const chromeVersion = /Chrome\/([0-9.]+)/.exec(navigator.userAgent)[1];
+class ExtensionInfo {
+  /** ***This manifest*** version of brimstone-recorder, 
+   * this may be diferent than the version a test was recorded by.
+   * See {@link ExtensionInfo.version}. */
+  _brimstoneVersion = 'v' + chrome.runtime.getManifest().version;
+  
+  /** The chrome version comes from the useragent string */
+  chromeVersion = /Chrome\/([0-9.]+)/.exec(navigator.userAgent)[1];
+
+  /** Development or normal? */
+  _info = '';
+
+  /** e.g. "👿dev v1.11.1" or "v2.32.5" 
+   * 
+   * *note:* "👿" > "v"
+   *  
+   * *so dev versions compare 
+   * "higher" than all non-dev versions.*
+   * */
+  get version() {
+    return (this._info === 'development' ? '👿dev ' : ' ') + this._brimstoneVersion; 
+  }
+}
+
+export let extensionInfo = new ExtensionInfo();
+(async() => {
+  extensionInfo._info = await chrome.management.getSelf();
+})();
+
 
 function padDigits(len, num) {
     return num.toString().padStart(len, '0');
@@ -156,9 +181,9 @@ export class Test {
             /** @type {Step[]} */
             steps: this.steps,
 
-            chromeVersion: this.chromeVersion,
+            chromeVersion: extensionInfo.chromeVersion,
 
-            brimstoneVersion: this.brimstoneVersion,
+            brimstoneVersion: extensionInfo.version,
 
             startingServer: this.startingServer,
 

@@ -1,10 +1,8 @@
 "use strict";
 
-import * as BDS from "./brimstoneDataService.js";
+import { extensionInfo } from "./brimstoneDataService"; 
 
 class InfoBar {
-    installType = '';
-
     setText(infobarText) {
         if (!infobarText) {
             if ($('#recordButton').hasClass('active')) {
@@ -17,7 +15,7 @@ class InfoBar {
                 infobarText = 'ready';
             }
         }
-        this.setHtml(this.installType + BDS.brimstoneVersion + ' ' + infobarText);
+        this.setHtml(extensionInfo.version + ' ' + infobarText);
     }
 
     setHtml(html) {
@@ -32,10 +30,10 @@ class InfoBar {
      */
     setProgress(label, complete, value, max) {
         if (value === max) {
-            this.setHtml(`${this.installType}${BDS.brimstoneVersion} ${complete} ${value}/${max}`);
+            this.setHtml(`${extensionInfo.version} ${complete} ${value}/${max}`);
         }
         else {
-            this.setHtml(`${this.installType}${BDS.brimstoneVersion} ${label} ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
+            this.setHtml(`${extensionInfo.version} ${label} ${value}/${max} <progress max="${max}" value="${value}"></progress>`);
         }
     }
 }

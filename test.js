@@ -210,7 +210,7 @@ export class Test {
     toJSON() {
         return {
             steps: this.steps,
-            brimstoneVersion: BDS.brimstoneVersion,
+            brimstoneVersion: BDS.extensionInfo.version,
             hideCursor: this.hideCursor,
             incognito: this.incognito
         };
@@ -345,7 +345,7 @@ export class Test {
             this.brimstoneVersion = 'v1.0.0';
         }
 
-        if (this.brimstoneVersion > BDS.brimstoneVersion) {
+        if (this.brimstoneVersion > BDS.extensionInfo.version) {
             let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with a newer version of Brimstone than you are currently using. This test mght misbehave unless you upgrade Brimstone to at least version '${this.brimstoneVersion}', but that's up to you.
             
 Continue to load this newer test with your older version of Brimstone?`);
@@ -357,7 +357,7 @@ Continue to load this newer test with your older version of Brimstone?`);
         let screenshotPromises = [];
         for (let i = 0; i < actions.length; ++i) {
             let _action = actions[i];
-            if (this.brimstoneVersion < BDS.brimstoneVersion) {
+            if (this.brimstoneVersion < BDS.extensionInfo.version) {
                 this.oldVersion = true;
                 // convert old tests
                 if (_action.type === 'start') {
@@ -378,7 +378,7 @@ Continue to load this newer test with your older version of Brimstone?`);
                 if (_action.tab.virtualId === undefined) {
                     _action.tab.virtualId = 0;
                 }
-                if ('v1.18.0' <= BDS.brimstoneVersion) {
+                if ('v1.18.0' <= BDS.extensionInfo.version) {
                     if (_action.type === 'wait' && _action?.event?.milliseconds === undefined) {
                         _action.type = 'pollscreen';
                     }
@@ -674,8 +674,8 @@ export class PlayTree {
             flatReport.userTime = 0;
             flatReport.name = this._fileHandle.name;
             flatReport.startingServer = reports[0].startingServer;
-            flatReport.chromeVersion = BDS.chromeVersion;
-            flatReport.brimstoneVersion = BDS.brimstoneVersion;
+            flatReport.chromeVersion = BDS.extensionInfo.chromeVersion;
+            flatReport.brimstoneVersion = BDS.extensionInfo.version;
 
             var baseIndex = 0;
             for (let i = 0; i < reports.length; ++i) {
