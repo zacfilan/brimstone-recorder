@@ -179,7 +179,7 @@ export class Screenshot {
      * @returns 
      */
     async hydrate() {
-        if (!this.dataUrl && this.fileName) {
+        if (!this.dataUrl && this.zipEntry) {
             return this.loadDataUrlFromZip()
                 .then(() => this.png);
         }
@@ -190,8 +190,13 @@ export class Screenshot {
     * free up screenshot memory. only on steps that are NOT dirty
     */
     dehydrate() {
+        // dirty actions will not dehydrate their screenshots
         delete this._png;     // this is the large one, chuck it.
-        delete this._dataUrl; // smaller to keep around, than the PNG object, but clean them up anyway. (dirty actions will not dehydrate their screenshots)
+        if(this.zipEntry) {
+            // smaller to keep around, than the PNG object, but clean them up anyway, providing that they can
+            // be rehydrated via a zipEntry.
+            delete this._dataUrl;
+        }
     }
     
     /**

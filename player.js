@@ -12,7 +12,7 @@ import { Test } from "./test.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
 import { Correction } from "./rectangle.js";
-import {infobar} from "./ui/infobar.js";
+import { infobar } from "./ui/infobar.js";
 /**
  * This function is injected and run in the app
  * 
@@ -145,7 +145,7 @@ export class Player {
      */
     async _hydrate(actions, startIndex, endIndex) {
         await progressIndicator({
-            progressCallback: infobar.setProgress.bind(infobar, 'prefetch', 'prefetched'), 
+            progressCallback: infobar.setProgress.bind(infobar, 'prefetch', 'prefetched'),
             items: actions,
             startIndex: startIndex,
             endIndex: endIndex,
@@ -169,7 +169,7 @@ export class Player {
         await loadOptions();
         let actions = test.steps; // short alias
 
-        if(options.maxNumberOfActionsToPrehydrate)
+        if (options.maxNumberOfActionsToPrehydrate)
             await this._hydrate(actions, startIndex, startIndex + options.maxNumberOfActionsToPrehydrate);
 
         // start timer
@@ -181,8 +181,8 @@ export class Player {
             action._view = constants.view.EXPECTED;
 
             // free up memory from clean steps we've played.
-            if(i>0 && !actions[i-1].dirty) {
-                actions[i-1].dehydrateScreenshots();
+            if (i > 0 && !actions[i - 1].dirty) {
+                actions[i - 1].dehydrateScreenshots();
             }
 
             next = actions[i + 1];
@@ -196,52 +196,51 @@ export class Player {
                 await this.onBeforePlay(action); // this shows the correct step (and will start the waiting animation)
             }
 
-            if (action.breakPoint) {
-                next._match = constants.match.CANCEL;
-                next._view = constants.view.EXPECTED;
-                return next.index;
-            }
+            if (!action.breakPoint) {
 
-            // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
-            // performed this action, we just need to put the mouse in the correct spot and
-            // do the screen verification again
-            if (resume && i === startIndex) {
-                // not needed? it is already in the right spot?
-                //await this.mousemove(this.mouseLocation); 
-            }
-            else {
-                action.tab.chromeTab = this.tab.chromeTab; // just for debugging
-                if (action != 'keys' && options.userMouseDelay) {
-                    console.log(`[step:${action.index + 1} tab:${action.tab.id}] wait ${options.userMouseDelay}ms before playing`);
-                    await sleep(options.userMouseDelay);
+                // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
+                // performed this action, we just need to put the mouse in the correct spot and
+                // do the screen verification again
+                if (resume && i === startIndex) {
+                    // not needed? it is already in the right spot?
+                    //await this.mousemove(this.mouseLocation); 
                 }
-                console.log(`[step:${action.index + 1} tab:${action.tab.id}] begin play "${action.description}"`);
-                await this[action.type](action); // really perform this in the browser (this action may start some navigations)
-                console.log(`[step:${action.index + 1} tab:${action.tab.id}] end   play "${action.description}"`);
-            }
-            delete action.pixelDiffScreenshot; // save a lttle memory. I don't need to hang onto calculatable previous step data
+                else {
+                    action.tab.chromeTab = this.tab.chromeTab; // just for debugging
+                    if (action != 'keys' && options.userMouseDelay) {
+                        console.log(`[step:${action.index + 1} tab:${action.tab.id}] wait ${options.userMouseDelay}ms before playing`);
+                        await sleep(options.userMouseDelay);
+                    }
+                    console.log(`[step:${action.index + 1} tab:${action.tab.id}] begin play "${action.description}"`);
+                    await this[action.type](action); // really perform this in the browser (this action may start some navigations)
+                    console.log(`[step:${action.index + 1} tab:${action.tab.id}] end   play "${action.description}"`);
+                }
+                delete action.pixelDiffScreenshot; // save a lttle memory. I don't need to hang onto calculatable previous step data
 
-            // grep for FOCUS ISSUE for details
-            if (i === startIndex && action.type === 'goto') {
-                await this.mousemove({ x: 0, y: 0 });
-                await this.mousemove({ x: -1, y: -1 });
-            }
+                // grep for FOCUS ISSUE for details
+                if (i === startIndex && action.type === 'goto') {
+                    await this.mousemove({ x: 0, y: 0 });
+                    await this.mousemove({ x: -1, y: -1 });
+                }
 
-            start = performance.now();
-            if (!mustVerifyScreenshot) {
-                next._match = constants.view.PASS;
+                start = performance.now();
+                if (!mustVerifyScreenshot) {
+                    next._match = constants.view.PASS;
+                }
+                else {
+                    await this.verifyScreenshot({ step: next });
+                }
+                stop = performance.now();
+
+                action.latency = Math.round(stop - start); // in ms
+
+                // clear out old data
+                next.latency = 0;
+                next.memoryUsed = 0;
             }
             else {
-                await this.verifyScreenshot({ step: next });
+                next._match = constants.match.BREAKPOINT;
             }
-            stop = performance.now();
-
-            action.latency = Math.round(stop - start); // in ms
-
-            // clear out old data
-            next.latency = 0;
-            next.memoryUsed = 0;
-
             action._view = constants.view.EXPECTED;
             let bailEarly = false;
             switch (next._match) {
@@ -257,9 +256,9 @@ export class Player {
                     bailEarly = true;
                     break;
                 case constants.match.CANCEL:
+                case constants.match.BREAKPOINT:
                     this._stopPlaying = false;
-                    next._match = constants.match.CANCEL;
-                    next._view = constants.view.EXPECTED; 
+                    next._view = constants.view.EXPECTED;
                     bailEarly = true;
                     break;
             }
@@ -267,12 +266,12 @@ export class Player {
             if (this.onAfterPlay) {
                 await this.onAfterPlay(action);
             }
-            if(bailEarly) {
-                 break;
+            if (bailEarly) {
+                break;
             }
         }
 
-        return next.index; 
+        return next.index;
     }
 
     async goto(action) {
@@ -670,11 +669,11 @@ export class Player {
         let i = 0;
         let badTab = false;
 
-        let attemptAutocorrect = ( Correction.availableInstances.length && options.autoCorrect);
-        
+        let attemptAutocorrect = (Correction.availableInstances.length && options.autoCorrect);
+
         // this loop will run even if the app is in the process of navigating to the next page.
         while ((((performance.now() - start) / 1000) < nextStep._lastTimeout) && (i < max_attempts)) {
-            if (this._stopPlaying) { // asyncronously injected
+            if (this._stopPlaying) { // asyncronously injected by user clicking the play button again
                 nextStep._match = constants.match.CANCEL;
                 return;
             }
@@ -945,8 +944,8 @@ export class Player {
 }
 
 Player.pngDiff = function pngDiff(
-    expectedPng, 
-    actualPng, 
+    expectedPng,
+    actualPng,
     maskPng,
 
     pixelMatchThreshhold,

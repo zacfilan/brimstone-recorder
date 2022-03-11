@@ -72,6 +72,26 @@ export class TestLoadError extends Error {
     }
 }
 
+
+/** an error that identifies we had issues saving the requested test */
+export class TestSaveError extends Error {
+    constructor(msg, testName) {
+        if(!testName) {
+            testName = 'The requested test';
+        }
+        else {
+            testName = `Test '${testName}'`;
+        }
+        if(msg) {
+            msg = `${testName} could not be saved: \n\n${msg}.`;
+        }
+        else {
+            msg = `${testName} could not be saved.`;
+        }
+        super(msg);
+    }
+}
+
 /**
  * an error that indicates the user is loading a test from a version of brimstone older than the 
  * version that reecorded the test

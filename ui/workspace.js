@@ -14,7 +14,7 @@ import * as Errors from "../error.js";
 import { MenuController } from "./menu_controller.js";
 import { clone, brimstone } from "../utilities.js";
 import * as BDS from "./brimstoneDataService.js";
-import {infobar} from "./infobar.js";
+import { infobar } from "./infobar.js";
 
 const ALT_KEYCODE = 18;
 const META_KEYCODE = 91;
@@ -190,6 +190,7 @@ class Actions {
                     data: JSON.stringify(report),
                     contentType: "application/json",
                     success: function (result) {
+                        infobar.setText(`✅ results posted to ${options.postMetricsEndpoint}`);
                         console.log(result);
                     },
                     error: function (jqXHR, textStatus, errorThrown) {
@@ -262,10 +263,10 @@ class Actions {
         // The test instance is still linked to by the playtree, for reporting stuff, so free up what memory I can.
         Test.current.removeScreenshots();
         delete Test.current.actionCache;
-        delete zipNodes[currentTestNumber-1]; // remove this link to memory
+        delete zipNodes[currentTestNumber - 1]; // remove this link to memory
         ////
 
-        
+
         // remove the cards
         // FIXME abstract this away in a Test instance
         Test.current = new Test();
@@ -278,7 +279,7 @@ class Actions {
 
         $('#cards').empty();
         $('#step').empty();
-        if(options.forgetCorrectionsWhenTestIsCleared) {
+        if (options.forgetCorrectionsWhenTestIsCleared) {
             Correction.availableInstances = [];
         }
     }
@@ -455,7 +456,7 @@ class Actions {
                 break;
             case constants.view.ACTUAL: // actual -> edit
                 action._view = constants.view.EDIT;
-                if(action.acceptablePixelDifferences) {
+                if (action.acceptablePixelDifferences) {
                     await action.acceptablePixelDifferences.hydrate(Test.current.zip?.folder("screenshots"));
                 }
                 action.calculatePixelDiff();
@@ -497,11 +498,11 @@ class Actions {
     }
 
     async enableAutoPlayCheckbox(e) {
-        $('.card.edit').find('button[autoplay]').each( (index, button) => {
+        $('.card.edit').find('button[autoplay]').each((index, button) => {
             button.setAttribute('autoplay', enableAutoPlayCheckbox.checked ? 'true' : 'false');
             let title = button.getAttribute('title');
             title = title.replace(' Autoplay.', '');
-            if(enableAutoPlayCheckbox.checked) {
+            if (enableAutoPlayCheckbox.checked) {
                 title += ' Autoplay.';
             }
 
@@ -551,11 +552,13 @@ async function errorHandler(e) {
             await brimstone.window.alert(e.message);
             break;
         case Errors.DebuggerAttachError:
-            if(e.message ==='Cannot access a chrome:// URL') {
+            if (e.message === 'Cannot access a chrome:// URL') {
                 await brimstone.window.alert(`Brimstone can't attach to chrome:// URLs by default. See chrome://flags/#extensions-on-chrome-urls if you really want to try.\n\nLast operation was cancelled.`);
-                break;               
+                break;
             }
-            // else fall thru
+        case Errors.TestSaveError:
+            await brimstone.window.alert(e.stack);
+            break;
         default:
             await brimstone.window.error(e);
             break;
@@ -604,6 +607,7 @@ let jsonEditor;
         disableConsole(); // can be reenabled in the debugger later
     }
 
+
     enableAutoCorrectCheckbox.checked = options.autoCorrect;
     enableAutoPlayCheckbox.checked = options.autoPlay;
 
@@ -612,7 +616,6 @@ let jsonEditor;
         await saveOptions(options);
     }
 
-    setToolbarState();
     /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
     // grab the parent window id from the query parameter   
     const urlParams = new URLSearchParams(window.location.search);
@@ -636,6 +639,9 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
         await chrome.windows.update(activeChromeTab.windowId, { focused: true });
         await chrome.windows.remove(w.id);
     }
+    setToolbarState();
+    BDS.extensionInfo._info = await chrome.management.getSelf();
+    infobar.setText();
 })();
 
 async function countDown(seconds, action) {
@@ -702,7 +708,7 @@ $('#step').on('click', '#correctAsUnpredictable', async (e) => {
 /** 
  * Click the question mark to create unpredictable regions/corrections.
  */
- $('#step').on('click', '#correctAsAntiAlias', async (e) => {
+$('#step').on('click', '#correctAsAntiAlias', async (e) => {
     e.stopPropagation();
     await actions.callMethodByUser(actions.applyCorrections, e);
 });
@@ -715,7 +721,7 @@ $("#step").on('click', '#correctAsActual', async (e) => {
 /** 
  * Click the magic wand to apply the possible corrections
  */
- $('#step').on('click', '#possibleCorrections', async (e) => {
+$('#step').on('click', '#possibleCorrections', async (e) => {
     e.stopPropagation();
     await actions.callMethodByUser(actions.applyCorrections, e);
 });
@@ -827,7 +833,7 @@ function addVolatileRegions() {
     const { view, action } = getCard($('#content .card.waiting')[0], Test.current);
 
     // can't add rectangles unless there are red pixels
-    if(!action.numDiffPixels) {
+    if (!action.numDiffPixels) {
         return;
     }
 
@@ -1015,11 +1021,11 @@ async function _playSomething() {
 
                 // if we never played anything but start in the middle I guess the
                 // best we can do is assume one tab exists.
-                if(! Tab.getByVirtualId(0)) {
+                if (!Tab.getByVirtualId(0)) {
                     Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
                     startingTab.trackCreated();
                 }
-                
+
             }
 
             startingTab.width = actions[0].tab.width;
@@ -1030,7 +1036,7 @@ async function _playSomething() {
 
             if (await player.attachDebugger({ tab: Tab.active })) {
                 if (Tab.active.url !== 'about:blank') { // it will not let me inject the script to tell the size into this - yet.
-                    await Tab.active.resizeViewport(); 
+                    await Tab.active.resizeViewport();
                 }
             }
             await playTab();
@@ -1038,7 +1044,7 @@ async function _playSomething() {
                 hideCursor();
             }
 
-            let indexOfNext  = await player.play(Test.current, playFrom, resume); // players gotta play...
+            let indexOfNext = await player.play(Test.current, playFrom, resume); // players gotta play...
             let nextAction = Test.current.steps[indexOfNext];
             playMatchStatus = nextAction._match;
 
@@ -1075,6 +1081,9 @@ async function _playSomething() {
                     break;
                 case constants.match.CANCEL:
                     infobar.setText(`✋ last run canceled after user action ${indexOfNext}`);
+                    break;
+                case constants.match.BREAKPOINT:
+                    infobar.setText(`✋ user defined breakpoint hit, step ${indexOfNext} not executed`);
                     break;
                 default:
                     infobar.setText(`💀 unnown status reported '${playMatchStatus}'`);
@@ -1753,32 +1762,37 @@ $('#clearButton').on('click', actions.clearWorkspace.bind(actions));
 
 
 async function loadNextTest() {
-    let numberOfTestsInSuite = zipNodes.length;
-    if (currentTestNumber >= numberOfTestsInSuite) {
-        return false;
+    try {
+        let numberOfTestsInSuite = zipNodes.length;
+        if (currentTestNumber >= numberOfTestsInSuite) {
+            return false;
+        }
+        await actions.clearTest(); // any previous test is cleared out
+        currentTestNumber++;
+
+        let options = await loadOptions();
+        let suite = numberOfTestsInSuite > 1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})` : '';
+        //let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
+
+        // This load is just super fast.
+        Test.current = await (new Test()).fromPlayTree(zipNodes[currentTestNumber - 1]);
+
+        if (currentTestNumber === 1) {
+            Test.current.startingServer = Test.current.steps[0].url || zipNodes[0]._zipTest.startingServer || null;
+        }
+
+        window.document.title = `Brimstone - ${Test.current._playTree.path()}${suite}`;
+        await updateStepInView(Test.current.steps[0]);
+        // for (let i = 1; i < Test.current.steps.length; ++i) {
+        //      let action = Test.current.steps[i];
+        //      updateThumb(action);
+        // }
+        setToolbarState();
+        return true;
     }
-    await actions.clearTest(); // any previous test is cleared out
-    currentTestNumber++;
-
-    let options = await loadOptions();
-    let suite = numberOfTestsInSuite > 1 ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})` : '';
-    //let lastStep = Test.current.steps.length >= 1 ? Test.current.steps.length - 1 : 0;
-
-    // This load is just super fast.
-    Test.current = await (new Test()).fromPlayTree(zipNodes[currentTestNumber - 1]);
-
-    if(currentTestNumber === 1) {
-      Test.current.startingServer = Test.current.steps[0].url || zipNodes[0]._zipTest.startingServer || null;
+    catch (e) {
+        throw new Errors.TestLoadError(e.message, zipNodes[currentTestNumber - 1]._fileHandle.name);
     }
-
-    window.document.title = `Brimstone - ${Test.current._playTree.path()}${suite}`;
-    await updateStepInView(Test.current.steps[0]);
-    // for (let i = 1; i < Test.current.steps.length; ++i) {
-    //      let action = Test.current.steps[i];
-    //      updateThumb(action);
-    // }
-    setToolbarState();
-    return true;
 }
 
 
@@ -1819,20 +1833,20 @@ async function setStepContent(step) {
     $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
     setToolbarState();
     let acs = [];
-    if(step?.curr?.autoCorrected) {
-        acs.push(step.curr.index+1);
+    if (step?.curr?.autoCorrected) {
+        acs.push(step.curr.index + 1);
     }
-    if(step?.next?.autoCorrected) {
-        acs.push(step.next.index+1);
+    if (step?.next?.autoCorrected) {
+        acs.push(step.next.index + 1);
     }
-    if(acs.length) {
+    if (acs.length) {
         let s = '';
-        if(acs.length>1) {
+        if (acs.length > 1) {
             s = 's';
         }
         infobar.setText(`step${s} ${acs.join(', ')} auto-corrected.`);
     }
-    
+
     updateThumb(step.curr); // this isn't the cause of the slow processing of keystokes.
 };
 

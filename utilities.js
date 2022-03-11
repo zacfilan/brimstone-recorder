@@ -13,15 +13,15 @@ export function uuidv4() {
 }
 
 // credit where due https://stackoverflow.com/a/30800715
-export function downloadObjectAsJson(exportObj, exportName){
+export function downloadObjectAsJson(exportObj, exportName) {
     var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2)); // zac likes readable json
     var downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", exportName + ".json");
     document.body.appendChild(downloadAnchorNode); // required for firefox
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
-  }
+}
 
 /**
  * Make a deep clone of any object, via JSON magic.
@@ -74,42 +74,48 @@ export var brimstone = {
  * @returns 
  */
 export function progressIndicator({
-    progressCallback, 
-    items, 
+    progressCallback,
+    items,
     startIndex = undefined,
     endIndex = undefined,
     itemProcessor
-    }) {
-    if(startIndex === undefined) {
+}) {
+    if (startIndex === undefined) {
         startIndex = 0;
     }
-    if(startIndex < 0) {
+    if (startIndex < 0) {
         startIndex = 0;
     }
-    if(endIndex === undefined) {
+    if (endIndex === undefined) {
         endIndex = items.length;
     }
-    if(endIndex > items.length) {
+    if (endIndex > items.length) {
         endIndex = items.length;
     }
-    return new Promise(async (resolve) => {
-        let i = startIndex;
+    return new Promise(async (resolve, reject) => {
         let id;
-        if (progressCallback) {
-            id = setInterval(
-                () => {
-                    progressCallback(i + 1, endIndex);
-                },
-                1000);
+        try {
+            let i = startIndex;
+            if (progressCallback) {
+                id = setInterval(
+                    () => {
+                        progressCallback(i + 1, endIndex);
+                    },
+                    1000);
+            }
+            for (i = startIndex; i < endIndex; ++i) {
+                let item = items[i];
+                await itemProcessor.call(item, item);
+            }
+            if (progressCallback) {
+                clearInterval(id);
+                progressCallback(endIndex, endIndex);
+            }
+            resolve(true);
         }
-        for (i = startIndex; i < endIndex; ++i) {
-            let item = items[i];
-            await itemProcessor.call(item, item);
-        }
-        if (progressCallback) {
+        catch (e) {
             clearInterval(id);
-            progressCallback(endIndex, endIndex);
+            reject(e);
         }
-        resolve(true);
-    });  
+    });
 }

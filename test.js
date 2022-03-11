@@ -98,19 +98,20 @@ export class Test {
         console.debug('hydrating step dataurls');
         return progressIndicator({
             progressCallback: infobar.setProgress.bind(infobar, 'hydrate', 'hydrated'),
-            items: this.steps, 
+            items: this.steps,
             itemProcessor: async action => {
-            if (action.expectedScreenshot && !action.expectedScreenshot.dataUrl) {
-                if (action.expectedScreenshot?.fileName) { // protect against possible bad save
-                    await action.expectedScreenshot.loadDataUrlFromZip();
+                if (action.expectedScreenshot && !action.expectedScreenshot.dataUrl) {
+                    if (action.expectedScreenshot?.fileName) { // protect against possible bad save
+                        await action.expectedScreenshot.loadDataUrlFromZip();
+                    }
+                }
+                if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.dataUrl) {
+                    if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
+                        await action.acceptablePixelDifferences.loadDataUrlFromZip();
+                    }
                 }
             }
-            if (action.acceptablePixelDifferences && !action.acceptablePixelDifferences.dataUrl) {
-                if (action.acceptablePixelDifferences?.fileName) { // protect against possible bad save
-                    await action.acceptablePixelDifferences.loadDataUrlFromZip();
-                }
-            }
-        }});
+        });
     }
 
     /**
@@ -153,11 +154,11 @@ export class Test {
      * @param {TestAction} action */
     async deleteAction(action) {
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
-        this.dirty = true;
         let removeIndex = action.index;
         for (let i = action.index + 1; i < this.steps.length; ++i) {
             let action = this.steps[i];
             action.setIndex(i - 1);
+            action.dirty = true;
         }
         this.steps.splice(removeIndex, 1);
     }
@@ -169,7 +170,6 @@ export class Test {
      */
     async deleteActionsBefore(action) {
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
-        this.dirty = true;
         this.steps.splice(0, action.index);
         this.reindex();
     }
@@ -177,7 +177,11 @@ export class Test {
     reindex() {
         for (let i = 0; i < this.steps.length; ++i) {
             let action = this.steps[i];
+            let oldIndex = action.index;
             action.setIndex(i);
+            if (oldIndex !== i) {
+                action.dirty = true;
+            }
         }
     }
     /**
@@ -188,7 +192,6 @@ export class Test {
      */
     async deleteActionsAfter(action) {
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
-        this.dirty = true;
         this.steps.splice(action.index + 2);
         this.reindex();
 
@@ -202,7 +205,6 @@ export class Test {
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
         newAction.test = this;
         newAction.tab = clone(this.steps[newAction.index].tab);
-        newAction.dirty = true;
         this.steps.splice(newAction.index, 0, newAction);
         this.reindex();
     }
@@ -235,16 +237,17 @@ export class Test {
 
         // write the dataUrl for expected and acceptable screenshots in all steps of this test into the zip.
         await progressIndicator({
-            progressCallback: infobar.setProgress.bind(infobar, 'write zip step', 'wrote zip steps'), 
-            items: this.steps, 
+            progressCallback: infobar.setProgress.bind(infobar, 'write zip step', 'wrote zip steps'),
+            items: this.steps,
             itemProcessor: async card => {
-            if (card.expectedScreenshot?.dataUrl) {
-                await writer.add(`screenshots/${card.expectedScreenshot.fileName}`, new zip.Data64URIReader(card.expectedScreenshot.dataUrl));
+                if (card.expectedScreenshot?.dataUrl) {
+                    await writer.add(`screenshots/${card.expectedScreenshot.fileName}`, new zip.Data64URIReader(card.expectedScreenshot.dataUrl));
+                }
+                if (card.acceptablePixelDifferences?.dataUrl) {
+                    await writer.add(`screenshots/${card.acceptablePixelDifferences.fileName}`, new zip.Data64URIReader(card.acceptablePixelDifferences.dataUrl));
+                }
             }
-            if (card.acceptablePixelDifferences?.dataUrl) {
-                await writer.add(`screenshots/${card.acceptablePixelDifferences.fileName}`, new zip.Data64URIReader(card.acceptablePixelDifferences.dataUrl));
-            }
-        }});
+        });
         await writer.close();
         return blobWriter.getData();
     }
@@ -253,12 +256,15 @@ export class Test {
      * save the current state to a zip file 
      */
     async saveFile() {
-        // FIXME: this will NOT work if you insert or delete items !!
-        let blobPromise = this.createZip();
-
-        console.debug('save zip to disk');
+        let handle;
         try {
-            const handle = await window.showSaveFilePicker({
+            // FIXME: this will NOT work if you insert or delete items !!
+            let blob = await this.createZip();
+            console.debug('save zip to disk'); 
+
+            // the moment I invoke showSaveFilePicker the file is truncated, which means I cannot overlap the createZip operation
+            // with picking the save file which is a nice time saver for te user
+            handle = await window.showSaveFilePicker({
                 suggestedName: this.filename,
                 types: [
                     {
@@ -267,10 +273,9 @@ export class Test {
                     }
                 ]
             });
-            const writable = await handle.createWritable();
 
-            // get the zip file as a Blob
-            let blob = await blobPromise;
+            // get the zip file as a Blob, if the promise rejects the wait throws the rejected value.
+            const writable = await handle.createWritable();
             infobar.setText(`saving ${handle.name} <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="save"
             class="svg-inline--fa fa-save fa-w-14" role="img" xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 448 512">
@@ -291,7 +296,7 @@ export class Test {
             if (e instanceof DOMException && e.message === 'The user aborted a request.') {
                 return; // fine
             }
-            throw e;
+            throw new Errors.TestSaveError(e.stack);
         }
     }
 
@@ -346,9 +351,9 @@ export class Test {
         }
 
         if (this.brimstoneVersion > BDS.extensionInfo.version) {
-            let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with a newer version of Brimstone than you are currently using. This test mght misbehave unless you upgrade Brimstone to at least version '${this.brimstoneVersion}', but that's up to you.
+            let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with version ${this.brimstoneVersion}. This test might misbehave unless you use extension version '${this.brimstoneVersion}' or better, but that's up to you.
             
-Continue to load this newer test with your older version of Brimstone?`);
+Continue to load this test with (your possibly) incompatible version of Brimstone?`);
             if (!tryAnyway) {
                 return false; // bail
             }
@@ -426,7 +431,7 @@ Continue to load this newer test with your older version of Brimstone?`);
                 action.actualScreenshot = new Screenshot(action.actualScreenshot);
                 action.actualScreenshot.zipEntry = entries.find(e => e.filename === `screenshots/${action.actualScreenshot.fileName}`);
                 if (!action.actualScreenshot.zipEntry) {
-                    throw new Error("can't find entry")
+                    action.actualScreenshot = undefined; // whack any bad data
                 }
             }
             else {
@@ -674,8 +679,6 @@ export class PlayTree {
             flatReport.userTime = 0;
             flatReport.name = this._fileHandle.name;
             flatReport.startingServer = reports[0].startingServer;
-            flatReport.chromeVersion = BDS.extensionInfo.chromeVersion;
-            flatReport.brimstoneVersion = BDS.extensionInfo.version;
 
             var baseIndex = 0;
             for (let i = 0; i < reports.length; ++i) {

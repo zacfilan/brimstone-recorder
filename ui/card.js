@@ -32,7 +32,8 @@ export const constants = {
         ALLOW: 'allow',
         FAIL: 'fail',
         CANCEL: 'cancel',
-        NOTRUN: 'notrun'
+        NOTRUN: 'notrun',
+        BREAKPOINT: 'breakpoint'
     }
 };
 
@@ -687,13 +688,13 @@ export class Step {
                         </div>
 
                         <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
-                            <button ${questionMarkDisabled ? 'disabled': ''} title="Mark red pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsUnpredictable" ${autoplay}>
+                            <button ${questionMarkDisabled ? 'disabled': ''} title="Mark ALL pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsUnpredictable" ${autoplay}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
                             </button>
                         </div>
 
                         <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
-                        <button ${ironDisabled ? 'disabled': ''} title="Mark red pixels in rectangle(s) as anti-alias differences.${titleSuffix}" id="correctAsAntiAlias" ${autoplay}>
+                        <button ${ironDisabled ? 'disabled': ''} title="Mark ONLY red pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsAntiAlias" ${autoplay}>
                             <svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
                                 viewBox="0 0 489.962 489.962" style="enable-background:new 0 0 489.962 489.962;" xml:space="preserve">
                                     <path d="M486.8,248.733c-15.9-14.8-22.6-38.9-16.3-59.9c0.8-2.3,23.9-54.7-17.5-71.5c-31.7-7.8-52.5,5.4-57.9,10.9l-2-4.2
@@ -707,7 +708,7 @@ export class Step {
                         </div>
 
                         <div class='stopPropagation' title="Enabled when red pixels exist.">
-                            <button ${checkDisabled ? 'disabled': ''} title="Mark red pixels/rectangles as correct.${titleSuffix}" id="correctAsActual" ${autoplay}>
+                            <button ${checkDisabled ? 'disabled': ''} title="Mark all pixels in rectangle(s) as correct.${titleSuffix}" id="correctAsActual" ${autoplay}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M438.6 105.4C451.1 117.9 451.1 138.1 438.6 150.6L182.6 406.6C170.1 419.1 149.9 419.1 137.4 406.6L9.372 278.6C-3.124 266.1-3.124 245.9 9.372 233.4C21.87 220.9 42.13 220.9 54.63 233.4L159.1 338.7L393.4 105.4C405.9 92.88 426.1 92.88 438.6 105.4H438.6z"/></svg>
                             </button>
                         </div>

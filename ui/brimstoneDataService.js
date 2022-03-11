@@ -14,7 +14,9 @@ class ExtensionInfo {
   /** Development or normal? */
   _info = '';
 
-  /** e.g. "👿dev v1.11.1" or "v2.32.5" 
+  /** 
+   * The dev-aware version of this extension.
+   * e.g. "👿dev v1.11.1" or "v2.32.5" 
    * 
    * *note:* "👿" > "v"
    *  
@@ -22,15 +24,11 @@ class ExtensionInfo {
    * "higher" than all non-dev versions.*
    * */
   get version() {
-    return (this._info === 'development' ? '👿dev ' : ' ') + this._brimstoneVersion; 
+    return (this._info.installType === 'development' ? '👿dev ' : ' ') + this._brimstoneVersion; 
   }
 }
 
 export let extensionInfo = new ExtensionInfo();
-(async() => {
-  extensionInfo._info = await chrome.management.getSelf();
-})();
-
 
 function padDigits(len, num) {
     return num.toString().padStart(len, '0');
@@ -112,12 +110,6 @@ export class Test {
     /** @type {string} this is the url that this test starts on */
     startingServer;
 
-    /** @type {string} the version of brimstone-recorder used */
-    brimstoneVersion;
-
-    /** @type {string} the version of chrome used*/
-    chromeVersion;
-
     /** @type {number} how many seconds in walltime the run took */
     get wallTime() {
         if(this._wallTime !== undefined) {
@@ -189,7 +181,9 @@ export class Test {
 
             brimstoneComputerAlias: options.installedOnAlias,
 
-            applicationVersion: Test.applicationVersion
+            applicationVersion: Test.applicationVersion,
+
+            options: JSON.stringify(options)
         }
     }
 };

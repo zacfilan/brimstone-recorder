@@ -1,6 +1,6 @@
 "use strict";
 
-import { extensionInfo } from "./brimstoneDataService"; 
+import { extensionInfo } from "./brimstoneDataService.js"; 
 
 class InfoBar {
     setText(infobarText) {
