@@ -300,6 +300,7 @@ class Actions {
         let name = prompt('What would you like to name this step?', action.name || 'User action');
         if (name && name !== 'User action') {
             action.name = name;
+            action.dirty = true;
             await updateStepInView(Test.current.steps[action.index]);
         }
     }
@@ -686,17 +687,6 @@ var _lastScreenshot;
 */
 var _lastSavedScreenshot;
 
-/**
- * cache the last mouse move 
- * */
-var _lastMouseMove;
-
-/** The parsed test.json object, this will change in memory during use.
- * It represents the recorded user actions, and optionally the result
- * of playing them back. 
- * 
-*/
-
 /** 
  * Click the question mark to create unpredictable regions/corrections.
  */
@@ -806,7 +796,6 @@ $('#step').on('click', '.stopPropagation', async (e) => {
     e.stopPropagation();
 });
 
-
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
     e.stopPropagation();
     actions.callMethodByUser(actions.deleteAction);
@@ -856,6 +845,12 @@ function addVolatileRegions() {
 
 $('#step').on('click', '.action .title', () => {
     actions.callMethodByUser(actions.editActionName);
+});
+
+$('#step').on('change', '#actionMatchTimeout', (e) => {
+    const { action } = getCard($('#content .card.waiting')[0], Test.current);
+    action.maxVerifyTimeout = parseInt(e.target.value);
+    action.dirty = true;
 });
 
 $('#step').on('click', '.waiting .click-to-change-view', (...args) => {
@@ -1826,6 +1821,7 @@ var port = false;
  */
 async function setStepContent(step) {
     await Promise.all([
+        loadOptions(),
         step.curr.hydrateScreenshots(),
         step?.next?.hydrateScreenshots()
     ]);

@@ -189,7 +189,7 @@ export class Player {
             next._match = constants.match.PLAY;
             let mustVerifyScreenshot = next.expectedScreenshot && !next.shadowDOMAction;
             if (mustVerifyScreenshot) {
-                next._lastTimeout = next.MAX_VERIFY_TIMEOUT || options.MAX_VERIFY_TIMEOUT;
+                next._lastTimeout = next.maxVerifyTimeout || options.MAX_VERIFY_TIMEOUT;
                 document.documentElement.style.setProperty('--screenshot-timeout', `${next._lastTimeout}s`); // how long the waiting animation runs for this action
             }
             if (this.onBeforePlay) {

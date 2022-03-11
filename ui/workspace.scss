@@ -1,5 +1,20 @@
 @import "../switch.scss";
 
+#actionMatchTimeout {
+    border-radius: 1em;
+    margin-left: .4em;
+    margin-right: .4em;
+    width: 2em;
+    background-color: inherit;
+    color:inherit;
+    border: 1px solid;
+    text-align: center;
+    &::-webkit-inner-spin-button {
+        //opacity: 1;
+        display:none;
+    }
+}
+
 //// for any modal
 .modal {
     color: black;

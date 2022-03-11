@@ -61,6 +61,21 @@
   border-radius: 50%;
 }
 
+#actionMatchTimeout {
+  border-radius: 1em;
+  margin-left: .4em;
+  margin-right: .4em;
+  width: 2em;
+  background-color: inherit;
+  color: inherit;
+  border: 1px solid;
+  text-align: center;
+}
+
+#actionMatchTimeout::-webkit-inner-spin-button {
+  display: none;
+}
+
 .modal {
   color: black;
   height: 80%;

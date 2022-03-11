@@ -188,7 +188,7 @@ export class TestAction {
      * if it is unset, when it is needed, it comes from the global options value.
      * @type {number}
      */
-    MAX_VERIFY_TIMEOUT;
+    maxVerifyTimeout;
 
     /** 
      * viewmodel variable for the time reported in the waiting title view
@@ -264,7 +264,8 @@ export class TestAction {
             shadowDOMAction: this.shadowDOMAction,
             css: this.css, // experimental for fun
             waitBeforePlaying: this.waitBeforePlaying,
-            breakPoint: this.breakPoint
+            breakPoint: this.breakPoint,
+            maxVerifyTimeout: this.maxVerifyTimeout
         };
 
         if (this.expectedScreenshot) {
@@ -655,7 +656,7 @@ export class Step {
 
                 switch (this.next._view) {
                     case constants.view.EXPECTED:
-                        title.text += 'Expected result';
+                        title.text += `Expected result under <input title="Change the timeout\n for just this action" class="stopPropagation" type="number" min="1" max="120" value="${this.next.maxVerifyTimeout || options.MAX_VERIFY_TIMEOUT}" id="actionMatchTimeout"></input> seconds`;
                         if (this.next.index === this.test.steps.length - 1) {
                             title.text += ' - final screenshot';
                         }

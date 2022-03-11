@@ -1,7 +1,7 @@
 /** Various user settable options. */
 export class Options {
     /** The maximum time waite for an expected screenshot to match an actua screenshot during playback, in seconds. */
-    MAX_VERIFY_TIMEOUT = 15;
+    MAX_VERIFY_TIMEOUT = 5;
 
     /** If true the blinking text cursor (properly caret) will be hidden during recording and during playback.
      * This speeds up playback.
