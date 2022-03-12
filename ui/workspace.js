@@ -294,17 +294,6 @@ class Actions {
         }
     }
 
-    /** change the name of the currently displayed action */
-    async editActionName() {
-        const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        let name = prompt('What would you like to name this step?', action.name || 'User action');
-        if (name && name !== 'User action') {
-            action.name = name;
-            action.dirty = true;
-            await updateStepInView(Test.current.steps[action.index]);
-        }
-    }
-
     editActionJson() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
         var copy = clone(action); // pass a copy
@@ -843,13 +832,16 @@ function addVolatileRegions() {
     // adds to DOM temporarily
 }
 
-$('#step').on('click', '.action .title', () => {
-    actions.callMethodByUser(actions.editActionName);
-});
-
 $('#step').on('change', '#actionMatchTimeout', (e) => {
     const { action } = getCard($('#content .card.waiting')[0], Test.current);
     action.maxVerifyTimeout = parseInt(e.target.value);
+    action.dirty = true;
+});
+
+/** change the name of the currently displayed action */
+$('#step').on('change', '#editActionName', (e) => {
+    const { action } = getCard($('#content .card.action')[0], Test.current);
+    action.name = e.target.value;
     action.dirty = true;
 });
 

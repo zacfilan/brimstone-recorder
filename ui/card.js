@@ -418,7 +418,7 @@ export class TestAction {
         return `${this?._view || ''} ${this?._match || ''}`;
     }
 
-    /** Return the html for the edit card view. */
+    /** Return a card, this could be the first or second card in the step */
     toHtml({ title, src, className, stats, screenshot = {class: ''} }) {
         src = src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
         //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
@@ -596,24 +596,24 @@ export class Step {
         this.next = next || test.steps[this.curr.index + 1];
     }
 
+    /**
+     * Render two cards, curr, next, in the workspace.
+     * @param } param0 
+     * @returns 
+     */
     toHtml({ isRecording }) {
+        // set up the first card
         let title = {
             text: `
-            <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="pencil-alt" role="img"
-            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-pencil-alt fa-w-16 fa-9x">
-            <path fill="currentColor"
-              d="M491.609 73.625l-53.861-53.839c-26.378-26.379-69.075-26.383-95.46-.001L24.91 335.089.329 484.085c-2.675 16.215 11.368 30.261 27.587 27.587l148.995-24.582 315.326-317.378c26.33-26.331 26.581-68.879-.628-96.087zM200.443 311.557C204.739 315.853 210.37 318 216 318s11.261-2.147 15.557-6.443l119.029-119.03 28.569 28.569L210 391.355V350h-48v-48h-41.356l170.259-169.155 28.569 28.569-119.03 119.029c-8.589 8.592-8.589 22.522.001 31.114zM82.132 458.132l-28.263-28.263 12.14-73.587L84.409 338H126v48h48v41.59l-18.282 18.401-73.586 12.141zm378.985-319.533l-.051.051-.051.051-48.03 48.344-88.03-88.03 48.344-48.03.05-.05.05-.05c9.147-9.146 23.978-9.259 33.236-.001l53.854 53.854c9.878 9.877 9.939 24.549.628 33.861z"
-              class="">
-            </path>
-          </svg>`,
-            tooltip: 'Click to edit.',
+            <input class="stopPropagation" id="editActionName" value="${this.curr.name || 'User action'}"></input>`,
+            tooltip: 'Edit the user name of this action.',
             actions: ''
         };
-        if (isRecording) {
-            title.text += this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Last recorded user action' : 'User action');
+        if(isRecording) {
+            title.text = 'Last recorded user action';
         }
-        else {
-            title.text += this.curr.name || (this.curr.index === this.test.steps.length - 1 ? 'Final screenshot' : 'User action');
+        else if(this.curr.index === this.test.steps.length - 1) {
+            title.text += 'Final screenshot';
         }
         title.actions = `
         <div class="actions">
@@ -631,7 +631,9 @@ export class Step {
         <div id="content">
             ${this.curr.toHtml({ title: title, src: null, className: 'action', stats: false })}
             `;
+        ////
 
+        /// set up 2nd card
         if (this.next) {
             let src;
             let title = {

@@ -1,18 +1,30 @@
 @import "../switch.scss";
 
-#actionMatchTimeout {
-    border-radius: 1em;
-    margin-left: .4em;
-    margin-right: .4em;
-    width: 2em;
+.userActionInput {
     background-color: inherit;
     color:inherit;
-    border: 1px solid;
-    text-align: center;
+}
+
+#actionMatchTimeout {
+    @extend .userActionInput;
+    border-radius: 1em;
+    width: 2em;
     &::-webkit-inner-spin-button {
         //opacity: 1;
         display:none;
     }
+    border: 1px solid;
+    text-align: center;
+    margin-left: .4em;
+    margin-right: .4em;
+}
+
+#editActionName {
+    @extend .userActionInput;
+    border: none;
+    text-align: left;
+    height: 2em;
+    width: 100%;
 }
 
 //// for any modal

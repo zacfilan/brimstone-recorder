@@ -61,19 +61,29 @@
   border-radius: 50%;
 }
 
-#actionMatchTimeout {
-  border-radius: 1em;
-  margin-left: .4em;
-  margin-right: .4em;
-  width: 2em;
+.userActionInput, #actionMatchTimeout, #editActionName {
   background-color: inherit;
   color: inherit;
+}
+
+#actionMatchTimeout {
+  border-radius: 1em;
+  width: 2em;
   border: 1px solid;
   text-align: center;
+  margin-left: .4em;
+  margin-right: .4em;
 }
 
 #actionMatchTimeout::-webkit-inner-spin-button {
   display: none;
+}
+
+#editActionName {
+  border: none;
+  text-align: left;
+  height: 2em;
+  width: 100%;
 }
 
 .modal {
