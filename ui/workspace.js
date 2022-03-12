@@ -4,10 +4,9 @@ import { Player } from "../player.js"
 import { Tab } from "../tab.js"
 import * as iconState from "../iconState.js";
 import { Correction, Rectangle } from "../rectangle.js";
-import { TestAction, getCard, constants, Step } from "./card.js";
 import { sleep, downloadObjectAsJson } from "../utilities.js";
 import { disableConsole, enableConsole } from "./console.js";
-import { Test, PlayTree } from "../test.js";
+import { Test, PlayTree, TestAction, getCard, constants, Step } from "../test.js";
 import { Screenshot } from "./screenshot.js";
 import { loadOptions, options, saveOptions } from "../options.js";
 import * as Errors from "../error.js";
@@ -144,6 +143,13 @@ class Actions {
             PlayTree.complete.depthFirstTraversal(zipNodes); // FIXME: add cycle check
 
             if (zipNodes.length) {
+                PlayTree.stepsInZipNodes = 0;
+                let indexOffset = 0;
+                for (let i = 0; i < zipNodes.length; ++i) {
+                    zipNodes[i]._stepBaseIndex = indexOffset;
+                    indexOffset += zipNodes[i]._stepsInZipTest;
+                }
+                PlayTree.stepsInZipNodes = indexOffset;
                 await loadNextTest();
             }
         }
@@ -272,7 +278,8 @@ class Actions {
         Test.current = new Test();
         Tab.reset();
         lastRunMetrics = undefined;
-
+        player.lastAutoCorrectedStepNumber = 0;
+        
         setToolbarState();
         infobar.setText();
         window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
@@ -985,6 +992,7 @@ async function _playSomething() {
             // this is used when the user fixes a failed step and wants to play from there.
             let resume = (playMatchStatus === constants.match.FAIL || playMatchStatus === constants.match.CANCEL) && playFrom > 0;
 
+            addEventHandlers(); // for debug
             if (playFrom === 0) {
                 // we are on the first step of some test in the suite. there are two cases.
                 // either way we need to attach the debugger to a tab and get going.
@@ -1027,9 +1035,7 @@ async function _playSomething() {
                 }
             }
             await playTab();
-            if (Tab.active.url !== 'about:blank') { // it will not let send a message to this tab either - yet.
-                hideCursor();
-            }
+            await hideCursor();
 
             let indexOfNext = await player.play(Test.current, playFrom, resume); // players gotta play...
             let nextAction = Test.current.steps[indexOfNext];
@@ -1168,7 +1174,16 @@ chrome.debugger.onDetach.addListener(debuggerOnDetach);
  */
 async function hideCursor() {
     if (Test.current.hideCursor) {
-        await chrome.tabs.sendMessage(Tab.active.chromeTab.id, { func: 'hideCursor' });
+        try {
+            await chrome.tabs.sendMessage(Tab.active.chromeTab.id, { func: 'hideCursor' });
+        }
+        catch (e) {
+            // i can't sendmessage to about:blank which makes no sense
+            // since i inject my recorder into it
+            // i.e. "match_about_blank": true is manifest
+            // trying to be clever enough to detect this isn't worth it
+            console.warn("unable to send a hideCursor message to active tab");
+        }
     }
 }
 
@@ -1179,6 +1194,9 @@ async function hideCursor() {
  * attached debugger getting detached. which is why i do so much in here.
  *  */
 async function webNavigationOnCompleteHandler(details) {
+    // some frame, in some tab, in some window, just completed navigation
+    console.log(`tab ${details.tabId} navigation completed.`, details);
+
     try {
 
         if (isRecording()) {
@@ -1199,9 +1217,6 @@ async function webNavigationOnCompleteHandler(details) {
                     throw new Error('Active tab is not tracked!');
                 }
             }
-            else {
-                console.log(`tab ${details.tabId} navigation completed.`, details);
-            }
 
             await recordTab();
         }
@@ -1212,14 +1227,13 @@ async function webNavigationOnCompleteHandler(details) {
         else {
             throw new Error("Navigation callbacks need to be removed.");
         }
-        // else you shouldn't get here
     }
     catch (e) {
         if (e instanceof Errors.PixelScalingError || e instanceof Errors.ZoomError) {
             throw e;
         }
         // FIXME: do these EVER occur anymore?
-        console.warn('swallowed navigation completion exception.', e);
+        console.error('swallowed navigation completion exception.', e);
     }
 }
 
@@ -1389,6 +1403,10 @@ async function windowsOnRemovedHandler(windowId) {
 //     console.log("EVENT! ", debugee, method, params);
 // }
 
+/**
+ * idempotent. remove then add all the window
+ * and tab lifecycle eventhandlers.
+ */
 function addEventHandlers() {
     chrome.webNavigation.onCompleted.removeListener(webNavigationOnCompleteHandler);
     chrome.webNavigation.onCompleted.addListener(webNavigationOnCompleteHandler);
@@ -1778,7 +1796,7 @@ async function loadNextTest() {
         return true;
     }
     catch (e) {
-        throw new Errors.TestLoadError(e.message, zipNodes[currentTestNumber - 1]._fileHandle.name);
+        throw new Errors.TestLoadError(e.stack, zipNodes[currentTestNumber - 1]._fileHandle.name);
     }
 }
 
@@ -1808,6 +1826,29 @@ async function updateStepInView(action) {
 var port = false;
 
 /**
+   * convert millseconds into something 
+   * more friendly
+   * @param {number} ms 
+   * @returns 
+   */
+function eta(ms) {
+    let seconds = Math.floor(ms / 1000);
+    let minutes = Math.ceil(seconds / 60);
+    if (minutes > 1) {
+        return `${minutes} minutes`;
+    }
+    else {
+        if (seconds > 30) {
+            return '1 minute'
+        }
+        if (seconds > 10) {
+            return 'less than 30 seconds';
+        }
+        return 'less that 10 seconds';
+    }
+}
+
+/**
  * 
  * @param {Step} step the step
  */
@@ -1820,19 +1861,25 @@ async function setStepContent(step) {
 
     $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
     setToolbarState();
-    let acs = [];
-    if (step?.curr?.autoCorrected) {
-        acs.push(step.curr.index + 1);
-    }
-    if (step?.next?.autoCorrected) {
-        acs.push(step.next.index + 1);
-    }
-    if (acs.length) {
-        let s = '';
-        if (acs.length > 1) {
-            s = 's';
+
+    if (isPlaying()) {
+        let end, current;
+        if (step.curr.test._playTree._stepBaseIndex !== undefined) {
+            end = PlayTree.stepsInZipNodes;
+            current = step.curr.index + 1 + step.curr.test._playTree._stepBaseIndex;
         }
-        infobar.setText(`step${s} ${acs.join(', ')} auto-corrected.`);
+        else {
+            end = step.curr.test.steps.length;
+            current = step.curr.index+1;
+        }
+        let text = '🟢 playing';
+        if(player._playStreak>5) { // get a few under our belt 
+            text += ` ETA ${eta((end-current)*player._expectedActionPlayTime)}`;
+        }
+        if (player.lastAutoCorrectedStepNumber) {
+            text += `. step ${player.lastAutoCorrectedStepNumber} auto-corrected.`;
+        }
+        infobar.setText(text);
     }
 
     updateThumb(step.curr); // this isn't the cause of the slow processing of keystokes.

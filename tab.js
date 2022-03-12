@@ -2,6 +2,14 @@ import { sleep } from "./utilities.js";
 import * as Errors from "./error.js";
 import { loadOptions } from "./options.js";
 
+function tabsOnUpdatedHandler(tabId, changeInfo, tab) {
+    console.debug(`tab ${this.id} tab update handler called: w/tab tabId:${tabId} winId:${tab.windowId} is updated.`, changeInfo);
+    if(tabId === this.chromeTab.id && changeInfo.status === 'complete') {
+        console.debug('resolved');
+        this._chromeTabStatusResolved(changeInfo.status);
+    }
+}
+
 /**
  * Wrapper for chromeTab.
  * 
@@ -48,6 +56,18 @@ export class Tab {
         * (starting from 0) to each tab in the order they are created (during the recording or playback).
         */
         this.virtualId = otherTab?.virtualId;
+
+        /**
+         * external promise resolution
+         */
+        this._chromeTabStatusResolved = null;
+        /**
+         * external promise rejection
+         */
+        this._chromeTabStatusReject = null;
+
+        /** bound to this instance */
+        this.tabsOnUpdatedHandler = tabsOnUpdatedHandler.bind(this);
     }
 
     toJSON() {
@@ -174,9 +194,20 @@ export class Tab {
     };
 
     /**
+     * Wait until 
+     */
+    chromeTabStatusIsCompleted() {
+        return new Promise((resolve, reject) => {
+            this._chromeTabStatusResolved = resolve;
+            this._chromeTabStatusReject = reject;
+        });
+    }
+
+    /**
      * remove the window if it exists and (re)create it 
      */
     async create({ url, incognito }) {
+        console.debug(`creating ${incognito ? 'incognito' : 'normal'} window`);
         let options = await loadOptions();
         // I will always try to reuse before create.
         // So the only time I can be leaving windows around
@@ -191,8 +222,17 @@ export class Tab {
             incognito: incognito, // if true this will create the window "You've gone Incognito" 
             url: url // this better be an URL I can attach a debugger to!
         });
-
         [this.chromeTab] = await chrome.tabs.query({ active: true, windowId: chromeWindow.id });
+
+        /*  
+         creating the chrome window only starts the tab navigation
+         to the url. I can't leave here until that navigation completes.                
+         set up some handlers and promise scaffolding to detect when that happens
+        */
+        chrome.tabs.onUpdated.removeListener(this.tabsOnUpdatedHandler);
+        chrome.tabs.onUpdated.addListener(this.tabsOnUpdatedHandler);
+        await this.chromeTabStatusIsCompleted();
+
         this.url = url;
     }
 

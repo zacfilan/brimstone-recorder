@@ -1,5 +1,5 @@
 import {options} from "../options.js";
-import {constants} from "./card.js";
+import {constants} from "../test.js";
 
 
 class ExtensionInfo {

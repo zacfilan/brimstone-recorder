@@ -1,5 +1,5 @@
 'use strict';
-import { TestAction } from "./ui/card.js";
+import { TestAction } from "./test.js";
 import { Screenshot } from "./ui/screenshot.js";
 const PNG = png.PNG;
 class Pixel {

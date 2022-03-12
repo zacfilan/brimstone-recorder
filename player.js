@@ -1,14 +1,12 @@
 'use strict';
 
-import { pixelmatch } from "./dependencies/pixelmatch.js";
 import { Screenshot } from "./ui/screenshot.js";
 
 const PNG = png.PNG;
 import { Tab } from "./tab.js"
 import { sleep, brimstone, progressIndicator } from "./utilities.js";
-import { constants, TestAction } from "./ui/card.js";
 import { options, loadOptions, Options } from "./options.js";
-import { Test } from "./test.js";
+import { Test, constants, TestAction } from "./test.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
 import { Correction } from "./rectangle.js";
@@ -81,9 +79,33 @@ export class Player {
     _stopPlaying = false;
 
     /**
-     * @type {Promise<any>} way to block a debugger cmd until the debugger is (re)attached.
+         * @type {Promise<any>} way to block a debugger cmd until the debugger is (re)attached.
      */
     _debuggerAttached = null;
+
+    /**
+     * The number of steps played successfully. Used to calulate ETA.
+     * 
+     * See {@link _expectedActionPlayTime}
+     */
+    _playStreak = 0;
+
+    /**
+     * The current weighted expected time to play an action,
+     * in ms. This is e_n = x_1/n + x_2/n +...+ x_n/n for 
+     * n actions. Then to calcuate the next action
+     * 
+     * do e = ((e * n) + x_n+1)/n+1
+     * 
+     * see {@link _playStreak}
+     */
+    _expectedActionPlayTime = 0;
+
+    /** The stepnumber index+1
+     * of the last step that
+     * was autocorrected
+     */
+    lastAutoCorrectedStepNumber;
 
     constructor() {
         /**
@@ -145,7 +167,7 @@ export class Player {
      */
     async _hydrate(actions, startIndex, endIndex) {
         await progressIndicator({
-            progressCallback: infobar.setProgress.bind(infobar, 'prefetch', 'prefetched'),
+            progressCallback: infobar.setProgress.bind(infobar, 'preload', 'preloaded'),
             items: actions,
             startIndex: startIndex,
             endIndex: endIndex,
@@ -176,7 +198,13 @@ export class Player {
         let start;
         let stop;
         let next;
+        /**
+         * the wallclock time of the current action
+         */
+        let eta;
         for (let i = startIndex; i < actions.length - 1; ++i) {
+            eta = performance.now();
+
             let action = actions[i];
             action._view = constants.view.EXPECTED;
 
@@ -269,6 +297,9 @@ export class Player {
             if (bailEarly) {
                 break;
             }
+            eta = performance.now() - eta;
+            this._expectedActionPlayTime = Math.floor(((this._expectedActionPlayTime * this._playStreak) + eta)/(this._playStreak+1));
+            ++this._playStreak;
         }
 
         return next.index;
@@ -720,7 +751,6 @@ export class Player {
             }
 
             // if it failed and auto correct is on - auto correct it right now if possible.
-            nextStep.autoCorrected = false;
             if (attemptAutocorrect) {
                 let correctionApplied = false;
                 Correction.availableInstances.forEach(correction => {
@@ -733,7 +763,7 @@ export class Player {
                 if (correctionApplied) {
                     nextStep.calculatePixelDiff({ fastFail: false });
                     if (nextStep._match !== constants.match.FAIL) {
-                        nextStep.autoCorrected = true;
+                        this.lastAutoCorrectedStepNumber = nextStep.index+1;
                         return; // auto correct fixed it for us
                     }
                     // else - it didn't fix it all.
@@ -942,43 +972,6 @@ export class Player {
         return Math.ceil(memory.usedJSHeapSize / Math.pow(2, 20));  // MB
     }
 }
-
-Player.pngDiff = function pngDiff(
-    expectedPng,
-    actualPng,
-    maskPng,
-
-    pixelMatchThreshhold,
-    fastFail = false) {
-
-    const { width, height } = expectedPng;
-
-    if (actualPng.width !== width || actualPng.height !== height) {
-        actualPng = new PNG({ width, height });
-    }
-
-    const diffPng = new PNG({ width, height }); // new 
-    var { numDiffPixels, numMaskedPixels, numUnusedMaskedPixels } =
-        pixelmatch(
-            expectedPng.data,
-            actualPng.data,
-            diffPng.data,
-            width,
-            height,
-            {
-                threshold: pixelMatchThreshhold,
-                ignoreMask: maskPng?.data,
-                fastFail: fastFail
-            }
-        );
-
-    return {
-        numUnusedMaskedPixels,
-        numDiffPixels,
-        numMaskedPixels,
-        diffPng
-    };
-};
 
 /**
  * This is how i distiguish sythetic events from user events in the recorder.

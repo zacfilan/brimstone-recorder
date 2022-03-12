@@ -119,3 +119,52 @@ export function progressIndicator({
         }
     });
 }
+
+import { pixelmatch } from "./dependencies/pixelmatch.js";
+const PNG = png.PNG;
+/**
+ * Wrapper around my modified version of
+ * pixelmatch.
+ * @param {*} expectedPng 
+ * @param {*} actualPng 
+ * @param {*} maskPng 
+ * @param {*} pixelMatchThreshhold 
+ * @param {*} fastFail 
+ * @returns 
+ */
+export function pngDiff(
+    expectedPng,
+    actualPng,
+    maskPng,
+
+    pixelMatchThreshhold,
+    fastFail = false) {
+
+    const { width, height } = expectedPng;
+
+    if (actualPng.width !== width || actualPng.height !== height) {
+        actualPng = new PNG({ width, height });
+    }
+
+    const diffPng = new PNG({ width, height }); // new 
+    var { numDiffPixels, numMaskedPixels, numUnusedMaskedPixels } =
+        pixelmatch(
+            expectedPng.data,
+            actualPng.data,
+            diffPng.data,
+            width,
+            height,
+            {
+                threshold: pixelMatchThreshhold,
+                ignoreMask: maskPng?.data,
+                fastFail: fastFail
+            }
+        );
+
+    return {
+        numUnusedMaskedPixels,
+        numDiffPixels,
+        numMaskedPixels,
+        diffPng
+    };
+};
