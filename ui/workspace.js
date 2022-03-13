@@ -279,7 +279,7 @@ class Actions {
         Tab.reset();
         lastRunMetrics = undefined;
         player.lastAutoCorrectedStepNumber = 0;
-        
+
         setToolbarState();
         infobar.setText();
         window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
@@ -389,21 +389,21 @@ class Actions {
     /** Delete the currently displayed user action */
     async deleteAction() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        Test.current.deleteAction(action);
+        await Test.current.deleteAction(action);
         await updateStepInView(Test.current.steps[action.index]);
     }
 
     /** Delete all actions before this one. This one becomes index 0. */
     async deleteActionsBefore() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        Test.current.deleteActionsBefore(action);
+        await Test.current.deleteActionsBefore(action);
         await updateStepInView(Test.current.steps[0]);
     }
 
     /** Delete all actions after this one. We keep one past this since it is the ending action.*/
     async deleteActionsAfter() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        Test.current.deleteActionsAfter(action);
+        await Test.current.deleteActionsAfter(action);
         await updateStepInView(Test.current.steps[action.index]);
     }
 
@@ -427,7 +427,7 @@ class Actions {
         if (newAction.acceptablePixelDifferences) {
             newAction._match === constants.match.ALLOW;
         }
-        Test.current.insertAction(newAction);
+        await Test.current.insertAction(newAction);
         await updateStepInView(newAction);
     }
 
@@ -1306,7 +1306,7 @@ async function tabsOnRemovedHandler(tabId, removeInfo) {
         if (Tab._open.length === 0) {
             // we closed the only active tab, we should end the recording.
             console.log("stopping recording since there are no tracked tabs!");
-            stopRecording();
+            await stopRecording();
         }
     }
 }
@@ -1471,7 +1471,7 @@ async function prepareToRecord() {
     console.debug(`connect: end   - preparing to record tab ${tab.chromeTab.id} ${tab.url}`);
 }
 
-function stopRecording() {
+async function stopRecording() {
     removeEventHandlers();
 
     $('#recordButton').removeClass('active');
@@ -1491,7 +1491,7 @@ function stopRecording() {
         // insert the action that our final useless "end-recording-noop-expected-screenshot-action" replaced.
         // insert it right after that noop. the user can delete the noop. i don't want to delete that for them.
         Test.current.replacedAction.index++;
-        Test.current.insertAction(Test.current.replacedAction);
+        await Test.current.insertAction(Test.current.replacedAction);
     }
 }
 
@@ -1543,7 +1543,7 @@ async function recordSomething(promptForUrl) {
             //await focusTab();
             let last = Test.current.steps[Test.current.steps.length - 1];
             last.addExpectedScreenshot(last.expectedScreenshot); // build the final png
-            stopRecording();
+            await stopRecording();
             return;
         }
 
@@ -1717,7 +1717,7 @@ async function recordSomething(promptForUrl) {
         await focusTab();
     }
     catch (e) {
-        stopRecording();
+        await stopRecording();
         if (e instanceof Errors.NoActiveTab) {
             infobar.setText(`❌ recording canceled - ${e?.message ?? ''}`);
         }
