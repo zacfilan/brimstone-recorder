@@ -229,7 +229,7 @@ export class Player {
                 // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
                 // performed this action, we just need to put the mouse in the correct spot and
                 // do the screen verification again
-                if (resume && i === startIndex) {
+                if (resume && i === startIndex && (action.type !== 'mousemove')) {
                     // not needed? it is already in the right spot?
                     //await this.mousemove(this.mouseLocation); 
                 }
