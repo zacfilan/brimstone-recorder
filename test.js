@@ -383,7 +383,7 @@ export class Test {
             
 Continue to load this test with (your possibly) incompatible version of Brimstone?`);
             if (!tryAnyway) {
-                return false; // bail
+                throw new Errors.InvalidVersion();
             }
         }
 

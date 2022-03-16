@@ -389,7 +389,7 @@ class Actions {
     /** Delete the currently displayed user action */
     async deleteAction() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        if(await Test.current.deleteAction(action)) {
+        if (await Test.current.deleteAction(action)) {
             await updateStepInView(Test.current.steps[action.index]);
         }
     }
@@ -397,7 +397,7 @@ class Actions {
     /** Delete all actions before this one. This one becomes index 0. */
     async deleteActionsBefore() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        if(await Test.current.deleteActionsBefore(action)) {
+        if (await Test.current.deleteActionsBefore(action)) {
             await updateStepInView(Test.current.steps[0]);
         }
     }
@@ -405,7 +405,7 @@ class Actions {
     /** Delete all actions after this one. We keep one past this since it is the ending action.*/
     async deleteActionsAfter() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        if(await Test.current.deleteActionsAfter(action)) {
+        if (await Test.current.deleteActionsAfter(action)) {
             await updateStepInView(Test.current.steps[action.index]);
         }
     }
@@ -643,17 +643,17 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
     infobar.setText();
 
     const beforeUnloadListener = (event) => {
-        if(Test.current.dirty) {
+        if (Test.current.dirty) {
             // well crap... https://chromestatus.com/feature/5349061406228480 
             event.returnValue = `🙋❓ File '${Test.current.filename}' has unsaved changes.\n\nExit without saving?`;
-            
+
             event.preventDefault();
             return event.returnValue;
         }
         return false;
-      };
-      
-      window.addEventListener('beforeunload', beforeUnloadListener, {capture: true});
+    };
+
+    window.addEventListener('beforeunload', beforeUnloadListener, { capture: true });
 })();
 
 async function countDown(seconds, action) {
@@ -1811,7 +1811,12 @@ async function loadNextTest() {
         return true;
     }
     catch (e) {
-        throw new Errors.TestLoadError(e.stack, zipNodes[currentTestNumber - 1]._fileHandle.name);
+        if (e instanceof Errors.InvalidVersion) {
+            throw(e); 
+        }
+        else {
+            throw new Errors.TestLoadError(e.stack, zipNodes[currentTestNumber - 1]._fileHandle.name);
+        }
     }
 }
 
@@ -1885,11 +1890,11 @@ async function setStepContent(step) {
         }
         else {
             end = step.curr.test.steps.length;
-            current = step.curr.index+1;
+            current = step.curr.index + 1;
         }
         let text = '🟢 playing';
-        if(player._playStreak>5) { // get a few under our belt 
-            text += ` ETA ${eta((end-current)*player._expectedActionPlayTime)}`;
+        if (player._playStreak > 5) { // get a few under our belt 
+            text += ` ETA ${eta((end - current) * player._expectedActionPlayTime)}`;
         }
         if (player.lastAutoCorrectedStepNumber) {
             text += `. step ${player.lastAutoCorrectedStepNumber} auto-corrected.`;
