@@ -156,6 +156,14 @@ export class Test {
      * persisted until a save. 
      * @param {TestAction} action */
     async deleteAction(action) {
+        let abort = false;
+        if(options.confirmToDelete) {
+            abort = !await brimstone.window.confirm("This will delete the current action from memory, not from disk. There is no undo (yet).\n\nContinue?");
+        }
+        if(abort) {
+            return false;
+        }
+
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
         let removeIndex = action.index;
         for (let i = action.index + 1; i < this.steps.length; ++i) {
@@ -164,6 +172,8 @@ export class Test {
             action.dirty = true;
         }
         this.steps.splice(removeIndex, 1);
+        return true;
+
     }
 
     /**
@@ -172,9 +182,17 @@ export class Test {
      * @param {TestAction} action 
      */
     async deleteActionsBefore(action) {
+        let abort = false;
+        if(options.confirmToDelete) {
+            abort = !await brimstone.window.confirm("This will delete all actions before the current one from memory, not from disk. There is no undo (yet).\n\nContinue?");
+        }
+        if(abort) {
+            return false;
+        }
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
         this.steps.splice(0, action.index);
         this.reindex();
+        return true;
     }
 
     reindex() {
@@ -194,10 +212,17 @@ export class Test {
      * @param {TestAction} action 
      */
     async deleteActionsAfter(action) {
+        let abort = false;
+        if(options.confirmToDelete) {
+            abort = !await brimstone.window.confirm("This will delete all actions after the current one from memory, not from disk. There is no undo (yet).\n\nContinue?");
+        }
+        if(abort) {
+            return false;
+        }
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
         this.steps.splice(action.index + 2);
         this.reindex();
-
+        return true;
     }
 
     /**

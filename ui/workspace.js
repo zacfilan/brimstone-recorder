@@ -389,22 +389,25 @@ class Actions {
     /** Delete the currently displayed user action */
     async deleteAction() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        await Test.current.deleteAction(action);
-        await updateStepInView(Test.current.steps[action.index]);
+        if(await Test.current.deleteAction(action)) {
+            await updateStepInView(Test.current.steps[action.index]);
+        }
     }
 
     /** Delete all actions before this one. This one becomes index 0. */
     async deleteActionsBefore() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        await Test.current.deleteActionsBefore(action);
-        await updateStepInView(Test.current.steps[0]);
+        if(await Test.current.deleteActionsBefore(action)) {
+            await updateStepInView(Test.current.steps[0]);
+        }
     }
 
     /** Delete all actions after this one. We keep one past this since it is the ending action.*/
     async deleteActionsAfter() {
         const { action } = getCard($('#content .card:first-of-type')[0], Test.current);
-        await Test.current.deleteActionsAfter(action);
-        await updateStepInView(Test.current.steps[action.index]);
+        if(await Test.current.deleteActionsAfter(action)) {
+            await updateStepInView(Test.current.steps[action.index]);
+        }
     }
 
     /**
@@ -577,7 +580,6 @@ window.addEventListener("error", async function (errorEvent) {
     return false;
 });
 
-
 /** the jsoneditor instance used in the modal
  * https://github.com/josdejong/jsoneditor
  */
@@ -639,6 +641,19 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
     setToolbarState();
     BDS.extensionInfo._info = await chrome.management.getSelf();
     infobar.setText();
+
+    const beforeUnloadListener = (event) => {
+        if(Test.current.dirty) {
+            // well crap... https://chromestatus.com/feature/5349061406228480 
+            event.returnValue = `🙋❓ File '${Test.current.filename}' has unsaved changes.\n\nExit without saving?`;
+            
+            event.preventDefault();
+            return event.returnValue;
+        }
+        return false;
+      };
+      
+      window.addEventListener('beforeunload', beforeUnloadListener, {capture: true});
 })();
 
 async function countDown(seconds, action) {

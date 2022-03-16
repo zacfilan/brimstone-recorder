@@ -183,6 +183,12 @@ export class Options {
       * Higher numbers, speed up playback. 
     */
       maxNumberOfActionsToPrehydrate = 100;
+
+      /**
+       * Should we give the user a confirm dialog before they
+       * issue any delete action?
+       */
+      confirmToDelete = true;
 };
 
 /**

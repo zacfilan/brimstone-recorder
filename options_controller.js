@@ -46,6 +46,7 @@ async function save_options() {
     //#region general options
     options.hideCursor = hideCursor.checked;
     options.closeOldTestWindowOnCreate = closeOldTestWindowOnCreate.checked;
+    options.confirmToDelete = confirmToDelete.checked;
     //#endregion general options
 
     //#region recording options
@@ -112,10 +113,9 @@ async function restore_options() {
     //#endregion database options
 
     //#region general options
-    closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
-
-    //#endregion general options
     hideCursor.checked = options.hideCursor;
+    closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
+    confirmToDelete.checked = options.confirmToDelete;
     //#endregion general options
 
     //#region recording options
