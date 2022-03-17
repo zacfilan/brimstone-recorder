@@ -16,15 +16,13 @@ class ExtensionInfo {
 
   /** 
    * The dev-aware version of this extension.
-   * e.g. "👿dev v1.11.1" or "v2.32.5" 
+   * e.g. "dev1.11.1" or "v2.32.5" 
    * 
-   * *note:* "👿" > "v"
-   *  
    * *so dev versions compare 
    * "higher" than all non-dev versions.*
    * */
   get version() {
-    return (this._info.installType === 'development' ? '👿dev ' : ' ') + this._brimstoneVersion; 
+    return (this._info.installType === 'development' ? 'de' : ' ') + this._brimstoneVersion; 
   }
 }
 

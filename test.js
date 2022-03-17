@@ -4,7 +4,7 @@ import { Screenshot } from "./ui/screenshot.js";
 import { brimstone, progressIndicator } from "./utilities.js";
 import * as Errors from "./error.js";
 import * as BDS from "./ui/brimstoneDataService.js";
-import { clone } from "./utilities.js"
+import { clone, getComparableVersion } from "./utilities.js"
 import { infobar } from "./ui/infobar.js";
 import { Tab } from "./tab.js";
 import { uuidv4, pngDiff } from "./utilities.js";
@@ -291,10 +291,10 @@ export class Test {
      * @param {Blob} the blob of the file to write to the zip
      */
     async saveZipFile(blob) {
-        if(!blob) {
+        if (!blob) {
             throw new Errors.TestSaveError('no blob was provided to saveZipFile');
         }
-    
+
         let handle;
         try {
             handle = await window.showSaveFilePicker({
@@ -383,12 +383,16 @@ export class Test {
             this.brimstoneVersion = 'v1.0.0';
         }
 
-        if (options.warnOnVersionMismatch && (this.brimstoneVersion > BDS.extensionInfo.version)) {
-            let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with version ${this.brimstoneVersion}. This test might misbehave unless you use extension version '${this.brimstoneVersion}' or better, but that's up to you.
+        if (options.warnOnVersionMismatch) {
+            let extensionVersion = getComparableVersion(BDS.extensionInfo.version);
+            let testVersion = getComparableVersion(this.brimstoneVersion);
+            if (testVersion > extensionVersion) {
+                let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with a newer version of Brimstone than you are currently using. This test might misbehave, but probably not. Your call.
             
 Continue to load this test with (your possibly) incompatible version of Brimstone?`);
-            if (!tryAnyway) {
-                throw new Errors.InvalidVersion();
+                if (!tryAnyway) {
+                    throw new Errors.InvalidVersion();
+                }
             }
         }
 

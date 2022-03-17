@@ -166,5 +166,15 @@ export function pngDiff(
         numDiffPixels,
         numMaskedPixels,
         diffPng
-    };
+    };ra
 };
+
+/**
+ * Return the x.yy.z part after something like
+ * dev1.22.2 or v6.6.6.
+ * @param {string} displayString 
+ */
+ export function getComparableVersion(displayString) {
+    let i = displayString.lastIndexOf('v');
+    return displayString.substring(i+1); 
+}
