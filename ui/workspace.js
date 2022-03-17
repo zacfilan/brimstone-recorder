@@ -1882,7 +1882,7 @@ function eta(ms) {
         if (seconds > 10) {
             return 'less than 30 seconds';
         }
-        return 'less that 10 seconds';
+        return 'less than 10 seconds';
     }
 }
 

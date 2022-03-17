@@ -167,7 +167,7 @@ export class Player {
      */
     async _hydrate(actions, startIndex, endIndex) {
         await progressIndicator({
-            progressCallback: infobar.setProgress.bind(infobar, 'preload', 'preloaded'),
+            progressCallback: infobar.setProgress.bind(infobar, 'load actions', 'actions loaded'),
             items: actions,
             startIndex: startIndex,
             endIndex: endIndex,

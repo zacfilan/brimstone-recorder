@@ -267,7 +267,7 @@ export class Test {
 
         // write the dataUrl for expected and acceptable screenshots in all steps of this test into the zip.
         await progressIndicator({
-            progressCallback: infobar.setProgress.bind(infobar, 'write zip step', 'wrote zip steps'),
+            progressCallback: infobar.setProgress.bind(infobar, 'build save data', 'built'),
             items: this.steps,
             itemProcessor: async card => {
                 if (card.expectedScreenshot?.dataUrl) {
