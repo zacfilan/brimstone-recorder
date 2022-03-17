@@ -310,7 +310,7 @@ class Actions {
      * user gesture save the current test as a zip file */
     async saveZip() {
         Test._saveBlob = await Test.current.createZipBlob();
-        await Test.current.saveZipFile(Test._saveBlob);
+        let fileHandle = await Test.current.saveZipFile(Test._saveBlob);
 
         // the name may have changed
         if (fileHandle) {
