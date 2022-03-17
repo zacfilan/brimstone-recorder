@@ -157,10 +157,10 @@ export class Test {
      * @param {TestAction} action */
     async deleteAction(action) {
         let abort = false;
-        if(options.confirmToDelete) {
+        if (options.confirmToDelete) {
             abort = !await brimstone.window.confirm("This will delete the current action from memory, not from disk. There is no undo (yet).\n\nContinue?");
         }
-        if(abort) {
+        if (abort) {
             return false;
         }
 
@@ -183,10 +183,10 @@ export class Test {
      */
     async deleteActionsBefore(action) {
         let abort = false;
-        if(options.confirmToDelete) {
+        if (options.confirmToDelete) {
             abort = !await brimstone.window.confirm("This will delete all actions before the current one from memory, not from disk. There is no undo (yet).\n\nContinue?");
         }
-        if(abort) {
+        if (abort) {
             return false;
         }
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
@@ -213,10 +213,10 @@ export class Test {
      */
     async deleteActionsAfter(action) {
         let abort = false;
-        if(options.confirmToDelete) {
+        if (options.confirmToDelete) {
             abort = !await brimstone.window.confirm("This will delete all actions after the current one from memory, not from disk. There is no undo (yet).\n\nContinue?");
         }
-        if(abort) {
+        if (abort) {
             return false;
         }
         await this.hydrateStepsDataUrls(); // this is required to save correctly now
@@ -247,9 +247,11 @@ export class Test {
     }
 
     /**
-     * create a zipfile.
+     * create a blob in memory that
+     * can be wrtten to disk as the zipfile.
+     * @returns {Blob}
      */
-    async createZip() {
+    async createZipBlob() {
         console.debug('create zip');
         const blobWriter = new zip.BlobWriter("application/zip");
         const writer = new zip.ZipWriter(blobWriter);
@@ -281,17 +283,20 @@ export class Test {
     }
 
     /**
-     * save the current state to a zip file 
+     * Pop the showSaveFilePicker dialog to the user. If the user picks
+     * a handle, write the passed in blob to the handle. The moment
+     * that the showSaveFilePicker dialog picks a handle that file
+     * is **truncated**. This is why the blob must be precalculated,
+     * we don't want the user to be able to lose data.
+     * @param {Blob} the blob of the file to write to the zip
      */
-    async saveFile() {
+    async saveZipFile(blob) {
+        if(!blob) {
+            throw new Errors.TestSaveError('no blob was provided to saveZipFile');
+        }
+    
         let handle;
         try {
-            // FIXME: this will NOT work if you insert or delete items !!
-            let blob = await this.createZip();
-            console.debug('save zip to disk');
-
-            // the moment I invoke showSaveFilePicker the file is truncated, which means I cannot overlap the createZip operation
-            // with picking the save file which is a nice time saver for te user
             handle = await window.showSaveFilePicker({
                 suggestedName: this.filename,
                 types: [
@@ -378,7 +383,7 @@ export class Test {
             this.brimstoneVersion = 'v1.0.0';
         }
 
-        if (this.brimstoneVersion > BDS.extensionInfo.version) {
+        if (options.warnOnVersionMismatch && (this.brimstoneVersion > BDS.extensionInfo.version)) {
             let tryAnyway = await brimstone.window.confirm(`You are trying to load test '${this.filename}' which was saved with version ${this.brimstoneVersion}. This test might misbehave unless you use extension version '${this.brimstoneVersion}' or better, but that's up to you.
             
 Continue to load this test with (your possibly) incompatible version of Brimstone?`);
@@ -522,6 +527,12 @@ Test.loadFileHandles = async function loadFileHandles() {
  * @type {Test}
  */
 Test.current = null;
+
+/**
+ * A precalculated blob of the zipfile to save.
+ * @type {Blob}
+ */
+Test._saveBlob;
 
 export class PlayTree {
     /** json identifier for this filetype */

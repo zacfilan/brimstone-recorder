@@ -189,6 +189,12 @@ export class Options {
        * issue any delete action?
        */
       confirmToDelete = true;
+
+      /**
+       * Should we give the user a warning if the test version is 
+       * ahead of the brimstone version being used.
+       */
+      warnOnVersionMismatch = true;
 };
 
 /**

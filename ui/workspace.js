@@ -263,13 +263,28 @@ class Actions {
             //     await actions.saveZip();
             // }
 
+            let blobError;
+            try {
+                Test._saveBlob = await Test.current.createZipBlob();
+            }
+            catch (e) {
+                blobError = e;
+            }
             let result = await actions.confirmSaveModal(`🙋❓ File '${Test.current.filename}' has unsaved changes.`);
+            if (result) {
+                if (blobError) {
+                    throw blobError; // now we actually care if that failed
+                }
+                await Test.current.saveZipFile(Test._saveBlob);
+            }
+            // else don't care if there is an error or not
         }
 
         // The test instance is still linked to by the playtree, for reporting stuff, so free up what memory I can.
         Test.current.removeScreenshots();
         delete Test.current.actionCache;
         delete zipNodes[currentTestNumber - 1]; // remove this link to memory
+        delete Test._saveBlob;
         ////
 
 
@@ -291,9 +306,12 @@ class Actions {
         }
     }
 
-    /** save the current test as a zip file */
+    /** 
+     * user gesture save the current test as a zip file */
     async saveZip() {
-        let fileHandle = await Test.current.saveFile();
+        Test._saveBlob = await Test.current.createZipBlob();
+        await Test.current.saveZipFile(Test._saveBlob);
+
         // the name may have changed
         if (fileHandle) {
             Test.current.filename = fileHandle.name;
@@ -871,15 +889,15 @@ $('#step').on('click', '.waiting .click-to-change-view', (...args) => {
     actions.callMethodByUser(actions.cycleEditStates, ...args);
 });
 
+/**
+ * handler for clicking save in the save changes dialog
+ */
 $('#confirmSaveChangesButton').click(async () => {
-    await actions.saveZip(); //  need to do this here, rather than post the promise the
-    // next line resolves. if i try it post the promise the next line resolves I get
-    // that dreaded "user gesture required"
-    actions._modalClosed('Save Changes');    // i don't actually know if the user actually saved or not, they could have cancelled.
+    actions._modalClosed(true);    // i don't actually know if the user actually saved or not, they could have cancelled.
 });
 
 $('#confirmDiscardChangesButton').click(() => {
-    actions._modalClosed('Discard Changes');
+    actions._modalClosed(false);
 });
 
 
@@ -1812,7 +1830,7 @@ async function loadNextTest() {
     }
     catch (e) {
         if (e instanceof Errors.InvalidVersion) {
-            throw(e); 
+            throw (e);
         }
         else {
             throw new Errors.TestLoadError(e.stack, zipNodes[currentTestNumber - 1]._fileHandle.name);

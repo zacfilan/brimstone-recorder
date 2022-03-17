@@ -47,6 +47,8 @@ async function save_options() {
     options.hideCursor = hideCursor.checked;
     options.closeOldTestWindowOnCreate = closeOldTestWindowOnCreate.checked;
     options.confirmToDelete = confirmToDelete.checked;
+    options.warnOnVersionMismatch = warnOnVersionMismatch.checked;
+
     //#endregion general options
 
     //#region recording options
@@ -116,6 +118,7 @@ async function restore_options() {
     hideCursor.checked = options.hideCursor;
     closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
     confirmToDelete.checked = options.confirmToDelete;
+    warnOnVersionMismatch.checked = options.warnOnVersionMismatch;
     //#endregion general options
 
     //#region recording options
