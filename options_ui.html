@@ -210,40 +210,7 @@
                     </label>
                 </td>
             </tr>
-            <tr>
-                <td>
-                    Mouse move sequence recording
-                </td>
-                <td>
-                    <div class="slider">
-                        <label>Slower</label>
-                        <input type="range" min="0" max="2" step="1" id="mouseMoveTimeout" list="mouseMoveSettings">
-                        <datalist id="mouseMoveSettings">
-                            <option>0</option>
-                            <option>1</option>
-                            <option>2</option>
-                        </datalist>
-                        <label>Faster</label>
-                    </div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    Mouse wheel sequence recording
-                </td>
-                <td>
-                    <div class="slider">
-                        <label>Slower</label>
-                        <input type="range" min="0" max="2" step="1" id="mouseWheelTimeout" list="mouseWheelSettings">
-                        <datalist id="mouseWheelSettings">
-                            <option>0</option>
-                            <option>1</option>
-                            <option>2</option>
-                        </datalist>
-                        <label>Faster</label>
-                    </div>
-                </td>
-            </tr>
+          
         </table>
     </details>
 
@@ -307,6 +274,40 @@
         <details id="timeouts">
             <summary>Timeouts</summary>
             <table>
+                <tr>
+                    <td>
+                        Mouse move sequence recording
+                    </td>
+                    <td>
+                        <div class="slider">
+                            <label>Slower</label>
+                            <input type="range" min="0" max="2" step="1" id="mouseMoveTimeout" list="mouseMoveSettings">
+                            <datalist id="mouseMoveSettings">
+                                <option>0</option>
+                                <option>1</option>
+                                <option>2</option>
+                            </datalist>
+                            <label>Faster</label>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        Mouse wheel sequence recording
+                    </td>
+                    <td>
+                        <div class="slider">
+                            <label>Slower</label>
+                            <input type="range" min="0" max="2" step="1" id="mouseWheelTimeout" list="mouseWheelSettings">
+                            <datalist id="mouseWheelSettings">
+                                <option>0</option>
+                                <option>1</option>
+                                <option>2</option>
+                            </datalist>
+                            <label>Faster</label>
+                        </div>
+                    </td>
+                </tr>
                 <tr title="In the verify screenshot function we need to take the actual screenshot
 first. There is setup to even pull this off. When this throws we sleep 
 and try again. This is that sleep amount.">
