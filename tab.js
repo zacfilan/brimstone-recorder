@@ -292,6 +292,9 @@ export class Tab {
                 await chrome.tabs.update(this.chromeTab.id, { url: url });
                 await navPromise; // the above nav is really done.
             }
+            else if(this.chromeTab.url.startsWith('chrome://')) { // e.g. chrome://newtab
+                return null; // force a create
+            }
 
             // give these sane defaults.
             this.height = this.chromeTab.height;

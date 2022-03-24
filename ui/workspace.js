@@ -1053,7 +1053,6 @@ async function _playSomething() {
                     Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
                     startingTab.trackCreated();
                 }
-
             }
 
             startingTab.width = actions[0].tab.width;
