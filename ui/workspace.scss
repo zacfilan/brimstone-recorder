@@ -27,6 +27,18 @@
     width: 100%;
 }
 
+#gotoFirstZip {
+    svg {
+        transform: rotate(90deg);
+    }
+}
+
+#gotoLastZip {
+    svg {
+        transform: rotate(-90deg);
+    }
+}
+
 //// for any modal
 .modal {
     color: black;

@@ -86,6 +86,16 @@
   width: 100%;
 }
 
+#gotoFirstZip svg {
+  -webkit-transform: rotate(90deg);
+          transform: rotate(90deg);
+}
+
+#gotoLastZip svg {
+  -webkit-transform: rotate(-90deg);
+          transform: rotate(-90deg);
+}
+
 .modal {
   color: black;
   height: 80%;
