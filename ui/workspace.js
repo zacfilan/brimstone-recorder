@@ -357,6 +357,7 @@ class Actions {
     // the name may have changed
     if (fileHandle) {
       Test.current.filename = fileHandle.name;
+      Test.current._playTree._fileHandle = fileHandle;
       window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
     }
   }
@@ -1077,8 +1078,11 @@ function setToolbarState() {
         if (index > 0 || currentTestNumber > 1) {
           $('#previous').attr('disabled', false);
           $('#first').attr('disabled', false);
+        }
+        if (currentTestNumber > 1) {
           $('#gotoFirstZip').attr('disabled', false);
         }
+
         $('#playButton').attr('disabled', false);
         if (
           index < Test.current.steps.length - 1 ||
@@ -1086,6 +1090,9 @@ function setToolbarState() {
         ) {
           $('#next').attr('disabled', false);
           $('#last').attr('disabled', false);
+        }
+        if (currentTestNumber < zipNodes.length) {
+          $('#gotoLastZip').attr('disabled', false);
         }
       }
 
