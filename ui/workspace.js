@@ -2019,6 +2019,7 @@ function postMessage(msg) {
 $('#loadButton').on('click', actions.loadTests.bind(actions));
 $('#saveButton').on('click', actions.saveZip);
 $('#clearButton').on('click', actions.clearWorkspace.bind(actions));
+$('#recordActiveTab').on('click', actions.recordActiveTab);
 
 /**
  * Load the test sepcified into the workspace
