@@ -195,6 +195,13 @@ export class Options {
    * ahead of the brimstone version being used.
    */
   warnOnVersionMismatch = true;
+
+  /**
+   * Should the clapperboard icon in the vertical toolbar
+   * clear the workspace before recording the active tab or
+   * not. This will add an emblem to the icon if set to true;
+   */
+  clearWorkspaceBeforeRecordingActiveTab = false;
 }
 
 /**

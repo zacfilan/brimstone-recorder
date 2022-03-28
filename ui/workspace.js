@@ -128,6 +128,9 @@ class Actions {
 
   /** try to record without specifying a URL */
   async recordActiveTab() {
+    if (options.clearWorkspaceBeforeRecordingActiveTab) {
+      await this.clearWorkspace();
+    }
     await recordSomething(false); // this can start a new recording of the the active tab (no initial goto url)
   }
 
@@ -688,9 +691,16 @@ window.addEventListener('error', async function (errorEvent) {
  * https://github.com/josdejong/jsoneditor
  */
 let jsonEditor;
+
+/**
+ * When the user changes the options this will be called
+ */
+async function onOptionsChanged() {
+  let options = await loadOptions();
+}
+
 /**
  * @type {string}
-
 /**********************************************************************************************
  * Main entry point. - allow this extension in incognito please. it increases the likelyhood that a test
  * recorded by person user can be replayed by another, since they will use common localstorage,
@@ -1017,6 +1027,18 @@ $('#confirmDiscardChangesButton').click(() => {
 });
 
 function setToolbarState() {
+  let clapperBoardButton = $('#recordActiveTab svg.emblem');
+  if (options.clearWorkspaceBeforeRecordingActiveTab) {
+    clapperBoardButton.addClass('delete');
+    $('#recordActiveTab').prop(
+      'title',
+      'Clear workspace and record active tab right now'
+    );
+  } else {
+    clapperBoardButton.removeClass('delete');
+    $('#recordActiveTab').prop('title', 'Record active tab right now');
+  }
+
   $('[data-action]').attr('disabled', true);
   $('.help.option [data-action]').attr('disabled', false);
   $('[data-action="openOptions"]').attr('disabled', false);
@@ -2019,7 +2041,7 @@ function postMessage(msg) {
 $('#loadButton').on('click', actions.loadTests.bind(actions));
 $('#saveButton').on('click', actions.saveZip);
 $('#clearButton').on('click', actions.clearWorkspace.bind(actions));
-$('#recordActiveTab').on('click', actions.recordActiveTab);
+$('#recordActiveTab').on('click', actions.recordActiveTab.bind(actions));
 
 /**
  * Load the test sepcified into the workspace

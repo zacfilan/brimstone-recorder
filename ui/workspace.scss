@@ -27,6 +27,24 @@
     width: 100%;
 }
 
+#recordActiveTab {
+    position:relative;
+    svg.emblem {
+        display:none;
+        height: 13px;
+        width: 13px;
+        circle {
+            fill: black;
+        }
+        position: absolute;
+        bottom: 1px;
+        right:1px;
+    }
+    svg.emblem.delete {
+        display:inline;
+    }
+}
+
 #gotoFirstZip {
     svg {
         transform: rotate(90deg);
