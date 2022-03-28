@@ -1,36 +1,35 @@
+document.addEventListener('DOMContentLoaded', function (event) {
+  // grab the parent window id from the query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const data = JSON.parse(urlParams.get('c'));
 
-document.addEventListener("DOMContentLoaded", function (event) {
-    // grab the parent window id from the query parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const data = JSON.parse(urlParams.get('c'));
-
-    var ctx = document.getElementById('myChart');
-    debugger;
-    data.options =  {
-        stacked: false,
-        title: {
-            display: true,
-            text: 'Some stats'
+  var ctx = document.getElementById('myChart');
+  debugger;
+  data.options = {
+    stacked: false,
+    title: {
+      display: true,
+      text: 'Some stats',
+    },
+    scales: {
+      yAxes: [
+        {
+          id: 'y',
+          type: 'linear',
+          display: true,
+          position: 'left',
         },
-        scales: {
-            yAxes: [
-                {
-                    id: "y",
-                    type: "linear",
-                    display: true,
-                    position: "left"
-                },
-                {
-                    id: "y1",
-                    type: "linear",
-                    display: true,
-                    position: "right",
-                    gridLines: {
-                        drawOnChartArea: false
-                    }
-                }
-            ]
-        }/*,
+        {
+          id: 'y1',
+          type: 'linear',
+          display: true,
+          position: 'right',
+          gridLines: {
+            drawOnChartArea: false,
+          },
+        },
+      ],
+    } /*,
         plugins: {
             tooltip: {
                 // Disable the on-canvas tooltip
@@ -107,8 +106,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
                 }
             }
             
-        }*/
-    };
-    var myChart = new Chart(ctx, data);
+        }*/,
+  };
+  var myChart = new Chart(ctx, data);
 });
-
