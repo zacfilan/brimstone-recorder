@@ -1392,7 +1392,10 @@ export class TestAction {
 
     footer += ` tab:${this.tab.virtualId} viewport:${width}x${height} `;
     let stepNumber = `${this.index + 1}/${this.test.steps.length}`;
-    if (this.test._playTree._stepBaseIndex !== undefined) {
+    if (
+      PlayTree.stepsInZipNodes > this.test.steps.length &&
+      this.test._playTree._stepBaseIndex !== undefined
+    ) {
       stepNumber += ` (${this.index + 1 + this.test._playTree._stepBaseIndex}/${
         PlayTree.stepsInZipNodes
       })`;
