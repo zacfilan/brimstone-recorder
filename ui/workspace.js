@@ -460,7 +460,9 @@ class Actions {
       Test.current
     );
     if (await Test.current.deleteAction(action)) {
-      await updateStepInView(Test.current.steps[action.index]);
+      PlayTree.stepsInZipNodes--;
+      let i = Math.min(action.index, Test.current.steps.length - 1);
+      await updateStepInView(Test.current.steps[i]);
     }
   }
 
@@ -470,7 +472,9 @@ class Actions {
       $('#content .card:first-of-type')[0],
       Test.current
     );
+    let i = action.index;
     if (await Test.current.deleteActionsBefore(action)) {
+      PlayTree.stepsInZipNodes -= i;
       await updateStepInView(Test.current.steps[0]);
     }
   }
@@ -482,6 +486,7 @@ class Actions {
       Test.current
     );
     if (await Test.current.deleteActionsAfter(action)) {
+      PlayTree.stepsInZipNodes -= Test.current.steps.length - action.index;
       await updateStepInView(Test.current.steps[action.index]);
     }
   }
