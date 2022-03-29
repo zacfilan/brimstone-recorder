@@ -1,736 +1,767 @@
-@import "../switch.scss";
+@import '../switch.scss';
 
 .userActionInput {
-    background-color: inherit;
-    color:inherit;
+  background-color: inherit;
+  color: inherit;
+}
+
+@media all and (max-width: 700px) {
+  #topbar {
+    flex-wrap: wrap;
+  }
+
+  #topbar #navigation {
+    width: 100%;
+    order: 3;
+  }
+
+  #topbar #menus {
+    order: 1;
+    width: 50%;
+  }
+
+  #topbar #right {
+    width: 50%;
+    order: 2;
+  }
 }
 
 #actionMatchTimeout {
-    @extend .userActionInput;
-    border-radius: 1em;
-    width: 2em;
-    &::-webkit-inner-spin-button {
-        //opacity: 1;
-        display:none;
-    }
-    border: 1px solid;
-    text-align: center;
-    margin-left: .4em;
-    margin-right: .4em;
+  @extend .userActionInput;
+  border-radius: 1em;
+  width: 2em;
+  &::-webkit-inner-spin-button {
+    //opacity: 1;
+    display: none;
+  }
+  border: 1px solid;
+  text-align: center;
+  margin-left: 0.4em;
+  margin-right: 0.4em;
 }
 
 #editActionName {
-    @extend .userActionInput;
-    border: none;
-    text-align: left;
-    height: 2em;
-    width: 100%;
+  @extend .userActionInput;
+  border: none;
+  text-align: left;
+  height: 2em;
+  width: 100%;
 }
 
 #recordActiveTab {
-    position:relative;
-    svg.emblem {
-        display:none;
-        height: 13px;
-        width: 13px;
-        circle {
-            fill: black;
-        }
-        position: absolute;
-        bottom: 1px;
-        right:1px;
+  position: relative;
+  svg.emblem {
+    display: none;
+    height: 13px;
+    width: 13px;
+    circle {
+      fill: black;
     }
-    svg.emblem.delete {
-        display:inline;
-    }
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+  }
+  svg.emblem.delete {
+    display: inline;
+  }
 }
 
 #gotoFirstZip {
-    svg {
-        transform: rotate(90deg);
-    }
+  svg {
+    transform: rotate(90deg);
+  }
 }
 
 #gotoLastZip {
-    svg {
-        transform: rotate(-90deg);
-    }
+  svg {
+    transform: rotate(-90deg);
+  }
 }
 
 //// for any modal
 .modal {
-    color: black;
-    height: 80%;
-    .content-wrapper {
-        height: 100%;
-        overflow: auto;
-    }
+  color: black;
+  height: 80%;
+  .content-wrapper {
+    height: 100%;
+    overflow: auto;
+  }
 }
 .blocker {
-    background: rgba(128, 128, 128, 0.75);
+  background: rgba(128, 128, 128, 0.75);
 }
 ////
 
-#right {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-
-    .toggle {
-        display: flex;
-        cursor: pointer;
-        border: 1px solid white;
-        border-radius: 3px;
-        padding: 0 5px;
-        .label {
-            line-height: 16px; // center the text
-        }
-    }
-}
-
 /// for the edit rectangles
 .rectangle {
-    position: absolute;
-    border: 1px dashed black;
+  position: absolute;
+  border: 1px dashed black;
 
-    &[type="ActualCorrection"] {
-        background: rgba(255, 255, 255, 0.9);
+  &[type='ActualCorrection'] {
+    background: rgba(255, 255, 255, 0.9);
 
-        //these make grey scale but I lose the border
-        //background: white;
-        //mix-blend-mode: hue; // turns the contents to grey scale
-    }
-    &[type="UnpredictableCorrection"] {
-        background: rgba(255, 165, 0, 0.9);
-    }
-    &[type="AntiAliasCorrection"] {
-        background: rgba(0, 255, 0, 0.9);
-    }
+    //these make grey scale but I lose the border
+    //background: white;
+    //mix-blend-mode: hue; // turns the contents to grey scale
+  }
+  &[type='UnpredictableCorrection'] {
+    background: rgba(255, 165, 0, 0.9);
+  }
+  &[type='AntiAliasCorrection'] {
+    background: rgba(0, 255, 0, 0.9);
+  }
 }
 ///
 
 #confirmSave {
+  display: flex;
+  font-size: 14px;
+  #title {
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+  #message {
+    margin-bottom: 0.6em;
+  }
+  #buttons {
     display: flex;
+    justify-content: end;
+    margin-top: 2em;
+  }
+  a.button {
+    margin-left: 1em;
+    background-color: #1a73e8;
+    border: 1px solid white;
+    outline: 2px solid #1a73e8;
+    border-radius: 5px;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
     font-size: 14px;
-    #title {
-        font-size: 15px;
-        margin-bottom: 12px;
+    //margin: 4px 2px;
+    cursor: pointer;
+    &:hover {
+      opacity: 0.5;
     }
-    #message {
-        margin-bottom: 0.6em;
-    }
-    #buttons {
-        display: flex;
-        justify-content: end;
-        margin-top: 2em;
-    }
-    a.button {
-        margin-left: 1em;
-        background-color: #1a73e8;
-        border: 1px solid white;
-        outline: 2px solid #1a73e8;
-        border-radius: 5px;
-        color: white;
-        padding: 10px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 14px;
-        //margin: 4px 2px;
-        cursor: pointer;
-        &:hover {
-            opacity: 0.5;
-        }
-    }
-    #confirmDiscardChangesButton {
-        background-color: white;
-        color: #1a73e8;
-    }
+  }
+  #confirmDiscardChangesButton {
+    background-color: white;
+    color: #1a73e8;
+  }
 }
 
 html {
-    height: 100%;
+  height: 100%;
 }
 
 [disabled] {
-    pointer-events: none;
-    opacity: 0.3;
+  pointer-events: none;
+  opacity: 0.3;
 }
 
 #topbar {
-    //padding: 0 .5em;;
-    font-size: 14px;
+  //padding: 0 .5em;;
+  font-size: 14px;
+  display: flex;
+  flex-direction: row;
+  //align-items: center;
+  //justify-content: space-between;
+  background: rgb(33, 33, 33);
+  button:hover {
+    background: rgb(75, 75, 75);
+  }
+}
+
+#menus {
+  order: 1;
+  width: 30%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  & > svg {
+    height: 17px;
+    width: 17px;
+    margin-left: 1em;
+  }
+
+  .option {
+    padding: 0.5em 0.6em;
+    position: relative;
+    max-width: 100px;
+    cursor: pointer;
+    &:hover {
+      background: rgb(75, 75, 75);
+    }
+    svg {
+      width: 14px;
+      height: 14px;
+      fill: white;
+    }
+  }
+
+  .options {
+    position: absolute;
+    left: 0px;
+    top: 100%;
+    background: rgb(50, 50, 50);
+    z-index: 2;
+    box-shadow: 1px 2px 4px black;
+    //border-right: 1px solid black;
+    // border-bottom: 1px solid black;
+    padding: 0.3em 0;
+    width: 250px;
+    border-radius: 0 0 4px 4px;
+    display: none;
+    &.open {
+      display: flex;
+    }
+    flex-direction: column;
+
+    .option {
+      max-width: unset;
+      &:hover {
+        background: var(--hover-color);
+      }
+      padding: 0.5em 2em 0.5em 1em;
+      svg {
+        margin-right: 0.3em;
+      }
+    }
+    hr {
+      width: 90%;
+      border-bottom: 0;
+    }
+  }
+}
+
+#navigation {
+  display: flex;
+  justify-content: center;
+  order: 2;
+  width: 40%;
+  #recordButton,
+  #playButton {
+    position: relative; /** let the recording overlay in this **/
+  }
+  #recordButton.active {
+    background: red;
+  }
+  #playButton.active {
+    background: green;
+  }
+}
+
+#right {
+  justify-content: right;
+  order: 3;
+  width: 30%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  .toggle {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    background: rgb(33, 33, 33);
-
-    #menus {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        & > svg {
-            height: 17px;
-            width: 17px;
-            margin-left: 1em;
-        }
-
-        .option {
-            padding: 0.5em 0.6em;
-            position: relative;
-            max-width: 100px;
-            cursor: pointer;
-            &:hover {
-                background: rgb(75, 75, 75);
-            }
-            svg {
-                width: 14px;
-                height: 14px;
-                fill: white;
-            }
-        }
-
-        .options {
-            position: absolute;
-            left: 0px;
-            top: 100%;
-            background: rgb(50, 50, 50);
-            z-index: 2;
-            box-shadow: 1px 2px 4px black;
-            //border-right: 1px solid black;
-            // border-bottom: 1px solid black;
-            padding: 0.3em 0;
-            width: 250px;
-            border-radius: 0 0 4px 4px;
-            display: none;
-            &.open {
-                display: flex;
-            }
-            flex-direction: column;
-
-            .option {
-                max-width: unset;
-                &:hover {
-                    background: var(--hover-color);
-                }
-                padding: 0.5em 2em 0.5em 1em;
-                svg {
-                    margin-right: 0.3em;
-                }
-            }
-            hr {
-                width: 90%;
-                border-bottom: 0;
-            }
-        }
+    cursor: pointer;
+    border: 1px solid white;
+    border-radius: 3px;
+    padding: 0 5px;
+    .label {
+      line-height: 16px; // center the text
     }
-
-    #navigation {
-        // align-self: center;
-        position: absolute;
-        left: calc(50% - 105px);
-        #recordButton,
-        #playButton {
-            position: relative; /** let the recording overlay in this **/
-        }
-        #recordButton.active {
-            background: red;
-        }
-        #playButton.active {
-            background: green;
-        }
-    }
-    button:hover {
-        background: rgb(75, 75, 75);
-    }
+  }
 }
 
 :root {
-    --screenshot-timeout: 15s;
-    --action-color: red;
-    --hover-color: #1571b3;
+  --screenshot-timeout: 15s;
+  --action-color: red;
+  --hover-color: #1571b3;
 }
 
 body {
-    height: 100%;
-    margin: 0;
-    user-select: none;
-    position: relative;
+  height: 100%;
+  margin: 0;
+  user-select: none;
+  position: relative;
 }
 
 .error-text {
-    color: red;
-    font-weight: bold;
+  color: red;
+  font-weight: bold;
 }
 
 body {
-    background: rgba(0, 0, 0, 0.75);
-    //background: rgb(64, 64,64);
-    color: white;
+  background: rgba(0, 0, 0, 0.75);
+  //background: rgb(64, 64,64);
+  color: white;
 }
 
 .row {
-    display: flex;
-    align-items: center;
-    flex-direction: row;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
 }
 
 .col {
-    display: flex;
-    align-items: center;
-    flex-direction: column;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
 }
 
 button {
-    background: unset;
-    color: unset;
-    border-radius: 3px;
-    border: 0;
-    //margin: 4px;
-    font-size: larger;
-    height: 31px;
+  background: unset;
+  color: unset;
+  border-radius: 3px;
+  border: 0;
+  //margin: 4px;
+  font-size: larger;
+  height: 31px;
 
-    &[disabled],
-    &[disabled] i {
-        opacity: 0.3;
-        &:hover {
-            background: unset;
-            cursor: unset;
-        }
-    }
-
+  &[disabled],
+  &[disabled] i {
+    opacity: 0.3;
     &:hover {
-        background: rgba(0, 0, 0, 0.3);
-        cursor: pointer;
+      background: unset;
+      cursor: unset;
     }
+  }
 
-    svg {
-        height: 20px;
-        width: 20px;
-        fill: white;
-        vertical-align: bottom;
-    }
+  &:hover {
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+  }
 
-    img {
-        height: 26px;
-        width: 26px;
-    }
+  svg {
+    height: 20px;
+    width: 20px;
+    fill: white;
+    vertical-align: bottom;
+  }
+
+  img {
+    height: 26px;
+    width: 26px;
+  }
 }
 
 #workspace {
-    display: flex;
-    flex-direction: row;
+  display: flex;
+  flex-direction: row;
 }
 
 .verticalToolBar {
-    @extend .col;
-    align-items: center;
-    padding: 0px;
-    width: 40px;
-    justify-content: space-between;
-    margin-top: 12px;
+  @extend .col;
+  align-items: center;
+  padding: 0px;
+  width: 40px;
+  justify-content: space-between;
+  margin-top: 12px;
 }
 
 /* these are the thumbnails */
 #cards {
-    display: flex;
-    flex: row;
-    overflow: auto;
-    height: 110px;
-    background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex: row;
+  overflow: auto;
+  height: 110px;
+  background: rgba(0, 0, 0, 0.2);
 
-    img {
-        object-fit: contain;
-        width: 100%;
-        height: 100%;
-    }
+  img {
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+  }
 
-    .card {
-        width: 100px;
-        padding: 5px;
-        min-width: 100px;
-    }
+  .card {
+    width: 100px;
+    padding: 5px;
+    min-width: 100px;
+  }
 }
 
 /*********************/
 /* common to cards   */
 /*********************/
 .card {
-    padding: 1em;
-    width: 50%;
+  padding: 1em;
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  margin-right: 1em;
+  border-radius: 0.6em;
+  border: 1px solid;
+  background: linear-gradient(
+    to right,
+    rgba(116, 116, 191, 0.3),
+    rgba(52, 138, 199, 0.3)
+  );
+
+  .screenshot {
+    position: relative; /* for the action overlay to float positioned to this when absolute positioned */
+    padding: none;
+    img {
+      width: 100%;
+      &.shadowDOM {
+        opacity: 0.1;
+      }
+    }
+
+    .overlay {
+      position: absolute;
+      background: var(--action-color);
+
+      &.pointer {
+        background: unset;
+        width: 12px;
+        height: 18px;
+        svg {
+          color: var(--action-color);
+          height: 18px;
+        }
+      }
+    }
+  }
+
+  &.empty {
+    height: 200px;
+    background: grey;
+  }
+
+  .stepNumber {
+    margin-left: auto; // right align him
+  }
+
+  .title {
+    @extend .row;
+
+    color: white;
     display: flex;
-    flex-direction: column;
-    margin-right: 1em;
-    border-radius: 0.6em;
-    border: 1px solid;
-    background: linear-gradient(to right, rgba(116, 116, 191, 0.3), rgba(52, 138, 199, 0.3));
 
-    .screenshot {
-        position: relative; /* for the action overlay to float positioned to this when absolute positioned */
-        padding: none;
-        img {
-            width: 100%;
-            &.shadowDOM {
-                opacity: 0.1;
-            }
-        }
-
-        .overlay {
-            position: absolute;
-            background: var(--action-color);
-
-            &.pointer {
-                background: unset;
-                width: 12px;
-                height: 18px;
-                svg {
-                    color: var(--action-color);
-                    height: 18px;
-                }
-            }
-        }
+    .actions {
+      margin-left: auto;
     }
 
-    &.empty {
-        height: 200px;
-        background: grey;
+    .text {
+      @extend .row;
+
+      align-items: center;
+
+      height: 20px;
+      padding: 1em;
+      &:hover {
+        background: rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+      }
+
+      flex-grow: 1;
+      svg {
+        height: 16px;
+        width: 16px;
+        margin-right: 0.3em;
+
+        // path {
+        //     fill: red;
+        // }
+        // margin-right: 0.3em;
+      }
     }
+  }
 
-    .stepNumber {
-        margin-left: auto; // right align him
+  .meter {
+    height: 5px;
+    position: relative;
+    background: #f3efe6;
+    overflow: hidden;
+
+    span {
+      display: block;
+      height: 100%;
     }
+    visibility: hidden; /* not seen but takes up layout space */
+  }
 
-    .title {
-        @extend .row;
-
-        color: white;
-        display: flex;
-
-        .actions {
-            margin-left: auto;
-        }
-
-        .text {
-            @extend .row;
-
-            align-items: center;
-
-            height: 20px;
-            padding: 1em;
-            &:hover {
-                background: rgba(0, 0, 0, 0.3);
-                cursor: pointer;
-            }
-
-            flex-grow: 1;
-            svg {
-                height: 16px;
-                width: 16px;
-                margin-right: 0.3em;
-
-                // path {
-                //     fill: red;
-                // }
-                // margin-right: 0.3em;
-            }
-        }
+  .footer {
+    @extend .row;
+    button {
+      margin: 0;
     }
-
-    .meter {
-        height: 5px;
-        position: relative;
-        background: #f3efe6;
-        overflow: hidden;
-
-        span {
-            display: block;
-            height: 100%;
-        }
-        visibility: hidden; /* not seen but takes up layout space */
-    }
-
-    .footer {
-        @extend .row;
-        button {
-            margin: 0;
-        }
-    }
+  }
 }
 
 @keyframes progressBar {
-    0% {
-        width: 0;
-        background-color: green;
-    }
-    80% {
-        background-color: green;
-    }
-    99% {
-        background-color: orange;
-    }
-    100% {
-        width: 100%;
-        background-color: red;
-    }
+  0% {
+    width: 0;
+    background-color: green;
+  }
+  80% {
+    background-color: green;
+  }
+  99% {
+    background-color: orange;
+  }
+  100% {
+    width: 100%;
+    background-color: red;
+  }
 }
 
 #content {
-    display: flex;
-    flex-direction: row;
+  display: flex;
+  flex-direction: row;
 
-    /***********************/
-    /* First card in step */
-    /***********************/
-    .card.action {
-        /** only the first card should see the action */
-        .action {
-            position: absolute;
-            text-align: center;
-            font-size: 18px;
-            background: var(--action-color);
-            margin: 3px;
-            border: 1px solid black;
-            border-radius: 6px;
-            padding: 5px;
-            .modifier {
-                background: lightgray;
-                border-radius: 5px;
-                color: black;
-                border: 1px solid black;
-                font-size: 14px;
-                padding: 0px 3px;
-                font-family: "Courier New", Courier, monospace;
-            }
-            max-width: 200px;
-            max-height: 200px;
-            overflow: auto;
-            z-index: 1;
-        }
-
-        .screenshot {
-            &:hover {
-                .pulse {
-                    animation: opacity2 3s infinite;
-                }
-                .pulse-light {
-                    animation: opacity3 3s infinite;
-                }
-            }
-
-            .overlay.action:hover {
-                animation: unset;
-            }
-
-            .overlay.pointer:hover {
-                animation: unset;
-            }
-        }
+  /***********************/
+  /* First card in step */
+  /***********************/
+  .card.action {
+    /** only the first card should see the action */
+    .action {
+      position: absolute;
+      text-align: center;
+      font-size: 18px;
+      background: var(--action-color);
+      margin: 3px;
+      border: 1px solid black;
+      border-radius: 6px;
+      padding: 5px;
+      .modifier {
+        background: lightgray;
+        border-radius: 5px;
+        color: black;
+        border: 1px solid black;
+        font-size: 14px;
+        padding: 0px 3px;
+        font-family: 'Courier New', Courier, monospace;
+      }
+      max-width: 200px;
+      max-height: 200px;
+      overflow: auto;
+      z-index: 1;
     }
 
-    /***********************/
-    /* second card in step */
-    /***********************/
-    .card.waiting {
-        //in the edit state
-        &.edit {
-            .screenshot.hasRedPixels {
-                cursor: crosshair;
-                position: unset; // for some reason when drawing rectangles I need this
-                &.relative-position {
-                    position: relative; // but when displaying possible corrections for example I need this.
-                }
-            }
-
-            /** hide that one */
-            &.fail .meter {
-                visibility: hidden;
-            }
-
-            svg#cycle {
-                transform: rotate(-135deg);
-            }
+    .screenshot {
+      &:hover {
+        .pulse {
+          animation: opacity2 3s infinite;
         }
-
-        &.actual {
-            svg#cycle {
-                transform: rotate(135deg);
-            }
+        .pulse-light {
+          animation: opacity3 3s infinite;
         }
+      }
 
-        .screenshot {
-            .overlay {
-                display: none;
+      .overlay.action:hover {
+        animation: unset;
+      }
 
-                &.countdown {
-                    display: block;
-                    font-size: 20vw;
-                    text-align: center;
-                    background: red;
-                }
-            }
-        }
-
-        &.play .meter,
-        &.fail .meter {
-            visibility: visible;
-        }
-
-        /** show the failed progress bar as red for failed states */
-        &.expected.fail .progress,
-        &.actual.fail .progress {
-            background-color: red;
-            animation: unset;
-            animation-fill-mode: unset;
-        }
-
-        /** the text that says "has unpredicable pixels" */
-        #unpredictable-pixels {
-            color: orange;
-        }
-        #error-pixels {
-            color: red;
-        }
-
-        .progress {
-            background-color: #e4c465;
-            animation: progressBar var(--screenshot-timeout) ease-in-out;
-            animation-fill-mode: both;
-        }
-
-        .actions {
-            .hide {
-                display: none;
-            }
-            button {
-                border: 1px solid transparent;
-                &[autoplay="true"]:not([disabled]) {
-                    border: 1px solid green;
-                }
-            }
-            display: flex;
-            flex-direction: row;
-        }
+      .overlay.pointer:hover {
+        animation: unset;
+      }
     }
+  }
+
+  /***********************/
+  /* second card in step */
+  /***********************/
+  .card.waiting {
+    //in the edit state
+    &.edit {
+      .screenshot.hasRedPixels {
+        cursor: crosshair;
+        position: unset; // for some reason when drawing rectangles I need this
+        &.relative-position {
+          position: relative; // but when displaying possible corrections for example I need this.
+        }
+      }
+
+      /** hide that one */
+      &.fail .meter {
+        visibility: hidden;
+      }
+
+      svg#cycle {
+        transform: rotate(-135deg);
+      }
+    }
+
+    &.actual {
+      svg#cycle {
+        transform: rotate(135deg);
+      }
+    }
+
+    .screenshot {
+      .overlay {
+        display: none;
+
+        &.countdown {
+          display: block;
+          font-size: 20vw;
+          text-align: center;
+          background: red;
+        }
+      }
+    }
+
+    &.play .meter,
+    &.fail .meter {
+      visibility: visible;
+    }
+
+    /** show the failed progress bar as red for failed states */
+    &.expected.fail .progress,
+    &.actual.fail .progress {
+      background-color: red;
+      animation: unset;
+      animation-fill-mode: unset;
+    }
+
+    /** the text that says "has unpredicable pixels" */
+    #unpredictable-pixels {
+      color: orange;
+    }
+    #error-pixels {
+      color: red;
+    }
+
+    .progress {
+      background-color: #e4c465;
+      animation: progressBar var(--screenshot-timeout) ease-in-out;
+      animation-fill-mode: both;
+    }
+
+    .actions {
+      .hide {
+        display: none;
+      }
+      button {
+        border: 1px solid transparent;
+        &[autoplay='true']:not([disabled]) {
+          border: 1px solid green;
+        }
+      }
+      display: flex;
+      flex-direction: row;
+    }
+  }
 }
 /** only show the meter on the next card when playing back */
 #step {
-    height: calc(100% - 172px);
-    width: calc(100% - 40px);
+  height: calc(100% - 172px);
+  width: calc(100% - 40px);
 }
 
 @keyframes opacity2 {
-    0% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0;
-    }
-    100% {
-        opacity: 1;
-    }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes opacity3 {
-    0% {
-        opacity: 0.25;
-    }
-    50% {
-        opacity: 0;
-    }
-    100% {
-        opacity: 0.25;
-    }
+  0% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.25;
+  }
 }
 
 .pulse {
-    animation: unset;
+  animation: unset;
 }
 
 .pulse-light {
-    animation: unset;
-    opacity: 0.25;
+  animation: unset;
+  opacity: 0.25;
 }
 
 #footer {
-    position: fixed;
-    bottom: 0%;
-    width: 100%;
+  position: fixed;
+  bottom: 0%;
+  width: 100%;
 
-    #infobar {
-        background: var(--hover-color);
-        color: white;
-        height: 12px;
-        padding: 5px;
-        line-height: 1em;
-        display: flex;
+  #infobar {
+    background: var(--hover-color);
+    color: white;
+    height: 12px;
+    padding: 5px;
+    line-height: 1em;
+    display: flex;
 
-        svg {
-            animation: opacity2 3s infinite;
-            margin-left: .6em;
-        }
+    svg {
+      animation: opacity2 3s infinite;
+      margin-left: 0.6em;
     }
+  }
 }
 
 .error-dialog {
-    display: flex;
-    flex-direction: column;
-    width: 300px;
-    height: 300px;
-    margin: 0 auto;
-    border: 1px solid;
-    background: black;
-    position: absolute;
-    left: calc(50% - 150px);
-    top: 0;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 300px;
+  margin: 0 auto;
+  border: 1px solid;
+  background: black;
+  position: absolute;
+  left: calc(50% - 150px);
+  top: 0;
 
-    .header {
-        border-bottom: 1px solid;
-        .content {
-            font-size: 14px;
-            padding: 10px;
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            svg {
-                width: 32px;
-                margin-right: 0.5em;
-            }
-        }
+  .header {
+    border-bottom: 1px solid;
+    .content {
+      font-size: 14px;
+      padding: 10px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      svg {
+        width: 32px;
+        margin-right: 0.5em;
+      }
     }
-    .body {
-        padding: 10px;
-        details {
-            height: 100px;
+  }
+  .body {
+    padding: 10px;
+    details {
+      height: 100px;
 
-            .stack {
-                user-select: text;
+      .stack {
+        user-select: text;
 
-                max-width: 370px;
-                max-height: 85px;
-                overflow: auto;
-                border: 1px solid gray;
-                padding: 0;
-                margin: 0;
-            }
-        }
+        max-width: 370px;
+        max-height: 85px;
+        overflow: auto;
+        border: 1px solid gray;
+        padding: 0;
+        margin: 0;
+      }
     }
-    .footer {
-        padding: 10px;
-        align-self: flex-end;
-        margin-top: auto;
-        button {
-            .content {
-                display: flex;
-                flex-direction: row;
-                align-items: center;
-                svg {
-                    width: 14px;
-                    margin-right: 0.5em;
-                }
-            }
+  }
+  .footer {
+    padding: 10px;
+    align-self: flex-end;
+    margin-top: auto;
+    button {
+      .content {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        svg {
+          width: 14px;
+          margin-right: 0.5em;
         }
+      }
     }
+  }
 }
 
 // it seems that a progress bar is kind of stupid, and I might
@@ -738,18 +769,18 @@ button {
 // this is what I did for the .meter and .progress class above.
 // but i got this far with <progress> so i am going to strap it in.
 progress {
-    -webkit-appearance: none;
-    width: 25%;
-    margin-left: .6em;
+  -webkit-appearance: none;
+  width: 25%;
+  margin-left: 0.6em;
 
-    &::-webkit-progress-bar {
-        border-radius: 1em;
-        padding: 1px;
-        background-color: white;
-        width: 100%;
-    }
-    &::-webkit-progress-value {
-        background-color: green;
-        border-radius: 1em;
-    }
+  &::-webkit-progress-bar {
+    border-radius: 1em;
+    padding: 1px;
+    background-color: white;
+    width: 100%;
+  }
+  &::-webkit-progress-value {
+    background-color: green;
+    border-radius: 1em;
+  }
 }

@@ -66,13 +66,38 @@
   color: inherit;
 }
 
+@media all and (max-width: 700px) {
+  #topbar {
+    -ms-flex-wrap: wrap;
+        flex-wrap: wrap;
+  }
+  #topbar #navigation {
+    width: 100%;
+    -webkit-box-ordinal-group: 4;
+        -ms-flex-order: 3;
+            order: 3;
+  }
+  #topbar #menus {
+    -webkit-box-ordinal-group: 2;
+        -ms-flex-order: 1;
+            order: 1;
+    width: 50%;
+  }
+  #topbar #right {
+    width: 50%;
+    -webkit-box-ordinal-group: 3;
+        -ms-flex-order: 2;
+            order: 2;
+  }
+}
+
 #actionMatchTimeout {
   border-radius: 1em;
   width: 2em;
   border: 1px solid;
   text-align: center;
-  margin-left: .4em;
-  margin-right: .4em;
+  margin-left: 0.4em;
+  margin-right: 0.4em;
 }
 
 #actionMatchTimeout::-webkit-inner-spin-button {
@@ -131,47 +156,20 @@
   background: rgba(128, 128, 128, 0.75);
 }
 
-#right {
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-box-orient: horizontal;
-  -webkit-box-direction: normal;
-      -ms-flex-direction: row;
-          flex-direction: row;
-  -webkit-box-align: center;
-      -ms-flex-align: center;
-          align-items: center;
-}
-
-#right .toggle {
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  cursor: pointer;
-  border: 1px solid white;
-  border-radius: 3px;
-  padding: 0 5px;
-}
-
-#right .toggle .label {
-  line-height: 16px;
-}
-
 .rectangle {
   position: absolute;
   border: 1px dashed black;
 }
 
-.rectangle[type="ActualCorrection"] {
+.rectangle[type='ActualCorrection'] {
   background: rgba(255, 255, 255, 0.9);
 }
 
-.rectangle[type="UnpredictableCorrection"] {
+.rectangle[type='UnpredictableCorrection'] {
   background: rgba(255, 165, 0, 0.9);
 }
 
-.rectangle[type="AntiAliasCorrection"] {
+.rectangle[type='AntiAliasCorrection'] {
   background: rgba(0, 255, 0, 0.9);
 }
 
@@ -243,16 +241,18 @@ html {
   -webkit-box-direction: normal;
       -ms-flex-direction: row;
           flex-direction: row;
-  -webkit-box-align: center;
-      -ms-flex-align: center;
-          align-items: center;
-  -webkit-box-pack: justify;
-      -ms-flex-pack: justify;
-          justify-content: space-between;
   background: #212121;
 }
 
-#topbar #menus {
+#topbar button:hover {
+  background: #4b4b4b;
+}
+
+#menus {
+  -webkit-box-ordinal-group: 2;
+      -ms-flex-order: 1;
+          order: 1;
+  width: 30%;
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
@@ -265,30 +265,30 @@ html {
           align-items: center;
 }
 
-#topbar #menus > svg {
+#menus > svg {
   height: 17px;
   width: 17px;
   margin-left: 1em;
 }
 
-#topbar #menus .option {
+#menus .option {
   padding: 0.5em 0.6em;
   position: relative;
   max-width: 100px;
   cursor: pointer;
 }
 
-#topbar #menus .option:hover {
+#menus .option:hover {
   background: #4b4b4b;
 }
 
-#topbar #menus .option svg {
+#menus .option svg {
   width: 14px;
   height: 14px;
   fill: white;
 }
 
-#topbar #menus .options {
+#menus .options {
   position: absolute;
   left: 0px;
   top: 100%;
@@ -306,51 +306,89 @@ html {
           flex-direction: column;
 }
 
-#topbar #menus .options.open {
+#menus .options.open {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
 }
 
-#topbar #menus .options .option {
+#menus .options .option {
   max-width: unset;
   padding: 0.5em 2em 0.5em 1em;
 }
 
-#topbar #menus .options .option:hover {
+#menus .options .option:hover {
   background: var(--hover-color);
 }
 
-#topbar #menus .options .option svg {
+#menus .options .option svg {
   margin-right: 0.3em;
 }
 
-#topbar #menus .options hr {
+#menus .options hr {
   width: 90%;
   border-bottom: 0;
 }
 
-#topbar #navigation {
-  position: absolute;
-  left: calc(50% - 105px);
+#navigation {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  -webkit-box-ordinal-group: 3;
+      -ms-flex-order: 2;
+          order: 2;
+  width: 40%;
 }
 
-#topbar #navigation #recordButton,
-#topbar #navigation #playButton {
+#navigation #recordButton,
+#navigation #playButton {
   position: relative;
   /** let the recording overlay in this **/
 }
 
-#topbar #navigation #recordButton.active {
+#navigation #recordButton.active {
   background: red;
 }
 
-#topbar #navigation #playButton.active {
+#navigation #playButton.active {
   background: green;
 }
 
-#topbar button:hover {
-  background: #4b4b4b;
+#right {
+  -webkit-box-pack: right;
+      -ms-flex-pack: right;
+          justify-content: right;
+  -webkit-box-ordinal-group: 4;
+      -ms-flex-order: 3;
+          order: 3;
+  width: 30%;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+#right .toggle {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  cursor: pointer;
+  border: 1px solid white;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+
+#right .toggle .label {
+  line-height: 16px;
 }
 
 :root {
@@ -676,7 +714,7 @@ button img {
   border: 1px solid black;
   font-size: 14px;
   padding: 0px 3px;
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 #content .card.action .screenshot:hover .pulse {
@@ -790,7 +828,7 @@ button img {
   border: 1px solid transparent;
 }
 
-#content .card.waiting .actions button[autoplay="true"]:not([disabled]) {
+#content .card.waiting .actions button[autoplay='true']:not([disabled]) {
   border: 1px solid green;
 }
 
@@ -879,7 +917,7 @@ button img {
 #footer #infobar svg {
   -webkit-animation: opacity2 3s infinite;
           animation: opacity2 3s infinite;
-  margin-left: .6em;
+  margin-left: 0.6em;
 }
 
 .error-dialog {
@@ -973,7 +1011,7 @@ button img {
 progress {
   -webkit-appearance: none;
   width: 25%;
-  margin-left: .6em;
+  margin-left: 0.6em;
 }
 
 progress::-webkit-progress-bar {
