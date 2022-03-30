@@ -347,6 +347,10 @@ class Recorder {
     this.mousewheelCursor = `url(${chrome.runtime.getURL(
       'images/scrolling.png'
     )}) 15 2, auto`;
+    /** the css for a copy cursor */
+    this.copyCursor = `url(${chrome.runtime.getURL(
+      'images/copy-cursor-32.png'
+    )}) 15 15, auto`;
   }
 
   /** The user has waited long enough that we should consider that an active
@@ -652,6 +656,11 @@ class Recorder {
     };
 
     switch (e.type) {
+      case 'mouseup':
+        msg.x = e.clientX;
+        msg.y = e.clientY;
+        msg.type = 'getVersion';
+        break;
       case 'mousemove':
         msg.event.clientX = e.clientX;
         msg.event.clientY = e.clientY;
@@ -766,6 +775,12 @@ class Recorder {
       css.innerText = css.innerText.replace(/\*[^\}]+\}/, '');
     }
   }
+
+  /**
+   * Shoud the net click be considered a getVersion
+   * @type {bool}
+   */
+  changeClickToGetVersion = false;
 
   /** the mousecursor */
   setCursorCssTo(v) {
@@ -940,12 +955,14 @@ class Recorder {
         }
         return this.propagate(e);
       case 'mousedown':
-        if (this.mouseMovePending) {
-          if (this.mouseMoveStartingElement !== e.target) {
-          } else {
-            this.clearPendingMouseMove(); // unless it is on the same element (fatfinger)
-          }
+        if (
+          this.mouseMovePending &&
+          this.mouseMoveStartingElement === e.target
+        ) {
+          this.clearPendingMouseMove(); // (fatfinger)
         }
+
+        this.startLongPressDetection();
 
         this.mouseDown = e; // down right now
         this.lastMouseDownEvent = e; // and hang onto it after it is not the last event
@@ -953,6 +970,16 @@ class Recorder {
       case 'mouseup':
         this.mouseDown = false;
         this.lastMouseMoveEvent = e;
+
+        this.cancelLongPressDetection();
+
+        if (this.changeClickToGetVersion) {
+          // the click event will never happen since we outwaited that window doing the long press
+          this.changeClickToGetVersion = false;
+          msg = this.buildMsg(e); // now a getVersion userAction
+          this.pushMessage(msg);
+        }
+
         return this.cancel(e); // going to simulate the whole click or double click, so I don't release this to the app
       case 'wheel':
         if (this.mouseMovePending) {
@@ -1035,11 +1062,11 @@ class Recorder {
         if (!this.pendingClick) {
           this.pendingClick = e;
           setTimeout(() => {
-            if (this.mouseMovePending) {
-              if (this.mouseMoveStartingElement !== this.pendingClick.target) {
-              } else {
-                this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
-              }
+            if (
+              this.mouseMovePending &&
+              this.mouseMoveStartingElement === this.pendingClick.target
+            ) {
+              this.clearPendingMouseMove(); // unless it is the same element (fatfinger)
             }
 
             msg = this.buildMsg(this.pendingClick);
@@ -1062,6 +1089,31 @@ class Recorder {
       default:
         return this.propagate(e); // why block other events?
     }
+  }
+
+  /**
+   * @type {number} id of the setTimeout
+   */
+  longPressTimeoutId;
+
+  /**
+   * detect when the mousedown is held long enough.
+   * this is used to switch the current click type
+   * to a applicationVersionDetection thing
+   */
+  startLongPressDetection() {
+    this.longPressTimeoutId = setTimeout(() => {
+      this.setCursorCssTo(this.copyCursor);
+      this.changeClickToGetVersion = true;
+    }, 2000);
+  }
+
+  /**
+   * cancel detection
+   */
+  cancelLongPressDetection() {
+    this.revertCursorCss();
+    clearTimeout(this.longPressTimeoutId);
   }
 
   /**

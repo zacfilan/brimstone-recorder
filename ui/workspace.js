@@ -2416,6 +2416,10 @@ async function userEventToAction(userEvent, insert = true) {
       testAction.description = 'click';
       addExpectedScreenshot(testAction);
       break;
+    case 'getVersion':
+      testAction.description = 'get text as application version';
+      addExpectedScreenshot(testAction);
+      break;
     case 'contextmenu':
       testAction.description = 'right click';
       addExpectedScreenshot(testAction);
@@ -2565,6 +2569,7 @@ async function onMessageHandler(message, _port) {
     case 'click':
     case 'contextmenu':
     case 'dblclick':
+    case 'getVersion':
       // it takes a mouse move to get here. if it wasn't allowed to end (fast user) we want to grab and reuse the pre-requisite screenshot of the mousemove.
       // (this is user error, if they want the right state they must wait and check, so acceptable.)
       // if it is allowed to end, then still, we want to grab and reuse the pre-requisite screenshot of the mousemove
