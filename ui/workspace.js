@@ -329,7 +329,13 @@ class Actions {
     // The test instance is still linked to by the playtree, for reporting stuff, so free up what memory I can.
     Test.current.removeScreenshots();
     delete Test.current.actionCache;
-    delete zipNodes[currentTestNumber - 1]?._zipTest; // remove this link to memory
+
+    // be very careful here about deleting zipNode stuff.
+    // if i delete the _zipTest then I lose the reporting info I built
+    // if I delete the whole zipnode something else breaks
+    // if I don't delete the zipNode I leak memory for something, but i forget what!
+    // delete zipNodes[currentTestNumber - 1]?._zipTest; // remove this link to memory
+
     delete Test._saveBlob;
     ////
 
@@ -461,6 +467,8 @@ class Actions {
     );
     if (await Test.current.deleteAction(action)) {
       PlayTree.stepsInZipNodes--;
+      // every zipNode past here needs it's offset decrements;
+
       let i = Math.min(action.index, Test.current.steps.length - 1);
       await updateStepInView(Test.current.steps[i]);
     }
