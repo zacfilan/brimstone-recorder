@@ -61,10 +61,12 @@ async function focusOrCreateTab(url) {
   await chrome.windows.update(tab.windowId, { focused: true });
 }
 
-/** Generic thigs the user can do in the UI
- *
+/**
+ * Controller for the workspace.
+ * Container for all the things
+ * the user can do in the UI
  */
-class Actions {
+class Workspace {
   _modalClosed; // function to resolve a promise externally
 
   /** lastAction executed */
@@ -314,8 +316,10 @@ class Actions {
       } catch (e) {
         blobError = e;
       }
-      let result = await actions.confirmSaveModal(
-        `🙋❓ File '${Test.current.filename}' has unsaved changes.`
+      let result = await this.confirmModal(
+        `File '${Test.current.filename}' has unsaved changes.`,
+        'Save Changes',
+        'Discard Changes'
       );
       if (result) {
         if (blobError) {
@@ -589,15 +593,79 @@ class Actions {
     await _stopPlaying();
   }
 
-  async confirmSaveModal(message) {
-    Test.current.filename;
+  async alertModal(message, okText = 'OK') {
     let userButtonPress = new Promise((resolve) => {
       this._modalClosed = resolve;
     });
 
-    let cs = $('#confirmSave');
-    cs.find('#message').text(message);
+    let cs = $('#alertModal');
+    cs.find('#message').text('🙋❗ ' + message);
+    cs.find('.ok')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed(true);
+      })
+      .text(okText);
+
     cs.modal();
+    return userButtonPress;
+  }
+
+  async confirmModal(message, okText = 'OK', cancelText = 'Cancel') {
+    let userButtonPress = new Promise((resolve) => {
+      this._modalClosed = resolve;
+    });
+
+    let cs = $('#confirmModal');
+    cs.find('#message').text('🙋❓ ' + message);
+    cs.find('.ok')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed(true);
+      })
+      .text(okText);
+
+    cs.find('.cancel')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed(false);
+      })
+      .text(cancelText);
+
+    cs.modal();
+    return userButtonPress;
+  }
+
+  async promptModal(
+    message,
+    defaultValue,
+    okText = 'OK',
+    cancelText = 'Cancel'
+  ) {
+    let userButtonPress = new Promise((resolve) => {
+      this._modalClosed = resolve;
+    });
+
+    let cs = $('#promptModal');
+    cs.find('#message').text('🙋 ' + message);
+    cs.find('input:text').val(defaultValue);
+
+    cs.find('.ok')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed(cs.find('input:text').val());
+      })
+      .text(okText);
+
+    cs.find('.cancel')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed('');
+      })
+      .text(cancelText);
+
+    cs.modal();
+    cs.find('input').focus().select();
     return userButtonPress;
   }
 
@@ -629,10 +697,11 @@ class Actions {
     options.autoCorrect = !!enableAutoCorrectCheckbox.checked;
     await saveOptions(options);
   }
-  //#endregion userActions
+  //#endregion workspace
 }
-const actions = new Actions();
-const menuController = new MenuController(actions);
+
+const workspace = new Workspace();
+const menuController = new MenuController(workspace);
 
 async function errorHandler(e) {
   let workspaceWindow;
@@ -780,6 +849,16 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
     BDS.extensionInfo._info = await chrome.management.getSelf();
     infobar.setText();
 
+    /**
+     * We cannot use anything here that is asynchronous, because, "whatever". :(
+     * Yet I wanna save data off that can only be saved with
+     * an asynchronous api. What's a dude to do? I need to make a call synchronously
+     * that under the covers can do some async things. This can be done with a
+     * synchronous XMLHttpRequest(), as long as that request can do the async part.
+     *
+     * @param {*} event
+     * @returns
+     */
     const beforeUnloadListener = (event) => {
       if (Test.current.dirty) {
         // well crap... https://chromestatus.com/feature/5349061406228480
@@ -844,7 +923,7 @@ var _lastSavedScreenshot;
  */
 $('#step').on('click', '#correctAsUnpredictable', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.applyCorrections, e);
+  await workspace.callMethodByUser(workspace.applyCorrections, e);
 });
 
 /**
@@ -852,12 +931,12 @@ $('#step').on('click', '#correctAsUnpredictable', async (e) => {
  */
 $('#step').on('click', '#correctAsAntiAlias', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.applyCorrections, e);
+  await workspace.callMethodByUser(workspace.applyCorrections, e);
 });
 
 $('#step').on('click', '#correctAsActual', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.applyCorrections, e);
+  await workspace.callMethodByUser(workspace.applyCorrections, e);
 });
 
 /**
@@ -865,7 +944,7 @@ $('#step').on('click', '#correctAsActual', async (e) => {
  */
 $('#step').on('click', '#possibleCorrections', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.applyCorrections, e);
+  await workspace.callMethodByUser(workspace.applyCorrections, e);
 });
 
 // color the rectangles when we are about to commit them
@@ -940,17 +1019,17 @@ $('#step').on('mouseleave', '#possibleCorrections', function (e) {
 
 $('#autoPlaySwitch').on('click', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.enableAutoPlayCheckbox, e);
+  await workspace.callMethodByUser(workspace.enableAutoPlayCheckbox, e);
 });
 
 $('#autoCorrectSwitch').on('click', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.enableAutoCorrectCheckbox, e);
+  await workspace.callMethodByUser(workspace.enableAutoCorrectCheckbox, e);
 });
 
 $('#step').on('click', '#undo', async (e) => {
   e.stopPropagation();
-  await actions.callMethodByUser(actions.undo);
+  await workspace.callMethodByUser(workspace.undo);
 });
 
 $('#step').on('click', '.stopPropagation', async (e) => {
@@ -959,7 +1038,7 @@ $('#step').on('click', '.stopPropagation', async (e) => {
 
 $('#step').on('click', '[data-action="deleteAction"]', (e) => {
   e.stopPropagation();
-  actions.callMethodByUser(actions.deleteAction);
+  workspace.callMethodByUser(workspace.deleteAction);
 });
 
 // stop the image drag behavior
@@ -1025,18 +1104,7 @@ $('#step').on('change', '#editActionName', (e) => {
 });
 
 $('#step').on('click', '.waiting .click-to-change-view', (...args) => {
-  actions.callMethodByUser(actions.cycleEditStates, ...args);
-});
-
-/**
- * handler for clicking save in the save changes dialog
- */
-$('#confirmSaveChangesButton').click(async () => {
-  actions._modalClosed(true); // i don't actually know if the user actually saved or not, they could have cancelled.
-});
-
-$('#confirmDiscardChangesButton').click(() => {
-  actions._modalClosed(false);
+  workspace.callMethodByUser(workspace.cycleEditStates, ...args);
 });
 
 function setToolbarState() {
@@ -1136,7 +1204,7 @@ function setToolbarState() {
   }
 }
 
-$('[data-action="openOptions"]').on('click', actions.openOptions);
+$('[data-action="openOptions"]').on('click', workspace.openOptions);
 
 $('#gotoFirstZip').on('click', async function (e) {
   await loadTest(1);
@@ -1173,10 +1241,10 @@ $('#playButton').on('click', function (e) {
   // I use "this". So no lambda.
   let button = $(this);
   if (button.hasClass('active')) {
-    actions.callMethodByUser(actions.stopPlaying);
+    workspace.callMethodByUser(workspace.stopPlaying);
     return;
   }
-  actions.callMethodByUser(actions.playSomething);
+  workspace.callMethodByUser(workspace.playSomething);
 });
 
 /**
@@ -1204,7 +1272,7 @@ async function _playSomething() {
       Test.current.lastRun.brimstoneVersion = BDS.extensionInfo.version;
       Test.current.lastRun.chromeVersion = BDS.chromeVersion;
 
-      let actions = Test.current.steps;
+      let testActions = Test.current.steps;
       player.onBeforePlay = updateStepInView;
       player.onAfterPlay = updateStepInView;
 
@@ -1251,8 +1319,8 @@ async function _playSomething() {
         }
       }
 
-      startingTab.width = actions[0].tab.width;
-      startingTab.height = actions[0].tab.height;
+      startingTab.width = testActions[0].tab.width;
+      startingTab.height = testActions[0].tab.height;
       startingTab.blessed = true;
 
       Tab.active = startingTab;
@@ -1294,7 +1362,7 @@ async function _playSomething() {
           nextTest = await loadTest(currentTestNumber + 1);
           if (!nextTest) {
             infobar.setText('✅ last run passed');
-            alert('✅ Test passed.');
+            await workspace.alertModal('✅ Test passed.');
           }
           break;
         case constants.match.FAIL:
@@ -1318,15 +1386,15 @@ async function _playSomething() {
           break;
       }
     } while (nextTest);
-    actions.callMethod(actions.stopPlaying);
+    workspace.callMethod(workspace.stopPlaying);
     lastRunMetrics = PlayTree.complete.buildReports();
     setToolbarState(); // enable the metrics menu
     if (options.postMetricsOnFail || options.postMetricsOnPass) {
-      await actions.postLastRunMetrics(true);
+      await workspace.postLastRunMetrics(true);
     }
   } catch (e) {
     let msg = e?.message ?? e ?? '';
-    actions.callMethod(actions.stopPlaying);
+    workspace.callMethod(workspace.stopPlaying);
     if (e instanceof Errors.NoActiveTab) {
       infobar.setText(`❌ play canceled - ${msg}`);
     } else {
@@ -1835,7 +1903,7 @@ async function recordSomething(promptForUrl) {
 
     if (promptForUrl) {
       let defaultUrl = options?.url ?? '';
-      url = await brimstone.window.prompt(
+      url = await workspace.promptModal(
         'Where to? Type or paste URL to start recording from.',
         defaultUrl
       );
@@ -1963,16 +2031,19 @@ async function recordSomething(promptForUrl) {
         // If you "Record the Active Tab" you will make a recording in incognito or not based on the Active Tab state, not any external preferences!
         Test.current.incognito = Tab.active.chromeTab.incognito;
 
-        if (!(await Tab.active.reuse({ incognito: Test.current.incognito }))) {
-          throw new Errors.ReuseTestWindow();
-        }
-        // there is nothing in the current test, so I should add something
-        if (Tab.active.chromeTab.url.startsWith('chrome:')) {
-          await brimstone.window.alert(
-            "We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue."
+        let reuse = await Tab.active.reuse({
+          incognito: Test.current.incognito,
+        });
+        if (Tab?.active?.chromeTab?.url?.startsWith('chrome:')) {
+          await workspace.alertModal(
+            "We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue.\n\nPlease specify a non chrome:// URL in the tab to record."
           );
           return;
         }
+        if (!reuse) {
+          throw new Errors.ReuseTestWindow();
+        }
+
         if (await player.attachDebugger({ tab: Tab.active })) {
           await Tab.active.resizeViewport();
         }
@@ -2051,10 +2122,10 @@ function postMessage(msg) {
   }
 }
 
-$('#loadButton').on('click', actions.loadTests.bind(actions));
-$('#saveButton').on('click', actions.saveZip);
-$('#clearButton').on('click', actions.clearWorkspace.bind(actions));
-$('#recordActiveTab').on('click', actions.recordActiveTab.bind(actions));
+$('#loadButton').on('click', workspace.loadTests.bind(workspace));
+$('#saveButton').on('click', workspace.saveZip);
+$('#clearButton').on('click', workspace.clearWorkspace.bind(workspace));
+$('#recordActiveTab').on('click', workspace.recordActiveTab.bind(workspace));
 
 /**
  * Load the test sepcified into the workspace
@@ -2067,7 +2138,7 @@ async function loadTest(testNumber) {
     if (testNumber > numberOfTestsInSuite || testNumber < 1) {
       return false;
     }
-    await actions.clearTest(); // any previous test is cleared out
+    await workspace.clearTest(); // any previous test is cleared out
     currentTestNumber = testNumber;
 
     let options = await loadOptions();

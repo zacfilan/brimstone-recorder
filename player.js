@@ -1005,7 +1005,7 @@ export class Player {
         return;
       } else {
         // else no error - implies that we actually needed to attach the debugger
-        console.debug(`debugger was attached to tab:${tab.id}`);
+        console.debug(`debugger was attached to tab:${tab.chromeTab.id}`);
         this.tab = tab;
         resolve(true); // an attach was required
         return;

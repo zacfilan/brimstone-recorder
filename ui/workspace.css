@@ -67,27 +67,96 @@
 }
 
 @media all and (max-width: 700px) {
-  #topbar {
+  body {
+    font-size: 12px;
+  }
+  body #topbar {
     -ms-flex-wrap: wrap;
         flex-wrap: wrap;
+    font-size: 12px;
   }
-  #topbar #navigation {
+  body #topbar #navigation {
     width: 100%;
     -webkit-box-ordinal-group: 4;
         -ms-flex-order: 3;
             order: 3;
   }
-  #topbar #menus {
+  body #topbar #navigation svg {
+    height: 15px;
+    width: 15px;
+  }
+  body #topbar #menus {
     -webkit-box-ordinal-group: 2;
         -ms-flex-order: 1;
             order: 1;
     width: 50%;
   }
-  #topbar #right {
+  body #topbar #right {
     width: 50%;
     -webkit-box-ordinal-group: 3;
         -ms-flex-order: 2;
             order: 2;
+  }
+  body #topbar #right .label {
+    width: 30px;
+    overflow: hidden;
+  }
+  body #workspace {
+    height: calc(100% - 84px);
+    width: 100%;
+  }
+  body #workspace .verticalToolBar svg {
+    height: 15px;
+    width: 15px;
+  }
+  body #workspace .verticalToolBar svg.emblem {
+    height: 11px;
+    width: 11px;
+    bottom: 2px;
+    right: 2px;
+  }
+  body #workspace #step {
+    height: 100%;
+    width: 100%;
+  }
+  body #workspace #step #content {
+    height: 100%;
+    width: 100%;
+    -ms-flex-wrap: wrap;
+        flex-wrap: wrap;
+  }
+  body #workspace #step #content .card {
+    width: 100%;
+    height: calc(50% - 5px);
+    padding: 0;
+    margin-bottom: 5px;
+  }
+  body #workspace #step #content .card .title {
+    -webkit-box-flex: 1;
+        -ms-flex-positive: 1;
+            flex-grow: 1;
+  }
+  body #workspace #step #content .card .title .text {
+    padding: 6px;
+  }
+  body #workspace #step #content .card .screenshot {
+    height: calc(100% - 60px);
+  }
+  body #workspace #step #content .card .screenshot img {
+    height: 100%;
+    width: auto;
+  }
+  body #workspace #step #content .card.action .action {
+    font-size: 12px;
+  }
+  body #workspace #step #content .card .footer {
+    -webkit-box-flex: 0.8;
+        -ms-flex-positive: 0.8;
+            flex-grow: 0.8;
+    padding: 0 5px;
+  }
+  body #footer details {
+    display: none;
   }
 }
 
@@ -145,11 +214,62 @@
 .modal {
   color: black;
   height: 80%;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  font-size: 14px;
+}
+
+.modal input {
+  width: 100%;
 }
 
 .modal .content-wrapper {
   height: 100%;
   overflow: auto;
+}
+
+.modal #title {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.modal #message {
+  margin-bottom: 0.6em;
+}
+
+.modal #buttons {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: end;
+      -ms-flex-pack: end;
+          justify-content: end;
+  margin-top: 2em;
+}
+
+.modal a.button {
+  margin-left: 1em;
+  background-color: #1a73e8;
+  border: 1px solid white;
+  outline: 2px solid #1a73e8;
+  border-radius: 5px;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modal a.button:hover {
+  opacity: 0.5;
+}
+
+.modal a.button.cancel {
+  background-color: white;
+  color: #1a73e8;
 }
 
 .blocker {
@@ -171,56 +291,6 @@
 
 .rectangle[type='AntiAliasCorrection'] {
   background: rgba(0, 255, 0, 0.9);
-}
-
-#confirmSave {
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  font-size: 14px;
-}
-
-#confirmSave #title {
-  font-size: 15px;
-  margin-bottom: 12px;
-}
-
-#confirmSave #message {
-  margin-bottom: 0.6em;
-}
-
-#confirmSave #buttons {
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-box-pack: end;
-      -ms-flex-pack: end;
-          justify-content: end;
-  margin-top: 2em;
-}
-
-#confirmSave a.button {
-  margin-left: 1em;
-  background-color: #1a73e8;
-  border: 1px solid white;
-  outline: 2px solid #1a73e8;
-  border-radius: 5px;
-  color: white;
-  padding: 10px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-#confirmSave a.button:hover {
-  opacity: 0.5;
-}
-
-#confirmSave #confirmDiscardChangesButton {
-  background-color: white;
-  color: #1a73e8;
 }
 
 html {
@@ -448,7 +518,6 @@ button {
   color: unset;
   border-radius: 3px;
   border: 0;
-  font-size: larger;
   height: 31px;
 }
 
@@ -495,7 +564,6 @@ button img {
       -ms-flex-align: center;
           align-items: center;
   padding: 0px;
-  width: 40px;
   -webkit-box-pack: justify;
       -ms-flex-pack: justify;
           justify-content: space-between;
@@ -556,6 +624,7 @@ button img {
 
 .card .screenshot img {
   width: 100%;
+  height: auto;
 }
 
 .card .screenshot img.shadowDOM {
@@ -579,7 +648,6 @@ button img {
 }
 
 .card.empty {
-  height: 200px;
   background: grey;
 }
 

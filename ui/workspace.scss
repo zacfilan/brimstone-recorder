@@ -6,23 +6,101 @@
 }
 
 @media all and (max-width: 700px) {
-  #topbar {
-    flex-wrap: wrap;
-  }
+  body {
+    font-size: 12px;
 
-  #topbar #navigation {
-    width: 100%;
-    order: 3;
-  }
+    #topbar {
+      flex-wrap: wrap;
+      #navigation {
+        width: 100%;
+        order: 3;
+        svg {
+          height: 15px; // smaller
+          width: 15px;
+        }
+      }
 
-  #topbar #menus {
-    order: 1;
-    width: 50%;
-  }
+      font-size: 12px;
+      #menus {
+        order: 1;
+        width: 50%;
+      }
 
-  #topbar #right {
-    width: 50%;
-    order: 2;
+      #right {
+        width: 50%;
+        order: 2;
+        .label {
+          width: 30px;
+          overflow: hidden;
+        }
+      }
+    }
+
+    #workspace {
+      .verticalToolBar {
+        svg {
+          height: 15px; // smaller
+          width: 15px;
+          &.emblem {
+            height: 11px;
+            width: 11px;
+            bottom: 2px;
+            right: 2px;
+          }
+        }
+      }
+
+      // the whole vp - 2 rows up top and 1 at bottom
+      height: calc(100% - 84px);
+      width: 100%; // whole vp
+
+      #step {
+        // same as parent
+        height: 100%;
+        width: 100%;
+
+        #content {
+          // same as parent
+          height: 100%;
+          width: 100%;
+
+          flex-wrap: wrap;
+          .card {
+            width: 100%;
+            height: calc(50% - 5px); // margin under card
+            padding: 0;
+            .title {
+              flex-grow: 1; // take it all bro
+              .text {
+                padding: 6px;
+              }
+            }
+
+            .screenshot {
+              height: calc(100% - 60px);
+              img {
+                height: 100%;
+                width: auto;
+              }
+            }
+
+            &.action .action {
+              font-size: 12px;
+            }
+
+            margin-bottom: 5px;
+            .footer {
+              flex-grow: 0.8;
+              padding: 0 5px;
+            }
+          }
+        }
+      }
+    }
+
+    #footer details {
+      display: none; // hide the thumbnails
+    }
   }
 }
 
@@ -80,40 +158,16 @@
 
 //// for any modal
 .modal {
+  input {
+    width: 100%;
+  }
   color: black;
   height: 80%;
   .content-wrapper {
     height: 100%;
     overflow: auto;
   }
-}
-.blocker {
-  background: rgba(128, 128, 128, 0.75);
-}
-////
 
-/// for the edit rectangles
-.rectangle {
-  position: absolute;
-  border: 1px dashed black;
-
-  &[type='ActualCorrection'] {
-    background: rgba(255, 255, 255, 0.9);
-
-    //these make grey scale but I lose the border
-    //background: white;
-    //mix-blend-mode: hue; // turns the contents to grey scale
-  }
-  &[type='UnpredictableCorrection'] {
-    background: rgba(255, 165, 0, 0.9);
-  }
-  &[type='AntiAliasCorrection'] {
-    background: rgba(0, 255, 0, 0.9);
-  }
-}
-///
-
-#confirmSave {
   display: flex;
   font-size: 14px;
   #title {
@@ -146,11 +200,36 @@
       opacity: 0.5;
     }
   }
-  #confirmDiscardChangesButton {
+  a.button.cancel {
     background-color: white;
     color: #1a73e8;
   }
 }
+.blocker {
+  background: rgba(128, 128, 128, 0.75);
+}
+////
+
+/// for the edit rectangles
+.rectangle {
+  position: absolute;
+  border: 1px dashed black;
+
+  &[type='ActualCorrection'] {
+    background: rgba(255, 255, 255, 0.9);
+
+    //these make grey scale but I lose the border
+    //background: white;
+    //mix-blend-mode: hue; // turns the contents to grey scale
+  }
+  &[type='UnpredictableCorrection'] {
+    background: rgba(255, 165, 0, 0.9);
+  }
+  &[type='AntiAliasCorrection'] {
+    background: rgba(0, 255, 0, 0.9);
+  }
+}
+///
 
 html {
   height: 100%;
@@ -315,7 +394,7 @@ button {
   border-radius: 3px;
   border: 0;
   //margin: 4px;
-  font-size: larger;
+  //font-size: larger;
   height: 31px;
 
   &[disabled],
@@ -354,7 +433,6 @@ button {
   @extend .col;
   align-items: center;
   padding: 0px;
-  width: 40px;
   justify-content: space-between;
   margin-top: 12px;
 }
@@ -402,6 +480,7 @@ button {
     padding: none;
     img {
       width: 100%;
+      height: auto;
       &.shadowDOM {
         opacity: 0.1;
       }
@@ -424,7 +503,6 @@ button {
   }
 
   &.empty {
-    height: 200px;
     background: grey;
   }
 
@@ -644,6 +722,7 @@ button {
     }
   }
 }
+
 /** only show the meter on the next card when playing back */
 #step {
   height: calc(100% - 172px);

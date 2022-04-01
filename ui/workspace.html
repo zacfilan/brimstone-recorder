@@ -28,12 +28,30 @@
 
 <body>
 
-  <div id="confirmSave" style="display:none">
+  <div id="alertModal" style="display:none">
     <div id="title">Brimstone</div>
-    <div id="message">🙋❓ File has unsaved changes.</div>
+    <div id="message"></div>
     <div id="buttons">
-      <a class="button" id="confirmSaveChangesButton" href="#" rel="modal:close">Save Changes</a>
-      <a class="button" id="confirmDiscardChangesButton" href="#" rel="modal:close">Discard Changes</a>
+      <a class="button ok" href="#" rel="modal:close"></a>
+    </div>
+  </div>
+
+  <div id="confirmModal" style="display:none">
+    <div id="title">Brimstone</div>
+    <div id="message"></div>
+    <div id="buttons">
+      <a class="button ok" href="#" rel="modal:close"></a>
+      <a class="button cancel" href="#" rel="modal:close"></a>
+    </div>
+  </div>
+
+  <div id="promptModal" style="display:none">
+    <div id="title">Brimstone</div>
+    <div id="message"></div>
+    <input type="text"></input>
+    <div id="buttons">
+      <a class="button ok" href="#" rel="modal:close">OK</a>
+      <a class="button cancel" href="#" rel="modal:close">Cancel</a>
     </div>
   </div>
 
