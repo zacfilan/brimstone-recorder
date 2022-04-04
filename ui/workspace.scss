@@ -89,6 +89,11 @@
               font-size: 12px;
             }
 
+            &.empty {
+              width: 100%;
+              height: auto;
+            }
+
             margin-bottom: 5px;
             .footer {
               flex-grow: 0.8;
@@ -520,6 +525,7 @@ button {
 
   &.empty {
     background: grey;
+    height: 200px;
   }
 
   .stepNumber {

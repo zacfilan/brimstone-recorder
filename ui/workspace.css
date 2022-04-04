@@ -152,6 +152,10 @@
   body #workspace #step #content .card.action .action {
     font-size: 12px;
   }
+  body #workspace #step #content .card.empty {
+    width: 100%;
+    height: auto;
+  }
   body #workspace #step #content .card .footer {
     -webkit-box-flex: 0.8;
         -ms-flex-positive: 0.8;
@@ -667,6 +671,7 @@ button img {
 
 .card.empty {
   background: grey;
+  height: 200px;
 }
 
 .card .stepNumber {
