@@ -556,7 +556,9 @@ export class Rectangle {
     }
 
     const rectangle = $(`<div class="rectangle" ${type}></div>`)[0];
-    (container ?? Rectangle.container).appendChild(rectangle);
+    let c = container ?? Rectangle.container;
+    c.appendChild(rectangle);
+
     rectangle.addEventListener('mousedown', (e) => {
       if (e.button === 2) {
         e.preventDefault();
@@ -581,10 +583,17 @@ export class Rectangle {
     const height = Math.max(this._coords[0].y, this._coords[1].y) - top;
     const left = Math.min(this._coords[0].x, this._coords[1].x);
     const width = Math.max(this._coords[0].x, this._coords[1].x) - left;
-    this.rectangle.style.top = top + 'px';
-    this.rectangle.style.height = height + 'px';
-    this.rectangle.style.left = left + 'px';
-    this.rectangle.style.width = width + 'px';
+
+    let pTop = (100 * top) / Rectangle.container.offsetHeight;
+    let pHeight = (100 * height) / Rectangle.container.offsetHeight;
+    let pLeft = (100 * left) / Rectangle.container.offsetWidth;
+    let pWidth = (100 * width) / Rectangle.container.offsetWidth;
+
+    //    console.log(`pos: (${pLeft}%,${pTop}%) size: ${pWidth}%x${pHeight}%`);
+    this.rectangle.style.top = pTop + '%';
+    this.rectangle.style.height = pHeight + '%';
+    this.rectangle.style.left = pLeft + '%';
+    this.rectangle.style.width = pWidth + '%';
   }
 }
 
@@ -595,16 +604,19 @@ Rectangle.setContainer = function (container, addCallback, delCallback) {
   container.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     Rectangle._resizing = new Rectangle({
-      x0: e.clientX,
-      y0: e.clientY,
-      x1: e.clientX,
-      y1: e.clientY,
+      x0: e.clientX - container.offsetLeft, // the clentX is the absolute x value of the mouse
+      y0: e.clientY - container.offsetTop,
+      x1: e.clientX - container.offsetLeft,
+      y1: e.clientY - container.offsetTop,
     });
   });
 
   container.addEventListener('mousemove', (e) => {
     if (Rectangle._resizing) {
-      Rectangle._resizing._coords[1] = { x: e.clientX, y: e.clientY };
+      Rectangle._resizing._coords[1] = {
+        x: e.clientX - container.offsetLeft,
+        y: e.clientY - container.offsetTop,
+      };
       Rectangle._resizing.redraw();
     }
   });
@@ -612,7 +624,10 @@ Rectangle.setContainer = function (container, addCallback, delCallback) {
   container.addEventListener('mouseup', (e) => {
     if (e.button !== 0) return;
     if (Rectangle._resizing) {
-      Rectangle._resizing._coords[1] = { x: e.clientX, y: e.clientY };
+      Rectangle._resizing._coords[1] = {
+        x: e.clientX - container.offsetLeft,
+        y: e.clientY - container.offsetTop,
+      };
       Rectangle._resizing.redraw();
       addCallback({
         coords: Rectangle._resizing._coords,

@@ -667,7 +667,6 @@ button {
     &.edit {
       .screenshot.hasRedPixels {
         cursor: crosshair;
-        position: unset; // for some reason when drawing rectangles I need this
         &.relative-position {
           position: relative; // but when displaying possible corrections for example I need this.
         }

@@ -74,7 +74,7 @@ async function windowsOnBoundsChangedHandler(window) {
   let workspace = await getWorkspaceInfo();
   if (window.id === workspace.windowId) {
     // If I resize it remember where it is/was/will be next time
-    chrome.storage.local.set({
+    await chrome.storage.local.set({
       window: {
         top: window.top,
         left: window.left,
@@ -82,6 +82,9 @@ async function windowsOnBoundsChangedHandler(window) {
         height: window.height,
       },
     });
+    // console.log(
+    //   `saved window postion:(${window.top},${window.left} size:${window.width}x${window.height}`
+    // );
   }
 }
 

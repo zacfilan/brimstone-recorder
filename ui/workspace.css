@@ -839,7 +839,6 @@ button img {
 
 #content .card.waiting.edit .screenshot.hasRedPixels {
   cursor: crosshair;
-  position: unset;
 }
 
 #content .card.waiting.edit .screenshot.hasRedPixels.relative-position {

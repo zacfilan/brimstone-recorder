@@ -222,16 +222,27 @@ export class Tab {
     // I will always try to reuse before create.
     // So the only time I can be leaving windows around
     // is if we go from non-inconito to incognito or vice versa.
+    let removedWindow;
     if (options.closeOldTestWindowOnCreate) {
-      await this.remove();
+      removedWindow = await this.remove();
     }
 
-    let chromeWindow = await chrome.windows.create({
+    let createParms = {
       type: 'normal',
       focused: false, // keep focus off omni bar when we open a new incognito window
       incognito: incognito, // if true this will create the window "You've gone Incognito"
       url: url, // this better be an URL I can attach a debugger to!
-    });
+    };
+
+    // does this anyway!
+    // if (removedWindow) {
+    //   createParms.height = removedWindow.height;
+    //   createParms.width = removedWindow.width;
+    //   createParms.top = removedWindow.top;
+    //   createParms.left = removedWindow.left;
+    // }
+
+    let chromeWindow = await chrome.windows.create(createParms);
     [this.chromeTab] = await chrome.tabs.query({
       active: true,
       windowId: chromeWindow.id,
@@ -335,7 +346,9 @@ export class Tab {
   /** Remove the currently configured window (if it exists) */
   async remove() {
     try {
+      let w = await chrome.windows.get(this.chromeTab.windowId);
       await chrome.windows.remove(this.chromeTab.windowId);
+      return w;
     } catch (e) {}
   }
 
