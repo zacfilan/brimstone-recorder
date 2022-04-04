@@ -63,7 +63,7 @@ export class Options {
   /**
    * Number of millseconds to wait to terminate a mousewheel sequence.
    */
-  mouseWheelTimeout = 250;
+  mouseWheelTimeout = 500;
 
   /**
    * Number of milliseconds to wait to terminiate a mousemove sequence action.
