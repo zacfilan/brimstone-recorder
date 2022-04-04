@@ -927,10 +927,7 @@ class Recorder {
     switch (e.type) {
       case 'mousemove':
         if (this.pendingWheelTimeout) {
-          if (this.mouseMoveStartingElement !== e.target) {
-          } else {
-            return this.propagate(e); // unless it is on the same element (fatfinger) then ignore this event
-          }
+          return this.propagate(e); // then ignore this event for recording purposes, user needs to wait for wheel to finish. ignore those "mousemoves" that occur because of scrolling
         }
 
         this.startMouseMove(e);
