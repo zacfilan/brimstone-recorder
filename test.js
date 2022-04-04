@@ -1333,7 +1333,7 @@ export class TestAction {
           o.left
         }%'>${o.html ? o.html : ''}</div>`;
       } else {
-        html += `<div class='overlay pulse-light' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div>`;
+        html += `<div class="overlay-clipper"><div class='overlay pulse-light' data-index=${this.index} style='height:${o.height}%;width:${o.width}%;top:${o.top}%;left:${o.left}%'></div></div>`;
       }
     }
 

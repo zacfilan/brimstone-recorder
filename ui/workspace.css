@@ -140,8 +140,10 @@
     padding: 6px;
   }
   body #workspace #step #content .card .screenshot {
-    overflow: hidden;
     height: calc(100% - 60px);
+    width: -webkit-fit-content;
+    width: -moz-fit-content;
+    width: fit-content;
   }
   body #workspace #step #content .card .screenshot img {
     height: 100%;
@@ -621,6 +623,11 @@ button img {
   position: relative;
   /* for the action overlay to float positioned to this when absolute positioned */
   padding: none;
+  /** the element highlight overlay is placed in one of these,
+    this allow me to clip big ones that overflow the window, like
+    an element receiving scroll, which might be huge, but is clipped
+    in the browser, so should be clipped in this view as well.
+    */
 }
 
 .card .screenshot img {
@@ -630,6 +637,16 @@ button img {
 
 .card .screenshot img.shadowDOM {
   opacity: 0.1;
+}
+
+.card .screenshot .overlay-clipper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
 }
 
 .card .screenshot .overlay {

@@ -77,8 +77,8 @@
             }
 
             .screenshot {
-              overflow: hidden; // clip the overlays that overflow
               height: calc(100% - 60px);
+              width: fit-content;
               img {
                 height: 100%;
                 width: auto; // ...preserve the aspect ratio'
@@ -485,6 +485,21 @@ button {
       &.shadowDOM {
         opacity: 0.1;
       }
+    }
+
+    /** the element highlight overlay is placed in one of these,
+    this allow me to clip big ones that overflow the window, like
+    an element receiving scroll, which might be huge, but is clipped
+    in the browser, so should be clipped in this view as well.
+    */
+    .overlay-clipper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
     }
 
     .overlay {
