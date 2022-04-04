@@ -66,7 +66,7 @@
 
           flex-wrap: wrap;
           .card {
-            width: 100%;
+            width: auto; // allow each card to adjust separately
             height: calc(50% - 5px); // margin under card
             padding: 0;
             .title {
@@ -77,10 +77,11 @@
             }
 
             .screenshot {
+              overflow: hidden; // clip the overlays that overflow
               height: calc(100% - 60px);
               img {
                 height: 100%;
-                width: auto;
+                width: auto; // ...preserve the aspect ratio'
               }
             }
 

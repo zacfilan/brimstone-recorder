@@ -126,7 +126,7 @@
         flex-wrap: wrap;
   }
   body #workspace #step #content .card {
-    width: 100%;
+    width: auto;
     height: calc(50% - 5px);
     padding: 0;
     margin-bottom: 5px;
@@ -140,6 +140,7 @@
     padding: 6px;
   }
   body #workspace #step #content .card .screenshot {
+    overflow: hidden;
     height: calc(100% - 60px);
   }
   body #workspace #step #content .card .screenshot img {
