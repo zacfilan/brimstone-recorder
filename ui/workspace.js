@@ -354,7 +354,10 @@ class Workspace {
     infobar.setText();
     window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
 
+    // clear the thumbnails
     $('#actionGutter').empty();
+    $('#thumbGutter').empty();
+
     $('#step').empty();
     if (options.forgetCorrectionsWhenTestIsCleared) {
       Correction.availableInstances = [];
@@ -1130,6 +1133,21 @@ $('#step').on('change', '#actionMatchTimeout', (e) => {
 $('#step').on('click', '#editDifferencesButton', async (e) => {
   e.stopPropagation();
   const { action } = getCard($('#content .card.waiting')[0], Test.current);
+
+  if (!action.actualScreenshot) {
+    action.actualScreenshot = new Screenshot(action.expectedScreenshot);
+    action.actualScreenshot.fileName = '';
+    if (action.acceptablePixelDifferences) {
+      await action.acceptablePixelDifferences.hydrate(
+        Test.current.zip?.folder('screenshots')
+      );
+    }
+  } else {
+    await action.actualScreenshot.hydrate(
+      Test.current.zip?.folder('screenshots')
+    );
+  }
+
   action._view = constants.view.EDIT;
   if (action.acceptablePixelDifferences) {
     await action.acceptablePixelDifferences.hydrate(
