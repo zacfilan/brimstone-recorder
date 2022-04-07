@@ -17,6 +17,12 @@ import {
   AntiAliasCorrection,
 } from './rectangle.js';
 
+const arrowsSvg =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Pro 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. --><path d="M32 176h370.8l-57.38 57.38c-12.5 12.5-12.5 32.75 0 45.25C351.6 284.9 359.8 288 368 288s16.38-3.125 22.62-9.375l112-112c12.5-12.5 12.5-32.75 0-45.25l-112-112c-12.5-12.5-32.75-12.5-45.25 0s-12.5 32.75 0 45.25L402.8 112H32c-17.69 0-32 14.31-32 32S14.31 176 32 176zM480 336H109.3l57.38-57.38c12.5-12.5 12.5-32.75 0-45.25s-32.75-12.5-45.25 0l-112 112c-12.5 12.5-12.5 32.75 0 45.25l112 112C127.6 508.9 135.8 512 144 512s16.38-3.125 22.62-9.375c12.5-12.5 12.5-32.75 0-45.25L109.3 400H480c17.69 0 32-14.31 32-32S497.7 336 480 336z"/></svg>';
+const pencilSvg =
+  '<svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="pencil-alt" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-pencil-alt fa-w-16 fa-9x"> <path fill="currentColor" d="M491.609 73.625l-53.861-53.839c-26.378-26.379-69.075-26.383-95.46-.001L24.91 335.089.329 484.085c-2.675 16.215 11.368 30.261 27.587 27.587l148.995-24.582 315.326-317.378c26.33-26.331 26.581-68.879-.628-96.087zM200.443 311.557C204.739 315.853 210.37 318 216 318s11.261-2.147 15.557-6.443l119.029-119.03 28.569 28.569L210 391.355V350h-48v-48h-41.356l170.259-169.155 28.569 28.569-119.03 119.029c-8.589 8.592-8.589 22.522.001 31.114zM82.132 458.132l-28.263-28.263 12.14-73.587L84.409 338H126v48h48v41.59l-18.282 18.401-73.586 12.141zm378.985-319.533l-.051.051-.051.051-48.03 48.344-88.03-88.03 48.344-48.03.05-.05.05-.05c9.147-9.146 23.978-9.259 33.236-.001l53.854 53.854c9.878 9.877 9.939 24.549.628 33.861z" class=""></path></svg>';
+const leftArrow =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Pro 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. --><path d="M224 480c-8.188 0-16.38-3.125-22.62-9.375l-192-192c-12.5-12.5-12.5-32.75 0-45.25l192-192c12.5-12.5 32.75-12.5 45.25 0s12.5 32.75 0 45.25L77.25 256l169.4 169.4c12.5 12.5 12.5 32.75 0 45.25C240.4 476.9 232.2 480 224 480z"/></svg>';
 /**
  * A ziptest instance is a recording of user actions that can be played back
  * and verified.
@@ -1536,14 +1542,9 @@ export class Step {
     if (this.next) {
       let src;
       let title = {
-        text: `
-                    <svg id='cycle' viewbox="0 0 120 120"">
-                    <circle cx="60"    cy="60"    r="40"   stroke="currentColor" stroke-width="5" fill="none" />
-                    <circle cx="60"    cy="22"  r="20" fill="currentColor" />
-                 </svg>`,
-        tooltip:
-          'Click to cycle through\nexpected, actual, and difference views.',
-        actions: '',
+        text: '',
+        tooltip: 'Click to cycle through\nexpected and actual views.',
+        actions: `<button id="editDifferencesButton" title="Edit differences">${pencilSvg}</button>`,
       };
 
       if (this.next._match === constants.match.PLAY) {
@@ -1559,7 +1560,7 @@ export class Step {
 
         switch (this.next._view) {
           case constants.view.EXPECTED:
-            title.text += `Expected result under <input title="Change the timeout\n for just this action" class="stopPropagation" type="number" min="1" max="120" value="${
+            title.text += `<button>${arrowsSvg}</button> <b>Expected</b> result under <input title="Change the timeout\n for just this action" class="stopPropagation" type="number" min="1" max="120" value="${
               this.next.maxVerifyTimeout || options.MAX_VERIFY_TIMEOUT
             }" id="actionMatchTimeout"></input> seconds`;
             if (this.next.index === this.test.steps.length - 1) {
@@ -1571,12 +1572,12 @@ export class Step {
             title.text += 'Expecting result';
             break;
           case constants.view.ACTUAL:
-            title.text += 'Actual result.';
+            title.text += `<button>${arrowsSvg}</button> <b>Actual</b>result.`;
             src =
               this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
             break;
           case constants.view.EDIT:
-            title.text += `Difference (red pixels). ${this.next.numDiffPixels} pixels, ${this.next.percentDiffPixels}% different.`;
+            title.text += `<button title="Back to expected view">${leftArrow}</button><b>Difference</b>${this.next.numDiffPixels} pixels (${this.next.percentDiffPixels}%).`;
             let titleSuffix = enableAutoPlayCheckbox.checked
               ? ' Autoplay.'
               : '';

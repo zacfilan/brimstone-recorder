@@ -509,6 +509,9 @@ button {
       &:hover {
         background: rgba(0, 0, 0, 0.3);
         cursor: pointer;
+        button {
+          background: rgba(0, 0, 0, 0.3);
+        }
       }
 
       flex-grow: 1;
@@ -521,6 +524,10 @@ button {
         //     fill: red;
         // }
         // margin-right: 0.3em;
+      }
+      b {
+        font-size: 14px;
+        margin-right: 0.3em;
       }
     }
   }

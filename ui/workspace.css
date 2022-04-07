@@ -705,9 +705,18 @@ button img {
   cursor: pointer;
 }
 
+.card .title .text:hover button {
+  background: rgba(0, 0, 0, 0.3);
+}
+
 .card .title .text svg {
   height: 16px;
   width: 16px;
+  margin-right: 0.3em;
+}
+
+.card .title .text b {
+  font-size: 14px;
   margin-right: 0.3em;
 }
 

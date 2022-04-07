@@ -537,7 +537,7 @@ class Workspace {
     await updateStepInView(newAction);
   }
 
-  /** When clicking on an editable action, cycle through expected, actual, and difference views. */
+  /** When clicking on an editable action, cycle through expected and actual views. */
   async cycleEditStates(e) {
     // flip the cards
     const { view, action } = getCard(e.currentTarget, Test.current);
@@ -560,17 +560,9 @@ class Workspace {
         }
         await updateStepInView(Test.current.steps[action.index - 1]);
         break;
-      case constants.view.ACTUAL: // actual -> edit
-        action._view = constants.view.EDIT;
-        if (action.acceptablePixelDifferences) {
-          await action.acceptablePixelDifferences.hydrate(
-            Test.current.zip?.folder('screenshots')
-          );
-        }
-        action.calculatePixelDiff();
+      case constants.view.ACTUAL: // actual -> expected
+        action._view = constants.view.EXPECTED;
         await updateStepInView(Test.current.steps[action.index - 1]);
-        /** Add rectangles where we don't care about pixel differences. */
-        addVolatileRegions();
         break;
       case constants.view.EDIT: // edit -> expected
         action._view = constants.view.EXPECTED;
@@ -1133,6 +1125,21 @@ $('#step').on('change', '#actionMatchTimeout', (e) => {
   const { action } = getCard($('#content .card.waiting')[0], Test.current);
   action.maxVerifyTimeout = parseInt(e.target.value);
   action.dirty = true;
+});
+
+$('#step').on('click', '#editDifferencesButton', async (e) => {
+  e.stopPropagation();
+  const { action } = getCard($('#content .card.waiting')[0], Test.current);
+  action._view = constants.view.EDIT;
+  if (action.acceptablePixelDifferences) {
+    await action.acceptablePixelDifferences.hydrate(
+      Test.current.zip?.folder('screenshots')
+    );
+  }
+  action.calculatePixelDiff();
+  await updateStepInView(Test.current.steps[action.index - 1]);
+  /** Add rectangles where we don't care about pixel differences. */
+  addVolatileRegions();
 });
 
 /** change the name of the currently displayed action */
