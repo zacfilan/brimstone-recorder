@@ -1,0 +1,65 @@
+.modal {
+  color: black;
+  height: 80%;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  font-size: 14px;
+}
+
+.modal input {
+  width: 100%;
+}
+
+.modal .content-wrapper {
+  height: 100%;
+  overflow: auto;
+}
+
+.modal #title {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.modal #message {
+  margin-bottom: 0.6em;
+}
+
+.modal #buttons {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: end;
+      -ms-flex-pack: end;
+          justify-content: end;
+  margin-top: 2em;
+}
+
+.modal a.button {
+  margin-left: 1em;
+  background-color: #1a73e8;
+  border: 1px solid white;
+  outline: 2px solid #1a73e8;
+  border-radius: 5px;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modal a.button:hover {
+  opacity: 0.5;
+}
+
+.modal a.button.cancel {
+  background-color: white;
+  color: #1a73e8;
+}
+
+.blocker {
+  background: rgba(128, 128, 128, 0.75);
+}
+/*# sourceMappingURL=modal.css.map */

@@ -354,7 +354,7 @@ class Workspace {
     infobar.setText();
     window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
 
-    $('#cards').empty();
+    $('#actionGutter').empty();
     $('#step').empty();
     if (options.forgetCorrectionsWhenTestIsCleared) {
       Correction.availableInstances = [];
@@ -904,8 +904,6 @@ function isPlaying() {
   return $('#playButton').hasClass('active');
 }
 
-var uiCardsElement = document.getElementById('cards');
-
 /**
  * asynchronously updated "latest" view of the app
  * @type {Screenshot}
@@ -1044,14 +1042,55 @@ $('#step').on('click', '[data-action="deleteAction"]', (e) => {
 // stop the image drag behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
 
-$('#cards').on(
+$('#actionGutter').on(
   'click',
-  '.thumb',
+  'button',
   /** When the user clicks on the thumbnail put that step in the main area. */
   async function gotoStepFromThumb(e) {
-    const { action } = getCard(e.currentTarget, Test.current);
+    let index = parseInt($(e.currentTarget).attr('index'));
+    let action = Test.current.steps[index];
     let step = new Step({ curr: action, test: Test.current });
     await setStepContent(step);
+  }
+);
+
+let seqNum = 0;
+/** timeout ID to show a thumbnail */
+$('#actionGutter').on(
+  'mouseenter',
+  'button',
+  /** When the user clicks on the thumbnail put that step in the main area. */
+  async function showThumbnail(e) {
+    let id = ++seqNum;
+    $('#thumbNail').remove();
+    let $button = $(e.currentTarget);
+    let index = parseInt($button.attr('index'));
+    let action = Test.current.steps[index];
+
+    if (
+      action.expectedScreenshot &&
+      !action.expectedScreenshot.dataUrl &&
+      action.expectedScreenshot.zipEntry
+    ) {
+      await action.expectedScreenshot.loadDataUrlFromZip();
+    }
+    if (id !== seqNum) {
+      return; // this was reentered before this instance got here
+    }
+    let $thumb = $(action.toThumb());
+    $thumb.css({
+      left: $button[0].offsetLeft - actionGutter.scrollLeft + 'px',
+    });
+    thumbGutter.appendChild($thumb[0]);
+  }
+);
+
+$('#actionGutter').on(
+  'mouseleave',
+  'button',
+  /** When the user clicks on the thumbnail put that step in the main area. */
+  () => {
+    $('#thumbNail').remove();
   }
 );
 
@@ -1892,7 +1931,6 @@ async function recordSomething(promptForUrl) {
     let url = '';
     let options = await loadOptions();
     let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - unless the user is showing the last only!)
-    //updateThumbs(); // If I actually changed it I should show that
 
     let startingTab = await getActiveApplicationTab();
     // are we doing an incognito recording - this is determined by the option only now.
@@ -2153,6 +2191,11 @@ async function loadTest(testNumber) {
       zipNodes[currentTestNumber - 1]
     );
 
+    var actionGutterElement = $('#actionGutter');
+    for (let i = 0; i < Test.current.steps.length; ++i) {
+      actionGutterElement.append(`<button index=${i}>${i + 1}</button>`);
+    }
+
     if (currentTestNumber === 1) {
       Test.current.startingServer =
         Test.current.steps[0].url ||
@@ -2162,10 +2205,6 @@ async function loadTest(testNumber) {
 
     window.document.title = `Brimstone - ${Test.current._playTree.path()}${suite}`;
     await updateStepInView(Test.current.steps[0]);
-    // for (let i = 1; i < Test.current.steps.length; ++i) {
-    //      let action = Test.current.steps[i];
-    //      updateThumb(action);
-    // }
     setToolbarState();
     return true;
   } catch (e) {
@@ -2258,23 +2297,6 @@ async function setStepContent(step) {
       text += `. step ${player.lastAutoCorrectedStepNumber} auto-corrected.`;
     }
     infobar.setText(text);
-  }
-
-  updateThumb(step.curr); // this isn't the cause of the slow processing of keystokes.
-}
-
-/**
- * Update the thumb from the given action
- * @param {TestAction} action
- */
-function updateThumb(action) {
-  let $thumb = $(action.toThumb()); // smaller view
-  let card = $(`#cards .card[data-index=${action.index}]`);
-  if (card.length) {
-    // replace
-    card.replaceWith($thumb);
-  } else {
-    uiCardsElement.appendChild($thumb[0]);
   }
 }
 

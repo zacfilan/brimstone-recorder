@@ -1,4 +1,36 @@
 @import '../switch.scss';
+@import '../modal/modal.scss';
+
+// all scrollbars
+$gray3: #cccccc; // rgb(204 204 204)
+$gray4: #999999; // rgb(153 153 153)
+$gray5: #666666; // rgb(102 102 102)
+
+$scrollbar-track: $gray5;
+$scrollbar: $gray4;
+$hover-scrollbar: $gray3;
+
+* {
+  &::-webkit-scrollbar {
+    width: 13px; /* width of the entire scrollbar */
+    height: 13px;
+    background: $scrollbar-track;
+  }
+
+  &::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: $scrollbar-track; /* color of the tracking area */
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: $scrollbar; /* color of the scroll thumb */
+    border-radius: 20px; /* roundness of the scroll thumb */
+    border: 3px solid $scrollbar-track; /* creates "padding" around scroll thumb */
+    &:hover {
+      background-color: $hover-scrollbar;
+    }
+  }
+}
 
 .userActionInput {
   background-color: inherit;
@@ -50,8 +82,8 @@
         }
       }
 
-      // the whole vp - 2 rows up top and 1 at bottom
-      height: calc(100% - 84px);
+      // the whole vp - 2 rows up top and 2 at bottom
+      height: calc(100% - (84px + 31px + 13px + 5px));
       width: 100%; // whole vp
 
       #step {
@@ -161,60 +193,6 @@
     transform: rotate(-90deg);
   }
 }
-
-//// for any modal
-.modal {
-  input {
-    width: 100%;
-  }
-  color: black;
-  height: 80%;
-  .content-wrapper {
-    height: 100%;
-    overflow: auto;
-  }
-
-  display: flex;
-  font-size: 14px;
-  #title {
-    font-size: 15px;
-    margin-bottom: 12px;
-  }
-  #message {
-    margin-bottom: 0.6em;
-  }
-  #buttons {
-    display: flex;
-    justify-content: end;
-    margin-top: 2em;
-  }
-  a.button {
-    margin-left: 1em;
-    background-color: #1a73e8;
-    border: 1px solid white;
-    outline: 2px solid #1a73e8;
-    border-radius: 5px;
-    color: white;
-    padding: 10px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
-    //margin: 4px 2px;
-    cursor: pointer;
-    &:hover {
-      opacity: 0.5;
-    }
-  }
-  a.button.cancel {
-    background-color: white;
-    color: #1a73e8;
-  }
-}
-.blocker {
-  background: rgba(128, 128, 128, 0.75);
-}
-////
 
 /// for the edit rectangles
 .rectangle {
@@ -441,27 +419,6 @@ button {
   padding: 0px;
   justify-content: space-between;
   margin-top: 12px;
-}
-
-/* these are the thumbnails */
-#cards {
-  display: flex;
-  flex: row;
-  overflow: auto;
-  height: 110px;
-  background: rgba(0, 0, 0, 0.2);
-
-  img {
-    object-fit: contain;
-    width: 100%;
-    height: 100%;
-  }
-
-  .card {
-    width: 100px;
-    padding: 5px;
-    min-width: 100px;
-  }
 }
 
 /*********************/
@@ -781,6 +738,40 @@ button {
 .pulse-light {
   animation: unset;
   opacity: 0.25;
+}
+
+#thumbGutter {
+  max-width: 100%;
+  display: relative;
+  overflow: visible;
+  .card {
+    width: 100px;
+    padding: 5px;
+    min-width: 100px;
+    position: absolute;
+    top: 0px;
+    transform: translateY(-100%);
+
+    img {
+      object-fit: contain;
+      width: 100%;
+      height: 100%;
+    }
+  }
+}
+#actionGutter {
+  color: grey;
+
+  border-top: 1px solid grey;
+  border-bottom: 1px solid white;
+
+  display: flex;
+  flex: row;
+  overflow: auto;
+  max-width: 100%;
+  button:hover {
+    color: white;
+  }
 }
 
 #footer {

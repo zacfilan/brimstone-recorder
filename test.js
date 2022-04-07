@@ -1270,7 +1270,9 @@ export class TestAction {
   toThumb() {
     let src = this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png';
     return `
-        <div class='card ${this.classes()} thumb' data-index=${this.index}>
+        <div id="thumbNail" class='card ${this.classes()} thumb' data-index=${
+      this.index
+    }>
             <img draggable='false' src='${src}'>
         </div>`;
   }
