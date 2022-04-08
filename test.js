@@ -5,7 +5,7 @@ import { brimstone, progressIndicator } from './utilities.js';
 import * as Errors from './error.js';
 import * as BDS from './ui/brimstoneDataService.js';
 import { clone, getComparableVersion } from './utilities.js';
-import { infobar } from './ui/infobar.js';
+import { infobar } from './ui/infobar/infobar.js';
 import { Tab } from './tab.js';
 import { uuidv4, pngDiff } from './utilities.js';
 import { options } from './options.js';
@@ -68,17 +68,10 @@ export class Test {
     this.zip = undefined;
 
     /**
-     * Allow actions added to the test to overwrite old actions. This
-     * is needed to record over sections of the test. It remembers the
-     * index to recd the next action into.
+     * This is the default index of the next recorded action.
+     * If the action comes in with an index already that is used.
      */
     this.recordIndex = 0;
-
-    /**
-     * The last action we *overwrote* during a recording
-     * @type {TestAction}
-     */
-    this.replacedAction = null;
 
     /** Statistics about the last run of this zipfile test */
     this.lastRun = new BDS.Test();
@@ -164,12 +157,7 @@ export class Test {
       this.recordIndex = action.index + 1;
     }
 
-    if (this.steps[action.index]) {
-      // we are replacing a step, hang onto the original one.
-      this.replacedAction = this.steps[action.index];
-    }
     this.steps[action.index] = action;
-
     action.test = this; // each action knows what test it is in
   }
 
@@ -216,20 +204,27 @@ export class Test {
     }
     await this.hydrateStepsDataUrls(); // this is required to save correctly now
     this.steps.splice(0, action.index);
-    this.reindex();
+    this.reindex({ changedAsDirty: false });
     return true;
   }
 
-  reindex() {
+  /**
+   * Put the real index of the action within the
+   * steps property into the action index property.
+   *
+   * Will mark actions that are updated as dirty.
+   */
+  reindex({ changedAsDirty = true } = {}) {
     for (let i = 0; i < this.steps.length; ++i) {
       let action = this.steps[i];
       let oldIndex = action.index;
       action.setIndex(i);
-      if (oldIndex !== i) {
+      if (changedAsDirty && oldIndex !== i) {
         action.dirty = true;
       }
     }
   }
+
   /**
    * Delete all the actions after the passed in one.
    * The passed in one becomes one before the last.
@@ -262,6 +257,22 @@ export class Test {
     newAction.tab = clone(this.steps[newAction.index].tab);
     this.steps.splice(newAction.index, 0, newAction);
     this.reindex();
+  }
+
+  /**
+   * Insert the given actions into this test
+   * at the given index.
+   *
+   * @param {number} index the index to insert the actions
+   * @param {TestAction[]} actions the actions to insert
+   */
+  insertActions(index, actions) {
+    this.steps.splice(index, 0, ...actions);
+    for (let i = 0; i < actions.length; ++i) {
+      actions[i].inserted = true;
+      actions[i].test = this;
+    }
+    this.reindex({ changedAsDirty: false });
   }
 
   toJSON() {
@@ -356,6 +367,7 @@ export class Test {
       this.filename = handle.name;
       for (let i = 0; i < this.steps.length; ++i) {
         this.steps[i].dirty = false;
+        this.steps[i].inserted = false;
       }
       infobar.setText(`saved ${handle.name}`);
       return handle;
@@ -1084,6 +1096,9 @@ export class TestAction {
    */
   dirty = false;
 
+  /** Is this action presently in the inserted state */
+  inserted = false;
+
   constructor(args) {
     Object.assign(this, args);
     this.tab = new Tab(this.tab);
@@ -1552,12 +1567,6 @@ export class Step {
           this.next._lastTimeout > 1 ? 's' : ''
         } for actual screen to match this.`;
       } else {
-        if (this.next._match === constants.match.FAIL) {
-          title.text += `Failed to match in ${this.next._lastTimeout} second${
-            this.next._lastTimeout > 1 ? 's' : ''
-          }. `;
-        }
-
         switch (this.next._view) {
           case constants.view.EXPECTED:
             title.text += `<button>${arrowsSvg}</button> <b>Expected</b> result under <input title="Change the timeout\n for just this action" class="stopPropagation" type="number" min="1" max="120" value="${

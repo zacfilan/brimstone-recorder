@@ -10,7 +10,7 @@ import { Test, constants, TestAction } from './test.js';
 import * as Errors from './error.js';
 import * as BDS from './ui/brimstoneDataService.js';
 import { Correction } from './rectangle.js';
-import { infobar } from './ui/infobar.js';
+import { infobar } from './ui/infobar/infobar.js';
 /**
  * This function is injected and run in the app
  *

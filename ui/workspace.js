@@ -20,7 +20,47 @@ import * as Errors from '../error.js';
 import { MenuController } from './menu_controller.js';
 import { clone, brimstone } from '../utilities.js';
 import * as BDS from './brimstoneDataService.js';
-import { infobar } from './infobar.js';
+import { infobar } from './infobar/infobar.js';
+import { ActionGutter } from './actionGutter/actionGutter.js';
+
+/** used by the action gutter callbacks to keep it clean */
+let seqNum = 0;
+// instantiate some components
+let actionGutter = new ActionGutter({
+  element: '#actionGutter',
+  click: async function gotoStepFromThumb(e) {
+    let index = parseInt($(e.currentTarget).attr('index'));
+    let action = Test.current.steps[index];
+    let step = new Step({ curr: action, test: Test.current });
+    await setStepContent(step);
+  },
+  mouseenter: async function showThumbnail(e) {
+    let id = ++seqNum;
+    $('#thumbNail').remove();
+    let $button = $(e.currentTarget);
+    let index = parseInt($button.attr('index'));
+    let action = Test.current.steps[index];
+
+    if (
+      action.expectedScreenshot &&
+      !action.expectedScreenshot.dataUrl &&
+      action.expectedScreenshot.zipEntry
+    ) {
+      await action.expectedScreenshot.loadDataUrlFromZip();
+    }
+    if (id !== seqNum) {
+      return; // this was reentered before this instance got here
+    }
+    let $thumb = $(action.toThumb());
+    $thumb.css({
+      left: $button[0].offsetLeft - this.actionGutter[0].scrollLeft + 'px',
+    });
+    this.thumbGutter.append($thumb[0]);
+  },
+  mouseleave: () => {
+    $('#thumbNail').remove();
+  },
+});
 
 const ALT_KEYCODE = 18;
 const META_KEYCODE = 91;
@@ -291,7 +331,10 @@ class Workspace {
     addVolatileRegions();
   }
 
-  /** discard everything in the current workspace*/
+  /**
+   * Discard *everything* in the current workspace.
+   * Nothing is retained.
+   * */
   async clearWorkspace() {
     zipNodes = [];
     currentTestNumber = 0;
@@ -300,16 +343,13 @@ class Workspace {
     delete PlayTree.complete;
   }
 
-  /** one zipnode has completed */
+  /**
+   * Test.current is removed from the workspace.
+   *
+   * This will prompt to save the test if it is dirty
+   * */
   async clearTest() {
     if (Test.current.dirty) {
-      // the dreaded "user gesture required"
-      // await focusWorkspaceWindow();
-      // let result = window.confirm(`🙋❓ File '${Test.current.filename}' has unsaved changes.\n\nDo you want to save?`);
-      // if(result) {
-      //     await actions.saveZip();
-      // }
-
       let blobError;
       try {
         Test._saveBlob = await Test.current.createZipBlob();
@@ -354,9 +394,7 @@ class Workspace {
     infobar.setText();
     window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
 
-    // clear the thumbnails
-    $('#actionGutter').empty();
-    $('#thumbGutter').empty();
+    actionGutter.clean();
 
     $('#step').empty();
     if (options.forgetCorrectionsWhenTestIsCleared) {
@@ -375,6 +413,9 @@ class Workspace {
       Test.current.filename = fileHandle.name;
       Test.current._playTree._fileHandle = fileHandle;
       window.document.title = `Brimstone - ${Test.current._playTree.path()}`;
+
+      actionGutter.draw(Test.current.steps); // dirty and inserted tags are removed
+      actionGutter.setCurrent(currentStepIndex());
     }
   }
 
@@ -477,6 +518,10 @@ class Workspace {
       // every zipNode past here needs it's offset decrements;
 
       let i = Math.min(action.index, Test.current.steps.length - 1);
+
+      actionGutter.draw(Test.current.steps);
+      actionGutter.setCurrent(currentStepIndex());
+
       await updateStepInView(Test.current.steps[i]);
     }
   }
@@ -490,6 +535,10 @@ class Workspace {
     let i = action.index;
     if (await Test.current.deleteActionsBefore(action)) {
       PlayTree.stepsInZipNodes -= i;
+
+      actionGutter.draw(Test.current.steps);
+      actionGutter.setCurrent(currentStepIndex());
+
       await updateStepInView(Test.current.steps[0]);
     }
   }
@@ -502,6 +551,10 @@ class Workspace {
     );
     if (await Test.current.deleteActionsAfter(action)) {
       PlayTree.stepsInZipNodes -= Test.current.steps.length - action.index;
+
+      actionGutter.draw(Test.current.steps);
+      actionGutter.setCurrent(currentStepIndex());
+
       await updateStepInView(Test.current.steps[action.index]);
     }
   }
@@ -537,6 +590,10 @@ class Workspace {
       newAction._match === constants.match.ALLOW;
     }
     await Test.current.insertAction(newAction);
+
+    actionGutter.draw(Test.current.steps);
+    actionGutter.setCurrent(currentStepIndex());
+
     await updateStepInView(newAction);
   }
 
@@ -843,7 +900,6 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
     setToolbarState();
     BDS.extensionInfo._info = await chrome.management.getSelf();
     infobar.setText();
-
     /**
      * We cannot use anything here that is asynchronous, because, "whatever". :(
      * Yet I wanna save data off that can only be saved with
@@ -1036,58 +1092,6 @@ $('#step').on('click', '[data-action="deleteAction"]', (e) => {
 
 // stop the image drag behavior
 $('#step').on('mousedown', '.card.edit img', () => false);
-
-$('#actionGutter').on(
-  'click',
-  'button',
-  /** When the user clicks on the thumbnail put that step in the main area. */
-  async function gotoStepFromThumb(e) {
-    let index = parseInt($(e.currentTarget).attr('index'));
-    let action = Test.current.steps[index];
-    let step = new Step({ curr: action, test: Test.current });
-    await setStepContent(step);
-  }
-);
-
-let seqNum = 0;
-/** timeout ID to show a thumbnail */
-$('#actionGutter').on(
-  'mouseenter',
-  'button',
-  /** When the user clicks on the thumbnail put that step in the main area. */
-  async function showThumbnail(e) {
-    let id = ++seqNum;
-    $('#thumbNail').remove();
-    let $button = $(e.currentTarget);
-    let index = parseInt($button.attr('index'));
-    let action = Test.current.steps[index];
-
-    if (
-      action.expectedScreenshot &&
-      !action.expectedScreenshot.dataUrl &&
-      action.expectedScreenshot.zipEntry
-    ) {
-      await action.expectedScreenshot.loadDataUrlFromZip();
-    }
-    if (id !== seqNum) {
-      return; // this was reentered before this instance got here
-    }
-    let $thumb = $(action.toThumb());
-    $thumb.css({
-      left: $button[0].offsetLeft - actionGutter.scrollLeft + 'px',
-    });
-    thumbGutter.appendChild($thumb[0]);
-  }
-);
-
-$('#actionGutter').on(
-  'mouseleave',
-  'button',
-  /** When the user clicks on the thumbnail put that step in the main area. */
-  () => {
-    $('#thumbNail').remove();
-  }
-);
 
 let diffPromise = false;
 
@@ -1397,8 +1401,11 @@ async function _playSomething() {
       }
       await playTab();
       await hideCursor();
-
+      actionGutter.clearFail();
+      /************** PLAYING ****/
       let indexOfNext = await player.play(Test.current, playFrom, resume); // players gotta play...
+      /***************************/
+
       let nextAction = Test.current.steps[indexOfNext];
       playMatchStatus = nextAction._match;
 
@@ -1431,7 +1438,8 @@ async function _playSomething() {
           break;
         case constants.match.FAIL:
           addVolatileRegions(); // you can draw right away
-          Test.current.lastRun.errorMessage = `last run failed after user action ${indexOfNext}`;
+          Test.current.lastRun.errorMessage = `action ${indexOfNext}'s result did not match in time`;
+          actionGutter.setFail(indexOfNext - 1);
           Test.current.lastRun.failingStep = indexOfNext;
           infobar.setText(`❌ ${Test.current.lastRun.errorMessage}`);
           break;
@@ -1645,6 +1653,7 @@ async function startRecorders() {
   );
 
   port.onMessage.addListener(onMessageHandler);
+  infobar.setText('recording');
   await captureScreenshotAsDataUrlForRecording(); // grab the first screenshot
 }
 
@@ -1874,6 +1883,16 @@ async function prepareToRecord() {
   );
 }
 
+/**
+ * If we are making a recording to insert into the current test
+ * this holds the "current test".
+ * @type {Test} */
+let testToInsertRecordingInto = null;
+/**
+ * The index we will insert into.
+ */
+let insertIndex = 0;
+
 async function stopRecording() {
   removeEventHandlers();
 
@@ -1887,14 +1906,20 @@ async function stopRecording() {
     console.warn(e);
   }
 
-  // this is only supposed to be used when we are recording over steps in the MIDDLE of the
-  // test. FIXME: whole mechanism is a little gross.
-  if (Test.current.replacedAction?.index === Test.current.steps.length - 1) {
-    // insert the action that our final useless "end-recording-noop-expected-screenshot-action" replaced.
-    // insert it right after that noop. the user can delete the noop. i don't want to delete that for them.
-    Test.current.replacedAction.index++;
-    await Test.current.insertAction(Test.current.replacedAction);
+  let newIndex;
+  if (testToInsertRecordingInto) {
+    newIndex = Test.current.steps.length - 1 + insertIndex;
+    testToInsertRecordingInto.insertActions(insertIndex, Test.current.steps);
+    Test.current = testToInsertRecordingInto;
+    updateStepInView(Test.current.steps[newIndex]); // will refresh the cards with there new indexes show in them
+  } else {
+    newIndex = currentStepIndex();
   }
+  testToInsertRecordingInto = null;
+  infobar.setText();
+
+  actionGutter.draw(Test.current.steps);
+  actionGutter.setCurrent(newIndex);
 }
 
 async function focusTab() {
@@ -1955,6 +1980,7 @@ async function recordSomething(promptForUrl) {
 
     let url = '';
     let options = await loadOptions();
+    /** cached the current step index */
     let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - unless the user is showing the last only!)
 
     let startingTab = await getActiveApplicationTab();
@@ -2022,6 +2048,7 @@ async function recordSomething(promptForUrl) {
       // to work around this i do this preamble on record (when first action is goto) and play when first action is goto.
       await player.mousemove({ x: 0, y: 0 });
       await player.mousemove({ x: -1, y: -1 });
+      infobar.setText('🔴 recording');
     } else {
       // we are going to start recording *the* active tab at the current url.
       if (!startingTab.chromeTab) {
@@ -2048,10 +2075,9 @@ async function recordSomething(promptForUrl) {
         await updateStepInView(Test.current.steps[index]);
         await sleep(10); // update the ui please
 
-        // allow recording over the current steps (not insert, but overwriting them)
         if (
-          !(await brimstone.window.confirm(
-            `Recording from here will overwrite existing actions, starting with action ${
+          !(await workspace.confirmModal(
+            `Recording from here will INSERT new actions starting at action ${
               index + 2
             }, until you stop.`
           ))
@@ -2060,8 +2086,6 @@ async function recordSomething(promptForUrl) {
           await updateStepInView(Test.current.steps[index]);
           return;
         }
-        Test.current.recordIndex = index + 1;
-        Test.current.replacedAction = null;
 
         // see if we are tracking the tab of the action we are recording over
         Tab.active = Tab.getByVirtualId(action.tab.virtualId);
@@ -2082,54 +2106,63 @@ async function recordSomething(promptForUrl) {
         button.addClass('active');
         setToolbarState();
         await countDown(3, action);
+
+        action.overlay = old.overlay;
+        testToInsertRecordingInto = Test.current; // hang onto it
+        insertIndex = index + 1;
+        startingTab.virtualId = Test.current.steps[insertIndex].tab.virtualId;
+        actionGutter.clean();
+        infobar.setText('🔴 recording (for insert)');
       } else {
-        // we are recording a fresh test starting with the active tab.
-        // there is no test loaded in memory. recording starts at
-        // step 1 (index 0)
-
-        Test.current = new Test();
-        startingTab.trackCreated();
-        Tab.active = startingTab;
-
-        // If you "Record the Active Tab" you will make a recording in incognito or not based on the Active Tab state, not any external preferences!
-        Test.current.incognito = Tab.active.chromeTab.incognito;
-
-        let reuse = await Tab.active.reuse({
-          incognito: Test.current.incognito,
-        });
-        if (Tab?.active?.chromeTab?.url?.startsWith('chrome:')) {
-          await workspace.alertModal(
-            "We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue.\n\nPlease specify a non chrome:// URL in the tab to record."
-          );
-          return;
-        }
-        if (!reuse) {
-          throw new Errors.ReuseTestWindow();
-        }
-
-        if (await player.attachDebugger({ tab: Tab.active })) {
-          await Tab.active.resizeViewport();
-        }
-
-        await prepareToRecord();
-        button.addClass('active');
-        setToolbarState();
-
-        // update the UI: insert the first text card in the ui
-        await recordUserAction({
-          type: 'goto',
-          url: 'active tab',
-        });
-
-        // FOCUS ISSUE. when we create a window (because we need to record incognito for example),
-        // and then navigate the active tab, the focus/active tabs styles aren't automatically placed
-        // on the document.activeElement. i don't know why this is the case.
-        // so the initial screen is recorded without "focus".
-        //
-        // to work around this i do this preamble on record (when first action is goto) and play when first action is goto.
-        await player.mousemove({ x: 0, y: 0 });
-        await player.mousemove({ x: -1, y: -1 });
+        infobar.setText('🔴 recording (active tab)');
       }
+
+      // we are recording a fresh test starting with the active tab.
+      // there is no test loaded in memory. recording starts at
+      // step 1 (index 0)
+
+      Test.current = new Test();
+      startingTab.trackCreated();
+      Tab.active = startingTab;
+
+      // If you "Record the Active Tab" you will make a recording in incognito or not based on the Active Tab state, not any external preferences!
+      Test.current.incognito = Tab.active.chromeTab.incognito;
+
+      let reuse = await Tab.active.reuse({
+        incognito: Test.current.incognito,
+      });
+      if (Tab?.active?.chromeTab?.url?.startsWith('chrome:')) {
+        await workspace.alertModal(
+          "We don't currently allow recording in a chrome:// url. If you want this feature please upvote the issue.\n\nPlease specify a non chrome:// URL in the tab to record."
+        );
+        return;
+      }
+      if (!reuse) {
+        throw new Errors.ReuseTestWindow();
+      }
+
+      if (await player.attachDebugger({ tab: Tab.active })) {
+        await Tab.active.resizeViewport();
+      }
+
+      await prepareToRecord();
+      button.addClass('active');
+      setToolbarState();
+
+      // update the UI: insert the first text card in the ui
+      await recordUserAction({
+        type: 'goto',
+        url: 'active tab',
+      });
+
+      // FOCUS ISSUE. when we create a window (because we need to record incognito for example),
+      // and then navigate the active tab, the focus/active tabs styles aren't automatically placed
+      // on the document.activeElement. i don't know why this is the case.
+      // so the initial screen is recorded without "focus".
+      //
+      // to work around this i do this preamble on record (when first action is goto) and play when first action is goto.
+      await player.mousemove({ x: 0, y: 0 });
+      await player.mousemove({ x: -1, y: -1 });
     }
 
     if (!PlayTree.complete) {
@@ -2216,10 +2249,8 @@ async function loadTest(testNumber) {
       zipNodes[currentTestNumber - 1]
     );
 
-    var actionGutterElement = $('#actionGutter');
-    for (let i = 0; i < Test.current.steps.length; ++i) {
-      actionGutterElement.append(`<button index=${i}>${i + 1}</button>`);
-    }
+    actionGutter.draw(Test.current.steps);
+    actionGutter.setCurrent(currentStepIndex());
 
     if (currentTestNumber === 1) {
       Test.current.startingServer =
@@ -2303,6 +2334,9 @@ async function setStepContent(step) {
 
   $('#step').html(step.toHtml({ isRecording: isRecording() })); // two cards in a step
   setToolbarState();
+
+  // update the thumb gutter
+  actionGutter.setCurrent(step.curr.index);
 
   if (isPlaying()) {
     let end, current;
@@ -2655,6 +2689,7 @@ async function onMessageHandler(message, _port) {
       break;
     // the user is actively waiting for the screen to change
     case 'pollscreen':
+      // this is expecting to be called with at least 2 actions already in the test
       await captureScreenshotAsDataUrlForRecording(); // grab latest image
 
       // only one time ever
