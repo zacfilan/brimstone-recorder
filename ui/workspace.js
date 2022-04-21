@@ -1549,7 +1549,19 @@ async function debuggerOnDetach(debuggee, reason) {
     //await sleep(500); // why do I wait here you ask. It's to give the banner a chance to disappear, so that the resize below works.
 
     // This is to shrink it back
-    await Tab.active.resizeViewport();
+    // if the window is still open then we should resize it
+    let windowOpen = false;
+    try {
+      await chrome.windows.get(Tab.active.chromeTab.windowId);
+      let windowOpen = true;
+    } catch {}
+
+    if (windowOpen) {
+      // I know I could put this directly in the try block, but I want
+      // to dofferentiate between a the window not open at all and
+      // the resize failing for another reason.
+      await Tab.active.resizeViewport();
+    }
   }
 }
 

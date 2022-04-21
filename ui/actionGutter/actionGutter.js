@@ -79,7 +79,14 @@ export class ActionGutter {
 
   setCurrent(index) {
     this.actionGutter.find('button').removeClass('current');
-    this.actionGutter.find(`button[index=${index}]`).addClass('current');
+    let current = this.actionGutter.find(`button[index=${index}]`);
+    if (current.length) {
+      current.addClass('current');
+      this.actionGutter[0].scrollTo(
+        current[0].offsetLeft,
+        current[0].offsetTop
+      );
+    }
   }
 
   setFail(index) {
