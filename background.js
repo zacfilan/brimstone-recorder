@@ -1,3 +1,5 @@
+import { Options, loadOptions, saveOptions } from './options.js';
+
 /**
  * Get the Brimstone workspace windowId and tabId, if it is open.
  * @returns {Promise<{windowId:number, tabId:number}>}
@@ -148,19 +150,30 @@ chrome.action.onClicked.addListener(actionOnClickedHandler);
 
 // https://developer.chrome.com/docs/extensions/reference/runtime/#event-onInstalled
 chrome.runtime.onInstalled.addListener(async function (details) {
+  let version;
   switch (details.reason) {
     case 'install':
     case 'update':
+      version = chrome.runtime.getManifest().version;
       await Promise.all([
         chrome.action.setIcon({ path: 'images/grey_b_32.png' }),
         chrome.action.setTitle({
-          title: `Brimstone updated to ${
-            chrome.runtime.getManifest().version
-          }.`,
+          title: `Brimstone updated to ${version}.`,
         }),
         chrome.action.setBadgeText({ text: '✓' }),
         chrome.action.setBadgeBackgroundColor({ color: 'green' }),
       ]);
+
+      // on some rare updates we change the default for an option and push it into the users options.
+      // users are lazy and may miss changes that improve their use experience.
+      if (version === '1.23.1') {
+        let def = new Options();
+        let options = await loadOptions(); // users options
+        options.mouseWheelTimeout = def.mouseWheelTimeout;
+        options.autoPlay = def.autoPlay;
+        await saveOptions(options);
+      }
+
       break;
     case 'chrome_update':
     case 'shared_module_update':

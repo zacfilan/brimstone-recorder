@@ -165,7 +165,7 @@ export class Options {
    * Automatically resume playing after applying a
    * correction.
    */
-  autoPlay = false;
+  autoPlay = true;
 
   /**
    * Should we forget the corrections we learned when the
