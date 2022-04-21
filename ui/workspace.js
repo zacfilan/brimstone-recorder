@@ -303,7 +303,8 @@ class Workspace {
     );
     await action.applyCorrections(view, e);
     await updateStepInView(Test.current.steps[action.index - 1]);
-    if (enableAutoPlayCheckbox.checked) {
+    // autoplay if the user wants to and they took care of all the pixels.
+    if (enableAutoPlayCheckbox.checked && action.numDiffPixels === 0) {
       this.callMethod(this.playSomething);
     } else {
       addVolatileRegions();
