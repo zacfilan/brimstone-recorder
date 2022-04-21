@@ -1908,6 +1908,10 @@ async function stopRecording() {
 
   let newIndex;
   if (testToInsertRecordingInto) {
+    // always remove the first step in the insert - that is there just because it made the record path easier.
+    Test.current.steps.splice(0, 1);
+    // what about the last step, the one that has no action? Safeest to leave it and let the user delet it manually.
+
     newIndex = Test.current.steps.length - 1 + insertIndex;
     testToInsertRecordingInto.insertActions(insertIndex, Test.current.steps);
     Test.current = testToInsertRecordingInto;
