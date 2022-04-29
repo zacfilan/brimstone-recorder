@@ -568,138 +568,138 @@ button {
 #content {
   display: flex;
   flex-direction: row;
+}
 
-  /***********************/
-  /* First card in step */
-  /***********************/
-  .card.action {
-    /** only the first card should see the action */
-    .action {
-      position: absolute;
-      text-align: center;
-      font-size: 18px;
-      background: var(--action-color);
-      margin: 3px;
+/***********************/
+/* First card in step */
+/***********************/
+.card.action {
+  /** only the first card should see the action */
+  .action {
+    position: absolute;
+    text-align: center;
+    font-size: 18px;
+    background: var(--action-color);
+    margin: 3px;
+    border: 1px solid black;
+    border-radius: 6px;
+    padding: 5px;
+    .modifier {
+      background: lightgray;
+      border-radius: 5px;
+      color: black;
       border: 1px solid black;
-      border-radius: 6px;
-      padding: 5px;
-      .modifier {
-        background: lightgray;
-        border-radius: 5px;
-        color: black;
-        border: 1px solid black;
-        font-size: 14px;
-        padding: 0px 3px;
-        font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      padding: 0px 3px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    max-width: 200px;
+    max-height: 200px;
+    overflow: auto;
+    z-index: 1;
+  }
+
+  .screenshot {
+    &:hover {
+      .pulse {
+        animation: opacity2 3s infinite;
       }
-      max-width: 200px;
-      max-height: 200px;
-      overflow: auto;
-      z-index: 1;
+      .pulse-light {
+        animation: opacity3 3s infinite;
+      }
     }
 
-    .screenshot {
-      &:hover {
-        .pulse {
-          animation: opacity2 3s infinite;
-        }
-        .pulse-light {
-          animation: opacity3 3s infinite;
-        }
-      }
+    .overlay.action:hover {
+      animation: unset;
+    }
 
-      .overlay.action:hover {
-        animation: unset;
-      }
+    .overlay.pointer:hover {
+      animation: unset;
+    }
+  }
+}
 
-      .overlay.pointer:hover {
-        animation: unset;
+/***********************/
+/* second card in step */
+/***********************/
+.card.waiting {
+  //in the edit state
+  &.edit {
+    .screenshot.hasRedPixels {
+      cursor: crosshair;
+      &.relative-position {
+        position: relative; // but when displaying possible corrections for example I need this.
+      }
+    }
+
+    /** hide that one */
+    &.fail .meter {
+      visibility: hidden;
+    }
+
+    svg#cycle {
+      transform: rotate(-135deg);
+    }
+  }
+
+  &.actual {
+    svg#cycle {
+      transform: rotate(135deg);
+    }
+  }
+
+  .screenshot {
+    .overlay {
+      display: none;
+
+      &.countdown {
+        display: block;
+        font-size: 20vw;
+        text-align: center;
+        background: red;
       }
     }
   }
 
-  /***********************/
-  /* second card in step */
-  /***********************/
-  .card.waiting {
-    //in the edit state
-    &.edit {
-      .screenshot.hasRedPixels {
-        cursor: crosshair;
-        &.relative-position {
-          position: relative; // but when displaying possible corrections for example I need this.
-        }
-      }
+  &.play .meter,
+  &.fail .meter {
+    visibility: visible;
+  }
 
-      /** hide that one */
-      &.fail .meter {
-        visibility: hidden;
-      }
+  /** show the failed progress bar as red for failed states */
+  &.expected.fail .progress,
+  &.actual.fail .progress {
+    background-color: red;
+    animation: unset;
+    animation-fill-mode: unset;
+  }
 
-      svg#cycle {
-        transform: rotate(-135deg);
-      }
+  /** the text that says "has unpredicable pixels" */
+  #unpredictable-pixels {
+    color: orange;
+  }
+  #error-pixels {
+    color: red;
+  }
+
+  .progress {
+    background-color: #e4c465;
+    animation: progressBar var(--screenshot-timeout) ease-in-out;
+    animation-fill-mode: both;
+  }
+
+  .actions {
+    .hide {
+      display: none;
     }
-
-    &.actual {
-      svg#cycle {
-        transform: rotate(135deg);
-      }
-    }
-
-    .screenshot {
-      .overlay {
-        display: none;
-
-        &.countdown {
-          display: block;
-          font-size: 20vw;
-          text-align: center;
-          background: red;
-        }
+    button {
+      border: 1px solid transparent;
+      &[autoplay='true']:not([disabled]) {
+        border: 1px solid green;
       }
     }
-
-    &.play .meter,
-    &.fail .meter {
-      visibility: visible;
-    }
-
-    /** show the failed progress bar as red for failed states */
-    &.expected.fail .progress,
-    &.actual.fail .progress {
-      background-color: red;
-      animation: unset;
-      animation-fill-mode: unset;
-    }
-
-    /** the text that says "has unpredicable pixels" */
-    #unpredictable-pixels {
-      color: orange;
-    }
-    #error-pixels {
-      color: red;
-    }
-
-    .progress {
-      background-color: #e4c465;
-      animation: progressBar var(--screenshot-timeout) ease-in-out;
-      animation-fill-mode: both;
-    }
-
-    .actions {
-      .hide {
-        display: none;
-      }
-      button {
-        border: 1px solid transparent;
-        &[autoplay='true']:not([disabled]) {
-          border: 1px solid green;
-        }
-      }
-      display: flex;
-      flex-direction: row;
-    }
+    display: flex;
+    flex-direction: row;
   }
 }
 
@@ -827,5 +827,42 @@ progress {
   &::-webkit-progress-value {
     background-color: green;
     border-radius: 1em;
+  }
+}
+
+// the report that is generated to communicate a failing step
+#actionReport {
+  font-family: Arial, Helvetica, sans-serif;
+  .actions,
+  button,
+  .footer {
+    display: none;
+  }
+  pointer-events: none;
+  // we should still be able to hover the screenshot on the action to make the action pulse
+  .card.action .screenshot {
+    pointer-events: all;
+  }
+  #title {
+    padding: 1em;
+    font-size: 18px;
+    text-align: center;
+    font-weight: bold;
+    background: $card-background;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .cardContainer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .card {
+    margin: none;
   }
 }

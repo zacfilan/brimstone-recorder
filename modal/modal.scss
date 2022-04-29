@@ -1,50 +1,55 @@
 //// for any modal
 .modal {
-  input {
-    width: 100%;
-  }
-  color: black;
-  height: 80%;
-  .content-wrapper {
-    height: 100%;
-    overflow: auto;
-  }
-
-  display: flex;
-  font-size: 14px;
-  #title {
-    font-size: 15px;
-    margin-bottom: 12px;
-  }
-  #message {
-    margin-bottom: 0.6em;
-  }
-  #buttons {
-    display: flex;
-    justify-content: end;
-    margin-top: 2em;
-  }
-  a.button {
-    margin-left: 1em;
-    background-color: #1a73e8;
-    border: 1px solid white;
-    outline: 2px solid #1a73e8;
-    border-radius: 5px;
-    color: white;
-    padding: 10px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 14px;
-    //margin: 4px 2px;
-    cursor: pointer;
-    &:hover {
-      opacity: 0.5;
+  &#promptModal,
+  &#confirmModal,
+  &#promptModal,
+  &#alertModal {
+    input {
+      width: 100%;
     }
-  }
-  a.button.cancel {
-    background-color: white;
-    color: #1a73e8;
+    color: black;
+    height: 80%;
+    .content-wrapper {
+      height: 100%;
+      overflow: auto;
+    }
+
+    display: flex;
+    font-size: 14px;
+    #title {
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+    #message {
+      margin-bottom: 0.6em;
+    }
+    #buttons {
+      display: flex;
+      justify-content: end;
+      margin-top: 2em;
+    }
+    a.button {
+      margin-left: 1em;
+      background-color: #1a73e8;
+      border: 1px solid white;
+      outline: 2px solid #1a73e8;
+      border-radius: 5px;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+      //margin: 4px 2px;
+      cursor: pointer;
+      &:hover {
+        opacity: 0.5;
+      }
+    }
+    a.button.cancel {
+      background-color: white;
+      color: #1a73e8;
+    }
   }
 }
 .blocker {

@@ -4,7 +4,13 @@ import { Player } from '../player.js';
 import { Tab } from '../tab.js';
 import * as iconState from '../iconState.js';
 import { Correction, Rectangle } from '../rectangle.js';
-import { sleep, downloadObjectAsJson } from '../utilities.js';
+import {
+  sleep,
+  downloadObjectAsJson,
+  downloadHtmlContent,
+  clone,
+  brimstone,
+} from '../utilities.js';
 import { disableConsole, enableConsole } from './console.js';
 import {
   Test,
@@ -18,7 +24,6 @@ import { Screenshot } from './screenshot.js';
 import { loadOptions, options, saveOptions } from '../options.js';
 import * as Errors from '../error.js';
 import { MenuController } from './menu_controller.js';
-import { clone, brimstone } from '../utilities.js';
 import * as BDS from './brimstoneDataService.js';
 import { infobar } from './infobar/infobar.js';
 import { ActionGutter } from './actionGutter/actionGutter.js';
@@ -139,7 +144,7 @@ class Workspace {
 
   /**
    * Pass in another method of this class.
-   * Track it as being called from a user gensture.
+   * Track it as being called from a user gesture.
    * @param {function} method
    * @returns
    */
@@ -247,6 +252,50 @@ class Workspace {
 
   async downloadLastRunMetrics() {
     downloadObjectAsJson(lastRunMetrics, 'last_run_metrics');
+  }
+
+  async downloadLastRunReport() {
+    // basically I just want to copy out the html of the step and stick it in a new container
+    //let stepHtml = $('#step')[0].outerHTML;
+    let response = await fetch(chrome.runtime.getURL(`ui/workspace.css`));
+    let css = await response.text();
+    let index = currentStepIndex();
+
+    let actionView = Test.current.steps[index].toHtml({
+      view: constants.view.ACTION,
+    });
+
+    let expectedView = Test.current.steps[index + 1].toHtml({
+      view: constants.view.EXPECTED,
+    });
+    let actualView = Test.current.steps[index + 1].toHtml({
+      view: constants.view.ACTUAL,
+    });
+    let editView = Test.current.steps[index + 1].toHtml({
+      view: constants.view.EDIT,
+    });
+
+    let run = lastRunMetrics[lastRunMetrics.length - 1];
+    let html = `
+    <html>
+      <head>
+      <style>
+        ${css}
+      </style>
+      </head>
+      <body id="actionReport">
+        <div id="title">Brimstone Run Report: Test '${Test.current._playTree.path()}'</div>
+        <div class="cards">
+          ${actionView}
+          <div class="cardContainer">
+            ${expectedView}
+            ${actualView}
+          </div>
+          ${editView}
+        </div>
+      </body>
+    </html>`;
+    downloadHtmlContent(html, 'last_run_report');
   }
 
   /**
@@ -1326,10 +1375,10 @@ var lastRunMetrics;
 async function _playSomething() {
   let options = await loadOptions();
   try {
-    let nextTest;
+    let nextTest = true;
     let startingTab = await getActiveApplicationTab();
 
-    do {
+    for (let testPlayed = 0; nextTest; ++testPlayed) {
       nextTest = false;
       $('#playButton').addClass('active');
       setToolbarState();
@@ -1404,7 +1453,12 @@ async function _playSomething() {
       await hideCursor();
       actionGutter.clearFail();
       /************** PLAYING ****/
-      let indexOfNext = await player.play(Test.current, playFrom, resume); // players gotta play...
+      let indexOfNext = await player.play(
+        Test.current,
+        playFrom,
+        resume,
+        testPlayed === 0
+      ); // players gotta play...
       /***************************/
 
       let nextAction = Test.current.steps[indexOfNext];
@@ -1458,7 +1512,7 @@ async function _playSomething() {
           infobar.setText(`💀 unnown status reported '${playMatchStatus}'`);
           break;
       }
-    } while (nextTest);
+    }
     workspace.callMethod(workspace.stopPlaying);
     lastRunMetrics = PlayTree.complete.buildReports();
     setToolbarState(); // enable the metrics menu
@@ -2241,7 +2295,7 @@ $('#clearButton').on('click', workspace.clearWorkspace.bind(workspace));
 $('#recordActiveTab').on('click', workspace.recordActiveTab.bind(workspace));
 
 /**
- * Load the test sepcified into the workspace
+ * Load the test specified into the workspace
  * @param {number} testNumber The 1-based index of the test to load. This -1 is the index into zipNodes
  * @returns
  */

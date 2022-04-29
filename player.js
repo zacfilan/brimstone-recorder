@@ -191,8 +191,9 @@ export class Player {
    * @param {Test} test the test to play
    * @param {number} startIndex the index we start playing from
    * @param {boolean} resume if true we do not drive this step, just check it
+   * @param {boolean} firstTest if true this is the first test in the play loop
    * */
-  async play(test, startIndex = 0, resume = false) {
+  async play(test, startIndex = 0, resume = false, firstTest = false) {
     this._stopPlaying = false;
 
     await loadOptions();
@@ -239,7 +240,12 @@ export class Player {
         await this.onBeforePlay(action); // this shows the correct step (and will start the waiting animation)
       }
 
-      if (!action.breakPoint) {
+      // if the action has a breakpoint, we want to bail immediately, unless
+      // this is the very first action of the firstTest in the loop.
+      if (action.breakPoint && !(i === startIndex && firstTest)) {
+        // the action has a breakpoint we do nothing and leave immediately
+        next._match = constants.match.BREAKPOINT;
+      } else {
         // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
         // performed this action, we just need to put the mouse in the correct spot and
         // do the screen verification again
@@ -247,6 +253,7 @@ export class Player {
           // not needed? it is already in the right spot?
           //await this.mousemove(this.mouseLocation);
         } else {
+          // drive the action
           action.tab.chromeTab = this.tab.chromeTab; // just for debugging
           if (action != 'keys' && options.userMouseDelay) {
             console.log(
@@ -289,8 +296,6 @@ export class Player {
         // clear out old data
         next.latency = 0;
         next.memoryUsed = 0;
-      } else {
-        next._match = constants.match.BREAKPOINT;
       }
       action._view = constants.view.EXPECTED;
       let bailEarly = false;
@@ -1027,6 +1032,10 @@ export class Player {
    */
   async getClientMemoryByChromeApi() {
     var getMemory = function () {
+      try {
+        // console.clear(); // lots of memory leaks come from console messages
+        window.gc(); // if chrome is started with --js-flags=--expose_gc we can force a GC
+      } catch (e) {}
       let m = window.performance.memory;
       console.log(`used ${m.usedJSHeapSize} bytes`);
       return {

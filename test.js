@@ -23,6 +23,10 @@ const pencilSvg =
   '<svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="pencil-alt" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="svg-inline--fa fa-pencil-alt fa-w-16 fa-9x"> <path fill="currentColor" d="M491.609 73.625l-53.861-53.839c-26.378-26.379-69.075-26.383-95.46-.001L24.91 335.089.329 484.085c-2.675 16.215 11.368 30.261 27.587 27.587l148.995-24.582 315.326-317.378c26.33-26.331 26.581-68.879-.628-96.087zM200.443 311.557C204.739 315.853 210.37 318 216 318s11.261-2.147 15.557-6.443l119.029-119.03 28.569 28.569L210 391.355V350h-48v-48h-41.356l170.259-169.155 28.569 28.569-119.03 119.029c-8.589 8.592-8.589 22.522.001 31.114zM82.132 458.132l-28.263-28.263 12.14-73.587L84.409 338H126v48h48v41.59l-18.282 18.401-73.586 12.141zm378.985-319.533l-.051.051-.051.051-48.03 48.344-88.03-88.03 48.344-48.03.05-.05.05-.05c9.147-9.146 23.978-9.259 33.236-.001l53.854 53.854c9.878 9.877 9.939 24.549.628 33.861z" class=""></path></svg>';
 const leftArrow =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Pro 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. --><path d="M224 480c-8.188 0-16.38-3.125-22.62-9.375l-192-192c-12.5-12.5-12.5-32.75 0-45.25l192-192c12.5-12.5 32.75-12.5 45.25 0s12.5 32.75 0 45.25L77.25 256l169.4 169.4c12.5 12.5 12.5 32.75 0 45.25C240.4 476.9 232.2 480 224 480z"/></svg>';
+
+const noImageAvailableDataUrl =
+  'data:image/png;base64,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';
+
 /**
  * A ziptest instance is a recording of user actions that can be played back
  * and verified.
@@ -889,26 +893,37 @@ const PNG = png.PNG;
 export const constants = {
   /** properties of the instance. it can have more than one set, these are converted to classes.*/
   view: {
-    /** it doesn't match. (here is what we expected) */
+    /** 2nd card - result doesn't match. (here is what we expected) */
     EXPECTED: 'expected',
 
+    /** 2nd card during recording - screenshot is constantly being refreshed */
     DYNAMIC: 'dynamic',
 
-    /** it doesn't match. (here is what we got) */
+    /** 2nd card - it doesn't match. (here is what we got) */
     ACTUAL: 'actual',
 
-    /** it doesn't match. (let's make it okay to have some differences between expected and actual) */
+    /** 2nd card - it doesn't match. (let's make it okay to have some differences between expected and actual) */
     EDIT: 'edit',
+
+    /** 1st card - just show the action */
+    ACTION: 'action',
   },
 
   /** the status of a testrun/step */
   match: {
+    /** the last time this action ws played it passed */
     PASS: 'pass',
+    /** this action is currently being played */
     PLAY: 'play',
+    /** the last time this action was played it passed with allowed pixel differences */
     ALLOW: 'allow',
+    /** the last time this action was played it mismatched screenshots */
     FAIL: 'fail',
+    /** the last time this action was played it was canceled by the user before */
     CANCEL: 'cancel',
+    /** this action has not been played yet */
     NOTRUN: 'notrun',
+    /** play stopped just prior to this action actully playing because of a breakpoint */
     BREAKPOINT: 'breakpoint',
   },
 };
@@ -1025,8 +1040,8 @@ export class TestAction {
   numMaskedPixels = 0;
 
   /**
-   * the result of the last time we tried to match expected against actual with the mask
-   * one of 'fail', 'allow', 'pass', 'play', 'cancel', undefined. the last meaning we don't have that info.
+   * The result of the last time we tried to match expected against actual with the mask.
+   * One of 'fail', 'allow', 'pass', 'play', 'cancel', or undefined. Undefined means we don't have this info.
    */
   _match;
 
@@ -1303,10 +1318,176 @@ export class TestAction {
     return `${this?._view || ''} ${this?._match || ''}`;
   }
 
-  /** Return a card, this could be the first or second card in the step */
-  toHtml({ title, src, className, stats, screenshot = { class: '' } }) {
-    src =
-      src || (this?.expectedScreenshot?.dataUrl ?? '../images/notfound.png');
+  toHtml({ view = null, isRecording = false } = {}) {
+    if (!view) {
+      // allow override of the view by the parameter, but give it a default
+      view = this._view; // default
+    }
+
+    switch (view) {
+      case constants.view.ACTION: {
+        let title = {
+          text: `
+                    <input class="stopPropagation" id="editActionName" value="${
+                      this.name || 'User action'
+                    }"></input>`,
+          tooltip: 'Edit the user name of this action.',
+          actions: '',
+        };
+        if (isRecording) {
+          title.text = 'Last recorded user action';
+        } else if (this.index === this.test.steps.length - 1) {
+          title.text += 'Final screenshot';
+        }
+        title.actions = `
+                <div class="actions">
+                  <button title="Delete this action" data-action="deleteAction">
+                    <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="trash"
+                      class="svg-inline--fa fa-trash fa-w-14" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
+                      <path fill="currentColor"
+                        d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z">
+                      </path>
+                    </svg>
+                  </button>
+                </div>`;
+
+        return this._toHtml({
+          view: view,
+          title: title,
+          src: null,
+          className: constants.view.ACTION,
+          stats: false,
+        });
+      }
+      case constants.view.EXPECTED:
+      case constants.view.ACTUAL:
+      case constants.view.EDIT:
+      case constants.view.DYNAMIC:
+      default: {
+        let src;
+        let title = {
+          text: '',
+          tooltip: 'Click to cycle through\nexpected and actual views.',
+          actions: `<button id="editDifferencesButton" title="Edit differences">${pencilSvg}</button>`,
+        };
+
+        if (this._match === constants.match.PLAY) {
+          title.text += `Wait ${this._lastTimeout} second${
+            this._lastTimeout > 1 ? 's' : ''
+          } for actual screen to match this.`;
+        } else {
+          switch (view) {
+            case constants.view.EXPECTED:
+              title.text += `<button>${arrowsSvg}</button> <b>Expected</b> result under <input title="Change the timeout\n for just this action" class="stopPropagation" type="number" min="1" max="120" value="${
+                this.maxVerifyTimeout || options.MAX_VERIFY_TIMEOUT
+              }" id="actionMatchTimeout"></input> seconds`;
+              if (this.index === this.test.steps.length - 1) {
+                title.text += ' - final screenshot';
+              }
+              title.text += '.';
+              break;
+            case constants.view.DYNAMIC:
+              title.text += 'Expecting result';
+              break;
+            case constants.view.ACTUAL:
+              title.text += `<button>${arrowsSvg}</button> <b>Actual</b>result.`;
+              src = this.actualScreenshot?.dataUrl ?? '../images/notfound.png';
+              break;
+            case constants.view.EDIT:
+              title.text += `<button title="Back to expected view">${leftArrow}</button><b>Difference</b>${this.numDiffPixels} pixels (${this.percentDiffPixels}%).`;
+              let titleSuffix = enableAutoPlayCheckbox.checked
+                ? ' Autoplay.'
+                : '';
+
+              // at this point there can be NO untyped rectangles. But there *might* be red pixels or not.
+              let noRedPixels = !this.numDiffPixels;
+              let wandDisabled =
+                noRedPixels || !Correction.availableInstances.length;
+              let questionMarkDisabled = true; // there is no untyped rectangle
+              let ironDisabled = true; // there is no untyped rectangle
+              let checkDisabled = noRedPixels; // disabled if there are no red pixels
+              let autoplay = options.autoPlay
+                ? 'autoplay="true"'
+                : "autoplay='false'";
+
+              title.actions = `
+                        <div class="stopPropagation" title="Enabled when there are red pixels,\navailable corrections, and you have\nnot drawn a selecting rectangle.">
+                        <button class="${options.autoCorrect ? 'hide' : ''}"${
+                wandDisabled ? 'disabled' : ''
+              } title="Possible corrections.${titleSuffix}" id="possibleCorrections" ${autoplay}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M3.682 149.1L53.32 170.7L74.02 220.3c1.016 2.043 3.698 3.696 5.977 3.696c.0078 0-.0078 0 0 0c2.271-.0156 4.934-1.661 5.946-3.696l20.72-49.63l49.62-20.71c2.023-1.008 3.68-3.681 3.691-5.947C159.1 141.7 158.3 139 156.3 138L106.9 117.4L106.5 117L85.94 67.7C84.93 65.66 82.27 64.02 80 64c-.0078 0 .0078 0 0 0c-2.279 0-4.966 1.649-5.981 3.692L53.32 117.3L3.682 138C1.652 139.1 0 141.7 0 144C0 146.3 1.652 148.9 3.682 149.1zM511.1 368c-.0039-2.273-1.658-4.95-3.687-5.966l-49.57-20.67l-20.77-49.67C436.9 289.7 434.3 288 432 288c-2.281 0-4.948 1.652-5.964 3.695l-20.7 49.63l-49.64 20.71c-2.027 1.016-3.684 3.683-3.687 5.956c.0039 2.262 1.662 4.954 3.687 5.966l49.57 20.67l20.77 49.67C427.1 446.3 429.7 448 432 448c2.277 0 4.944-1.656 5.96-3.699l20.69-49.63l49.65-20.71C510.3 372.9 511.1 370.3 511.1 368zM207.1 64l12.42 29.78C221 95.01 222.6 96 223.1 96s2.965-.9922 3.575-2.219L239.1 64l29.78-12.42c1.219-.6094 2.215-2.219 2.215-3.578c0-1.367-.996-2.969-2.215-3.578L239.1 32L227.6 2.219C226.1 .9922 225.4 0 223.1 0S221 .9922 220.4 2.219L207.1 32L178.2 44.42C176.1 45.03 176 46.63 176 48c0 1.359 .9928 2.969 2.21 3.578L207.1 64zM399.1 191.1c8.875 0 15.1-7.127 15.1-16v-28l91.87-101.7c5.75-6.371 5.5-15.1-.4999-22.12L487.8 4.774c-6.125-6.125-15.75-6.375-22.12-.625L186.6 255.1H144c-8.875 0-15.1 7.125-15.1 15.1v36.88l-117.5 106c-13.5 12.25-14.14 33.34-1.145 46.34l41.4 41.41c12.1 12.1 34.13 12.36 46.37-1.133l279.2-309.5H399.1z"/></svg>
+                        </button>
+                        </div>
+
+                        <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
+                            <button ${
+                              questionMarkDisabled ? 'disabled' : ''
+                            } title="Mark ALL pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsUnpredictable" ${autoplay}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
+                            </button>
+                        </div>
+
+                        <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
+                        <button ${
+                          ironDisabled ? 'disabled' : ''
+                        } title="Mark ONLY red pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsAntiAlias" ${autoplay}>
+                            <svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+                                viewBox="0 0 489.962 489.962" style="enable-background:new 0 0 489.962 489.962;" xml:space="preserve">
+                                    <path d="M486.8,248.733c-15.9-14.8-22.6-38.9-16.3-59.9c0.8-2.3,23.9-54.7-17.5-71.5c-31.7-7.8-52.5,5.4-57.9,10.9l-2-4.2
+                                            l-36.6,21.8l-3.5-9.4c0,0-280.4,1.9-335.6,201.8h365.1l29.2-45.5l-44.4-118.8l40.4-23.3l-2.3-4.8c1.2-0.8,13.4-15.2,41.2-10.1
+                                            c20,5.6,6.2,44.7,5.4,47.8c-8.2,28,0.4,59.9,21.8,79.7c1.9,1.9,7.8,5.1,13.6-0.4C491.1,258.433,490.7,252.533,486.8,248.733z
+                                            M186.6,263.433c21-76.2,127.9-77,127.9-77l28.8,77H186.6z"/>
+                                        <rect y="357.533" width="382.6" height="17.5"/>
+                            
+                            </svg>
+                        </button>
+                        </div>
+
+                        <div class='stopPropagation' title="Enabled when red pixels exist.">
+                            <button ${
+                              checkDisabled ? 'disabled' : ''
+                            } title="Mark all pixels in rectangle(s) as correct.${titleSuffix}" id="correctAsActual" ${autoplay}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M438.6 105.4C451.1 117.9 451.1 138.1 438.6 150.6L182.6 406.6C170.1 419.1 149.9 419.1 137.4 406.6L9.372 278.6C-3.124 266.1-3.124 245.9 9.372 233.4C21.87 220.9 42.13 220.9 54.63 233.4L159.1 338.7L393.4 105.4C405.9 92.88 426.1 92.88 438.6 105.4H438.6z"/></svg>
+                            </button>
+                        </div>
+
+                        <button title="Clear Unpredictable Pixels" id="undo">
+                            <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"
+                                class="svg-inline--fa fa-undo fa-w-16" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                <path fill="currentColor"
+                                d="M212.333 224.333H12c-6.627 0-12-5.373-12-12V12C0 5.373 5.373 0 12 0h48c6.627 0 12 5.373 12 12v78.112C117.773 39.279 184.26 7.47 258.175 8.007c136.906.994 246.448 111.623 246.157 248.532C504.041 393.258 393.12 504 256.333 504c-64.089 0-122.496-24.313-166.51-64.215-5.099-4.622-5.334-12.554-.467-17.42l33.967-33.967c4.474-4.474 11.662-4.717 16.401-.525C170.76 415.336 211.58 432 256.333 432c97.268 0 176-78.716 176-176 0-97.267-78.716-176-176-176-58.496 0-110.28 28.476-142.274 72.333h98.274c6.627 0 12 5.373 12 12v48c0 6.627-5.373 12-12 12z">
+                                </path>
+                            </svg>
+                        </button>
+  `;
+              src = this.pixelDiffScreenshot.dataUrl;
+              break;
+          }
+        }
+
+        if (this._match === constants.match.ALLOW) {
+          title.text += ` <span id='unpredictable-pixels'>&nbspHas unpredictable pixels.</span>`;
+        }
+
+        let screenshot = this.numDiffPixels && { class: 'hasRedPixels' };
+
+        return this._toHtml({
+          view: view,
+          title: title,
+          src: src,
+          className: 'waiting', // this is just a dumb name to id the 2nd card
+          stats: true,
+          screenshot: screenshot,
+        });
+      }
+    }
+  }
+
+  /**
+   * Return a card, this could be the first or second card in the step
+   * */
+  _toHtml({ view, title, src, className, stats, screenshot = { class: '' } }) {
+    src = src || (this?.expectedScreenshot?.dataUrl ?? noImageAvailableDataUrl);
     //let clickable = this._view === constants.view.EDIT ? '' : ' click-to-change-view';
 
     let imageClasses = this.shadowDOMAction ? 'class="shadowDOM"' : '';
@@ -1388,17 +1569,17 @@ export class TestAction {
     let width = '?';
     let height = '?';
     let ss;
-    switch (this._view) {
-      case 'dynamic':
-      case 'expected':
+    switch (view) {
+      case constants.view.DYNAMIC:
+      case constants.view.EXPECTED:
         ss = this.expectedScreenshot;
         break;
-      case 'edit':
+      case constants.view.EDIT:
         if (this.pixelDiffScreenshot) {
           ss = this.pixelDiffScreenshot;
         }
         break;
-      case 'actual':
+      case constants.view.ACTUAL:
         ss = this.actualScreenshot;
         break;
     }
@@ -1516,164 +1697,16 @@ export class Step {
    * @returns
    */
   toHtml({ isRecording }) {
-    // set up the first card
-    let title = {
-      text: `
-            <input class="stopPropagation" id="editActionName" value="${
-              this.curr.name || 'User action'
-            }"></input>`,
-      tooltip: 'Edit the user name of this action.',
-      actions: '',
-    };
-    if (isRecording) {
-      title.text = 'Last recorded user action';
-    } else if (this.curr.index === this.test.steps.length - 1) {
-      title.text += 'Final screenshot';
-    }
-    title.actions = `
-        <div class="actions">
-          <button title="Delete this action" data-action="deleteAction">
-            <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="trash"
-              class="svg-inline--fa fa-trash fa-w-14" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
-              <path fill="currentColor"
-                d="M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z">
-              </path>
-            </svg>
-          </button>
-        </div>`;
+    // first card
+    let html =
+      '<div id="content">' +
+      this.curr.toHtml({ view: constants.view.ACTION, isRecording });
 
-    let html = `
-        <div id="content">
-            ${this.curr.toHtml({
-              title: title,
-              src: null,
-              className: 'action',
-              stats: false,
-            })}
-            `;
-    ////
-
-    /// set up 2nd card
+    /// set up 2nd card if it exists
     if (this.next) {
-      let src;
-      let title = {
-        text: '',
-        tooltip: 'Click to cycle through\nexpected and actual views.',
-        actions: `<button id="editDifferencesButton" title="Edit differences">${pencilSvg}</button>`,
-      };
-
-      if (this.next._match === constants.match.PLAY) {
-        title.text += `Wait ${this.next._lastTimeout} second${
-          this.next._lastTimeout > 1 ? 's' : ''
-        } for actual screen to match this.`;
-      } else {
-        switch (this.next._view) {
-          case constants.view.EXPECTED:
-            title.text += `<button>${arrowsSvg}</button> <b>Expected</b> result under <input title="Change the timeout\n for just this action" class="stopPropagation" type="number" min="1" max="120" value="${
-              this.next.maxVerifyTimeout || options.MAX_VERIFY_TIMEOUT
-            }" id="actionMatchTimeout"></input> seconds`;
-            if (this.next.index === this.test.steps.length - 1) {
-              title.text += ' - final screenshot';
-            }
-            title.text += '.';
-            break;
-          case constants.view.DYNAMIC:
-            title.text += 'Expecting result';
-            break;
-          case constants.view.ACTUAL:
-            title.text += `<button>${arrowsSvg}</button> <b>Actual</b>result.`;
-            src =
-              this.next?.actualScreenshot?.dataUrl ?? '../images/notfound.png';
-            break;
-          case constants.view.EDIT:
-            title.text += `<button title="Back to expected view">${leftArrow}</button><b>Difference</b>${this.next.numDiffPixels} pixels (${this.next.percentDiffPixels}%).`;
-            let titleSuffix = enableAutoPlayCheckbox.checked
-              ? ' Autoplay.'
-              : '';
-
-            // at this point there can be NO untyped rectangles. But there *might* be red pixels or not.
-            let noRedPixels = !this.next.numDiffPixels;
-            let wandDisabled =
-              noRedPixels || !Correction.availableInstances.length;
-            let questionMarkDisabled = true; // there is no untyped rectangle
-            let ironDisabled = true; // there is no untyped rectangle
-            let checkDisabled = noRedPixels; // disabled if there are no red pixels
-            let autoplay = options.autoPlay
-              ? 'autoplay="true"'
-              : "autoplay='false'";
-
-            title.actions = `
-                        <div class="stopPropagation" title="Enabled when there are red pixels,\navailable corrections, and you have\nnot drawn a selecting rectangle.">
-                         <button class="${options.autoCorrect ? 'hide' : ''}"${
-              wandDisabled ? 'disabled' : ''
-            } title="Possible corrections.${titleSuffix}" id="possibleCorrections" ${autoplay}>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M3.682 149.1L53.32 170.7L74.02 220.3c1.016 2.043 3.698 3.696 5.977 3.696c.0078 0-.0078 0 0 0c2.271-.0156 4.934-1.661 5.946-3.696l20.72-49.63l49.62-20.71c2.023-1.008 3.68-3.681 3.691-5.947C159.1 141.7 158.3 139 156.3 138L106.9 117.4L106.5 117L85.94 67.7C84.93 65.66 82.27 64.02 80 64c-.0078 0 .0078 0 0 0c-2.279 0-4.966 1.649-5.981 3.692L53.32 117.3L3.682 138C1.652 139.1 0 141.7 0 144C0 146.3 1.652 148.9 3.682 149.1zM511.1 368c-.0039-2.273-1.658-4.95-3.687-5.966l-49.57-20.67l-20.77-49.67C436.9 289.7 434.3 288 432 288c-2.281 0-4.948 1.652-5.964 3.695l-20.7 49.63l-49.64 20.71c-2.027 1.016-3.684 3.683-3.687 5.956c.0039 2.262 1.662 4.954 3.687 5.966l49.57 20.67l20.77 49.67C427.1 446.3 429.7 448 432 448c2.277 0 4.944-1.656 5.96-3.699l20.69-49.63l49.65-20.71C510.3 372.9 511.1 370.3 511.1 368zM207.1 64l12.42 29.78C221 95.01 222.6 96 223.1 96s2.965-.9922 3.575-2.219L239.1 64l29.78-12.42c1.219-.6094 2.215-2.219 2.215-3.578c0-1.367-.996-2.969-2.215-3.578L239.1 32L227.6 2.219C226.1 .9922 225.4 0 223.1 0S221 .9922 220.4 2.219L207.1 32L178.2 44.42C176.1 45.03 176 46.63 176 48c0 1.359 .9928 2.969 2.21 3.578L207.1 64zM399.1 191.1c8.875 0 15.1-7.127 15.1-16v-28l91.87-101.7c5.75-6.371 5.5-15.1-.4999-22.12L487.8 4.774c-6.125-6.125-15.75-6.375-22.12-.625L186.6 255.1H144c-8.875 0-15.1 7.125-15.1 15.1v36.88l-117.5 106c-13.5 12.25-14.14 33.34-1.145 46.34l41.4 41.41c12.1 12.1 34.13 12.36 46.37-1.133l279.2-309.5H399.1z"/></svg>
-                        </button>
-                        </div>
-
-                        <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
-                            <button ${
-                              questionMarkDisabled ? 'disabled' : ''
-                            } title="Mark ALL pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsUnpredictable" ${autoplay}>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M204.3 32.01H96c-52.94 0-96 43.06-96 96c0 17.67 14.31 31.1 32 31.1s32-14.32 32-31.1c0-17.64 14.34-32 32-32h108.3C232.8 96.01 256 119.2 256 147.8c0 19.72-10.97 37.47-30.5 47.33L127.8 252.4C117.1 258.2 112 268.7 112 280v40c0 17.67 14.31 31.99 32 31.99s32-14.32 32-31.99V298.3L256 251.3c39.47-19.75 64-59.42 64-103.5C320 83.95 268.1 32.01 204.3 32.01zM144 400c-22.09 0-40 17.91-40 40s17.91 39.1 40 39.1s40-17.9 40-39.1S166.1 400 144 400z"/></svg>                      
-                            </button>
-                        </div>
-
-                        <div class='stopPropagation' title="Enabled when red pixels exist and\nyou select some with a rectangle.">
-                        <button ${
-                          ironDisabled ? 'disabled' : ''
-                        } title="Mark ONLY red pixels in rectangle(s) as unpredictable.${titleSuffix}" id="correctAsAntiAlias" ${autoplay}>
-                            <svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-                                viewBox="0 0 489.962 489.962" style="enable-background:new 0 0 489.962 489.962;" xml:space="preserve">
-                                    <path d="M486.8,248.733c-15.9-14.8-22.6-38.9-16.3-59.9c0.8-2.3,23.9-54.7-17.5-71.5c-31.7-7.8-52.5,5.4-57.9,10.9l-2-4.2
-                                            l-36.6,21.8l-3.5-9.4c0,0-280.4,1.9-335.6,201.8h365.1l29.2-45.5l-44.4-118.8l40.4-23.3l-2.3-4.8c1.2-0.8,13.4-15.2,41.2-10.1
-                                            c20,5.6,6.2,44.7,5.4,47.8c-8.2,28,0.4,59.9,21.8,79.7c1.9,1.9,7.8,5.1,13.6-0.4C491.1,258.433,490.7,252.533,486.8,248.733z
-                                            M186.6,263.433c21-76.2,127.9-77,127.9-77l28.8,77H186.6z"/>
-                                        <rect y="357.533" width="382.6" height="17.5"/>
-                            
-                            </svg>
-                        </button>
-                        </div>
-
-                        <div class='stopPropagation' title="Enabled when red pixels exist.">
-                            <button ${
-                              checkDisabled ? 'disabled' : ''
-                            } title="Mark all pixels in rectangle(s) as correct.${titleSuffix}" id="correctAsActual" ${autoplay}>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M438.6 105.4C451.1 117.9 451.1 138.1 438.6 150.6L182.6 406.6C170.1 419.1 149.9 419.1 137.4 406.6L9.372 278.6C-3.124 266.1-3.124 245.9 9.372 233.4C21.87 220.9 42.13 220.9 54.63 233.4L159.1 338.7L393.4 105.4C405.9 92.88 426.1 92.88 438.6 105.4H438.6z"/></svg>
-                            </button>
-                        </div>
-
-                        <button title="Clear Unpredictable Pixels" id="undo">
-                            <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="undo"
-                                class="svg-inline--fa fa-undo fa-w-16" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                                <path fill="currentColor"
-                                d="M212.333 224.333H12c-6.627 0-12-5.373-12-12V12C0 5.373 5.373 0 12 0h48c6.627 0 12 5.373 12 12v78.112C117.773 39.279 184.26 7.47 258.175 8.007c136.906.994 246.448 111.623 246.157 248.532C504.041 393.258 393.12 504 256.333 504c-64.089 0-122.496-24.313-166.51-64.215-5.099-4.622-5.334-12.554-.467-17.42l33.967-33.967c4.474-4.474 11.662-4.717 16.401-.525C170.76 415.336 211.58 432 256.333 432c97.268 0 176-78.716 176-176 0-97.267-78.716-176-176-176-58.496 0-110.28 28.476-142.274 72.333h98.274c6.627 0 12 5.373 12 12v48c0 6.627-5.373 12-12 12z">
-                                </path>
-                            </svg>
-                        </button>
- `;
-            src = this.next.pixelDiffScreenshot.dataUrl;
-            break;
-        }
-      }
-
-      if (this.next._match === constants.match.ALLOW) {
-        title.text += ` <span id='unpredictable-pixels'>&nbspHas unpredictable pixels.</span>`;
-      }
-
-      let screenshot = this.next.numDiffPixels && { class: 'hasRedPixels' };
-      html += this.next.toHtml({
-        title: title,
-        src: src,
-        className: 'waiting',
-        stats: true,
-        screenshot: screenshot,
-      });
+      html += this.next.toHtml();
     }
-    html += `
-        </div>
-        `;
-
+    html += '</div>';
     return html;
   }
 }

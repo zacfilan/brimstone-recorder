@@ -15,15 +15,30 @@ export function uuidv4() {
 
 // credit where due https://stackoverflow.com/a/30800715
 export function downloadObjectAsJson(exportObj, exportName) {
-  var dataStr =
-    'data:text/json;charset=utf-8,' +
-    encodeURIComponent(JSON.stringify(exportObj, null, 2)); // zac likes readable json
-  var downloadAnchorNode = document.createElement('a');
-  downloadAnchorNode.setAttribute('href', dataStr);
-  downloadAnchorNode.setAttribute('download', exportName + '.json');
-  document.body.appendChild(downloadAnchorNode); // required for firefox
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
+  var text = JSON.stringify(exportObj, null, 2); // zac likes readable json
+  return saveTemplateAsFile(exportName + '.json', text, 'text/json');
+}
+
+export function downloadHtmlContent(text, filename) {
+  return saveTemplateAsFile(filename + '.html', text, 'text/html');
+}
+
+export function saveTemplateAsFile(filename, text, type) {
+  const blob = new Blob([text], { type: type });
+  const link = document.createElement('a');
+
+  link.download = filename;
+  link.href = window.URL.createObjectURL(blob);
+  link.dataset.downloadurl = [type, link.download, link.href].join(':');
+
+  const evt = new MouseEvent('click', {
+    view: window,
+    bubbles: true,
+    cancelable: true,
+  });
+
+  link.dispatchEvent(evt);
+  link.remove();
 }
 
 /**
@@ -181,4 +196,31 @@ export function pngDiff(
 export function getComparableVersion(displayString) {
   let i = displayString.lastIndexOf('v');
   return displayString.substring(i + 1);
+}
+
+/**
+ * Replace variables with actual values in a given template string.
+ * Supports kendo variables (#=variable#) or es6 variables (${variable}), using es6 if not specified.
+ * @param {{ template: string; variables: Array<{}>, format: string }} opts
+ */
+export function interpolate(opts = { template: '', model: undefined }) {
+  if (!opts.model) {
+    return opts.template;
+  }
+
+  return opts.template.replace(/\${([^}]*)}/g, function (matchedStr, varName) {
+    var resolver = opts.model[varName];
+
+    if (typeof resolver === 'function') {
+      resolver = resolver(); // allow a function
+    }
+
+    if (typeof resolver === 'undefined') {
+      // if the caller didn't specify anything that resolves the variable value, no interpolation
+      return matchedStr;
+    }
+
+    // otherwise use the value directly
+    return resolver;
+  });
 }

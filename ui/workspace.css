@@ -61,7 +61,7 @@
   border-radius: 50%;
 }
 
-.modal {
+.modal#promptModal, .modal#confirmModal, .modal#promptModal, .modal#alertModal {
   color: black;
   height: 80%;
   display: -webkit-box;
@@ -70,25 +70,25 @@
   font-size: 14px;
 }
 
-.modal input {
+.modal#promptModal input, .modal#confirmModal input, .modal#promptModal input, .modal#alertModal input {
   width: 100%;
 }
 
-.modal .content-wrapper {
+.modal#promptModal .content-wrapper, .modal#confirmModal .content-wrapper, .modal#promptModal .content-wrapper, .modal#alertModal .content-wrapper {
   height: 100%;
   overflow: auto;
 }
 
-.modal #title {
+.modal#promptModal #title, .modal#confirmModal #title, .modal#promptModal #title, .modal#alertModal #title {
   font-size: 15px;
   margin-bottom: 12px;
 }
 
-.modal #message {
+.modal#promptModal #message, .modal#confirmModal #message, .modal#promptModal #message, .modal#alertModal #message {
   margin-bottom: 0.6em;
 }
 
-.modal #buttons {
+.modal#promptModal #buttons, .modal#confirmModal #buttons, .modal#promptModal #buttons, .modal#alertModal #buttons {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
@@ -98,7 +98,7 @@
   margin-top: 2em;
 }
 
-.modal a.button {
+.modal#promptModal a.button, .modal#confirmModal a.button, .modal#promptModal a.button, .modal#alertModal a.button {
   margin-left: 1em;
   background-color: #1a73e8;
   border: 1px solid white;
@@ -113,11 +113,11 @@
   cursor: pointer;
 }
 
-.modal a.button:hover {
+.modal#promptModal a.button:hover, .modal#confirmModal a.button:hover, .modal#promptModal a.button:hover, .modal#alertModal a.button:hover {
   opacity: 0.5;
 }
 
-.modal a.button.cancel {
+.modal#promptModal a.button.cancel, .modal#confirmModal a.button.cancel, .modal#promptModal a.button.cancel, .modal#alertModal a.button.cancel {
   background-color: white;
   color: #1a73e8;
 }
@@ -861,19 +861,16 @@ button img {
   -webkit-box-direction: normal;
       -ms-flex-direction: row;
           flex-direction: row;
-  /***********************/
-  /* First card in step */
-  /***********************/
-  /***********************/
-  /* second card in step */
-  /***********************/
 }
 
-#content .card.action {
+/***********************/
+/* First card in step */
+/***********************/
+.card.action {
   /** only the first card should see the action */
 }
 
-#content .card.action .action {
+.card.action .action {
   position: absolute;
   text-align: center;
   font-size: 18px;
@@ -888,7 +885,7 @@ button img {
   z-index: 1;
 }
 
-#content .card.action .action .modifier {
+.card.action .action .modifier {
   background: lightgray;
   border-radius: 5px;
   color: black;
@@ -898,75 +895,78 @@ button img {
   font-family: 'Courier New', Courier, monospace;
 }
 
-#content .card.action .screenshot:hover .pulse {
+.card.action .screenshot:hover .pulse {
   -webkit-animation: opacity2 3s infinite;
           animation: opacity2 3s infinite;
 }
 
-#content .card.action .screenshot:hover .pulse-light {
+.card.action .screenshot:hover .pulse-light {
   -webkit-animation: opacity3 3s infinite;
           animation: opacity3 3s infinite;
 }
 
-#content .card.action .screenshot .overlay.action:hover {
+.card.action .screenshot .overlay.action:hover {
   -webkit-animation: unset;
           animation: unset;
 }
 
-#content .card.action .screenshot .overlay.pointer:hover {
+.card.action .screenshot .overlay.pointer:hover {
   -webkit-animation: unset;
           animation: unset;
 }
 
-#content .card.waiting {
+/***********************/
+/* second card in step */
+/***********************/
+.card.waiting {
   /** show the failed progress bar as red for failed states */
   /** the text that says "has unpredicable pixels" */
 }
 
-#content .card.waiting.edit {
+.card.waiting.edit {
   /** hide that one */
 }
 
-#content .card.waiting.edit .screenshot.hasRedPixels {
+.card.waiting.edit .screenshot.hasRedPixels {
   cursor: crosshair;
 }
 
-#content .card.waiting.edit .screenshot.hasRedPixels.relative-position {
+.card.waiting.edit .screenshot.hasRedPixels.relative-position {
   position: relative;
 }
 
-#content .card.waiting.edit.fail .meter {
+.card.waiting.edit.fail .meter {
   visibility: hidden;
 }
 
-#content .card.waiting.edit svg#cycle {
+.card.waiting.edit svg#cycle {
   -webkit-transform: rotate(-135deg);
           transform: rotate(-135deg);
 }
 
-#content .card.waiting.actual svg#cycle {
+.card.waiting.actual svg#cycle {
   -webkit-transform: rotate(135deg);
           transform: rotate(135deg);
 }
 
-#content .card.waiting .screenshot .overlay {
+.card.waiting .screenshot .overlay {
   display: none;
 }
 
-#content .card.waiting .screenshot .overlay.countdown {
+.card.waiting .screenshot .overlay.countdown {
   display: block;
   font-size: 20vw;
   text-align: center;
   background: red;
 }
 
-#content .card.waiting.play .meter,
-#content .card.waiting.fail .meter {
+.card.waiting.play .meter,
+.card.waiting.fail .meter {
   visibility: visible;
 }
 
-#content .card.waiting.expected.fail .progress,
-#content .card.waiting.actual.fail .progress {
+.card.waiting.expected.fail .progress,
+.card.waiting.actual.fail .progress {
   background-color: red;
   -webkit-animation: unset;
           animation: unset;
@@ -974,15 +974,15 @@ button img {
           animation-fill-mode: unset;
 }
 
-#content .card.waiting #unpredictable-pixels {
+.card.waiting #unpredictable-pixels {
   color: orange;
 }
 
-#content .card.waiting #error-pixels {
+.card.waiting #error-pixels {
   color: red;
 }
 
-#content .card.waiting .progress {
+.card.waiting .progress {
   background-color: #e4c465;
   -webkit-animation: progressBar var(--screenshot-timeout) ease-in-out;
           animation: progressBar var(--screenshot-timeout) ease-in-out;
@@ -990,7 +990,7 @@ button img {
           animation-fill-mode: both;
 }
 
-#content .card.waiting .actions {
+.card.waiting .actions {
   display: -webkit-box;
   display: -ms-flexbox;
   display: flex;
@@ -1000,15 +1000,15 @@ button img {
           flex-direction: row;
 }
 
-#content .card.waiting .actions .hide {
+.card.waiting .actions .hide {
   display: none;
 }
 
-#content .card.waiting .actions button {
+.card.waiting .actions button {
   border: 1px solid transparent;
 }
 
-#content .card.waiting .actions button[autoplay='true']:not([disabled]) {
+.card.waiting .actions button[autoplay='true']:not([disabled]) {
   border: 1px solid green;
 }
 
@@ -1187,5 +1187,61 @@ progress::-webkit-progress-bar {
 progress::-webkit-progress-value {
   background-color: green;
   border-radius: 1em;
+}
+
+#actionReport {
+  font-family: Arial, Helvetica, sans-serif;
+  pointer-events: none;
+}
+
+#actionReport .actions,
+#actionReport button,
+#actionReport .footer {
+  display: none;
+}
+
+#actionReport .card.action .screenshot {
+  pointer-events: all;
+}
+
+#actionReport #title {
+  padding: 1em;
+  font-size: 18px;
+  text-align: center;
+  font-weight: bold;
+  background: -webkit-gradient(linear, left top, right top, from(rgba(116, 116, 191, 0.3)), to(rgba(52, 138, 199, 0.3)));
+  background: linear-gradient(to right, rgba(116, 116, 191, 0.3), rgba(52, 138, 199, 0.3));
+}
+
+#actionReport .cards {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  gap: 10px;
+}
+
+#actionReport .cardContainer {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: row;
+          flex-direction: row;
+  -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+          justify-content: space-between;
+  gap: 10px;
+}
+
+#actionReport .card {
+  margin: none;
 }
 /*# sourceMappingURL=workspace.css.map */
