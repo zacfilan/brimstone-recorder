@@ -21,7 +21,7 @@ import {
   Step,
 } from '../test.js';
 import { Screenshot } from './screenshot.js';
-import { loadOptions, options, saveOptions } from '../options.js';
+import { loadOptions, saveOptions, options } from '../options.js';
 import * as Errors from '../error.js';
 import { MenuController } from './menu_controller.js';
 import * as BDS from './brimstoneDataService.js';
@@ -307,7 +307,7 @@ class Workspace {
    * If false we will blindly post the metrics.
    */
   async postLastRunMetrics(autoPostMetrics) {
-    let options = await loadOptions();
+    await loadOptions();
 
     // (re)-generate the results in the playtree
     let reports = lastRunMetrics;
@@ -446,7 +446,10 @@ class Workspace {
 
     actionGutter.clean();
 
-    $('#step').empty();
+    $('#step').html(`<div id="content">
+    <div class='card empty'></div>
+    <div class='card empty'></div>
+    </div>`);
     if (options.forgetCorrectionsWhenTestIsCleared) {
       Correction.availableInstances = [];
     }
@@ -787,8 +790,7 @@ class Workspace {
 
         button.setAttribute('title', title);
       }); // .attr() didn't work for me
-    options.autoPlay = enableAutoPlayCheckbox.checked; // save it. note that changing this from the options page will not change the UI!
-    await saveOptions(options);
+    await saveOptions({ autoPlay: enableAutoPlayCheckbox.checked });
   }
 
   async enableAutoCorrectCheckbox(e) {
@@ -796,8 +798,7 @@ class Workspace {
       'hide',
       !!enableAutoCorrectCheckbox.checked
     );
-    options.autoCorrect = !!enableAutoCorrectCheckbox.checked;
-    await saveOptions(options);
+    await saveOptions({ autoCorrect: !!enableAutoCorrectCheckbox.checked });
   }
   //#endregion workspace
 }
@@ -877,13 +878,6 @@ window.addEventListener('error', async function (errorEvent) {
 let jsonEditor;
 
 /**
- * When the user changes the options this will be called
- */
-async function onOptionsChanged() {
-  let options = await loadOptions();
-}
-
-/**
  * @type {string}
 /**********************************************************************************************
  * Main entry point. - allow this extension in incognito please. it increases the likelyhood that a test
@@ -892,7 +886,7 @@ async function onOptionsChanged() {
  */
 (
   async function main() {
-    let options = await loadOptions();
+    await loadOptions();
     if (options.developerMode) {
       window.alert(
         `🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`
@@ -910,10 +904,10 @@ async function onOptionsChanged() {
     enableAutoPlayCheckbox.checked = options.autoPlay;
 
     for (let i = 0; i < 3 && !options.installedOnAlias; ++i) {
-      options.installedOnAlias = await brimstone.window.prompt(
+      let installedOnAlias = await brimstone.window.prompt(
         'Please provide an identifier for this computer. It can be the real computer name or something else, e.g. "Zac\'s Laptop"'
       );
-      await saveOptions(options);
+      await saveOptions({ installedOnAlias: installedOnAlias });
     }
 
     /** The id of the window that the user clicked the brimstone extension icon to launch this workspace. */
@@ -973,6 +967,28 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
 
     window.addEventListener('beforeunload', beforeUnloadListener, {
       capture: true,
+    });
+
+    chrome.runtime.onMessage.addListener(function (
+      request,
+      sender,
+      sendResponse
+    ) {
+      console.log(
+        sender.tab
+          ? 'message from a content script:' + sender.tab.url
+          : 'message from the extension'
+      );
+      if (request.optionsChanged) {
+        if (request.optionsChanged.hasOwnProperty('developerMode')) {
+          if (request.optionsChanged.developerMode) {
+            enableConsole();
+          } else {
+            disableConsole();
+          }
+        }
+      }
+      sendResponse(true);
     });
   }
 )();
@@ -1373,7 +1389,7 @@ var lastRunMetrics;
 
 /** play the current playnode */
 async function _playSomething() {
-  let options = await loadOptions();
+  await loadOptions();
   try {
     let nextTest = true;
     let startingTab = await getActiveApplicationTab();
@@ -1694,7 +1710,7 @@ async function webNavigationOnCompleteHandler(details) {
  */
 async function startRecorders() {
   // establish the recording communication channel between the tab being recorded and the brimstone workspace window
-  let options = await loadOptions();
+  await loadOptions();
   // connect to all frames in the the active tab in this window.
   // the recorder is injected in all pages, all frames, and will respond to onconnect by starting the event handlers.
   // https://developer.chrome.com/docs/extensions/reference/tabs/#method-connect
@@ -2050,7 +2066,7 @@ async function recordSomething(promptForUrl) {
     }
 
     let url = '';
-    let options = await loadOptions();
+    await loadOptions();
     /** cached the current step index */
     let index = currentStepIndex(); // there are two cards visible in the workspace now. (normally - unless the user is showing the last only!)
 
@@ -2076,8 +2092,7 @@ async function recordSomething(promptForUrl) {
         );
         return false;
       }
-      options.url = url; // Cache the last URL recorded so we can reset it in the prompt, next time.
-      await saveOptions(options);
+      await saveOptions({ url: url });
       let created = false;
       // recording from beginning
       if (
@@ -2308,7 +2323,7 @@ async function loadTest(testNumber) {
     await workspace.clearTest(); // any previous test is cleared out
     currentTestNumber = testNumber;
 
-    let options = await loadOptions();
+    await loadOptions();
     let suite =
       numberOfTestsInSuite > 1
         ? ` (test ${currentTestNumber}/${numberOfTestsInSuite})`

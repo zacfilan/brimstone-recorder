@@ -238,7 +238,7 @@
   color: inherit;
 }
 
-@media all and (max-width: 700px) {
+@media (max-aspect-ratio: 2 / 1) {
   body {
     font-size: 12px;
   }
@@ -294,8 +294,10 @@
   body #workspace #step #content {
     height: 100%;
     width: 100%;
-    -ms-flex-wrap: wrap;
-        flex-wrap: wrap;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+            flex-direction: column;
   }
   body #workspace #step #content .card {
     width: auto;
@@ -325,8 +327,8 @@
     font-size: 12px;
   }
   body #workspace #step #content .card.empty {
-    width: 100%;
-    height: auto;
+    width: unset;
+    height: 100%;
   }
   body #workspace #step #content .card .footer {
     -webkit-box-flex: 0.8;
@@ -671,6 +673,8 @@ button img {
   -webkit-box-direction: normal;
       -ms-flex-direction: row;
           flex-direction: row;
+  height: calc(100% - (84px + 13px + 5px));
+  width: 100%;
 }
 
 .verticalToolBar {
@@ -752,7 +756,6 @@ button img {
 
 .card.empty {
   background: grey;
-  height: 200px;
 }
 
 .card .stepNumber {
@@ -861,6 +864,7 @@ button img {
   -webkit-box-direction: normal;
       -ms-flex-direction: row;
           flex-direction: row;
+  height: 100%;
 }
 
 /***********************/
@@ -1014,7 +1018,7 @@ button img {
 
 /** only show the meter on the next card when playing back */
 #step {
-  height: calc(100% - 172px);
+  height: 100%;
   width: calc(100% - 40px);
 }
 

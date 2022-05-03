@@ -699,7 +699,7 @@ class Recorder {
         msg.y = e.clientY;
         ['clientX', 'clientY'].forEach((p) => (msg.event[p] = e[p]));
         msg.handler = { simulate: true };
-        if (this.options?.experiment?.includeCss) {
+        if (this.options.includeCss) {
           msg.css = TopLevelObject.DOMPresentationUtils.cssPath(e.target);
         }
         break;

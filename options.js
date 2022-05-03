@@ -40,14 +40,12 @@ export class Options {
   /**
    * Experimental features
    */
-  experiment = {
-    /**
-     * Record the CSS of the element acted on in each step.
-     * This is not used by the player, but may be
-     * useful for external code.
-     */
-    includeCss: false,
-  };
+  /**
+   * Record the CSS of the element acted on in each step.
+   * This is not used by the player, but may be
+   * useful for external code.
+   */
+  includeCss = false;
 
   /**
    * Allow provide a way to debug better after deploy
@@ -98,7 +96,7 @@ export class Options {
    * based on which machine was running the test app.
    * @type {string}
    */
-  installedOnAlias;
+  installedOnAlias = null;
 
   /**
    * In the verify screenshot function we need to take the actual screen
@@ -202,6 +200,37 @@ export class Options {
    * not. This will add an emblem to the icon if set to true;
    */
   clearWorkspaceBeforeRecordingActiveTab = false;
+
+  /**
+   * Copy constructor
+   * @param {Options} other
+   */
+  constructor(other = null) {
+    if (other) {
+      for (let prop in other) {
+        this[prop] = other[prop];
+      }
+    }
+  }
+
+  /**
+   * Set some options from this one from the other one.
+   * Return true if anything changed, false otherwise.
+   * @param {Options} other
+   * @returns {object |  false} changed options or false if there are none
+   */
+  set(other) {
+    // calculate which options changed value
+    let changed = false;
+    let changedOptions = {};
+    for (let key in other) {
+      if (other[key] !== this[key]) {
+        changedOptions[key] = this[key] = other[key];
+        changed = true;
+      }
+    }
+    return changed && changedOptions;
+  }
 }
 
 /**
@@ -210,24 +239,40 @@ export class Options {
  */
 export var options = new Options();
 
-/** load the user settable options from chrome storage
- *
+/**
+ * return a copy of the user settable options from chrome storage,
+ * also updated the exported options object.
  */
 export async function loadOptions() {
   let results = await new Promise((resolve) =>
     chrome.storage.local.get('options', resolve)
   );
-  Object.assign(options, results.options); // start with defaults and overwrite with stored values
-  return options;
+  let optionsCopy = new Options();
+  Object.assign(optionsCopy, results.options); // start with defaults and overwrite with stored values
+  options.set(optionsCopy);
+  return optionsCopy;
 }
 
 /**
- *
- * @param {Options} options
- * @returns when complete
- */
-export function saveOptions(options) {
-  return new Promise((resolve) =>
-    chrome.storage.local.set({ options }, resolve)
-  );
+ * If the options object passed has any different values
+ * save them to storage and send a message containing
+ * just the options that changed along with their value to the extension
+ * */
+export async function saveOptions(newOptions, message = true) {
+  let optionsCopy = await loadOptions();
+  let optionsChanged = optionsCopy.set(newOptions);
+  options.set(optionsCopy);
+  if (optionsChanged) {
+    await new Promise((resolve) =>
+      chrome.storage.local.set({ options }, resolve)
+    );
+    if (message) {
+      try {
+        await chrome.runtime.sendMessage({ optionsChanged });
+      } catch (e) {
+        console.log('ouch');
+        // it's possible the extension is not up, just the options page
+      }
+    }
+  }
 }

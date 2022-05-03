@@ -36,7 +36,9 @@ $hover-scrollbar: $gray3;
   color: inherit;
 }
 
-@media all and (max-width: 700px) {
+// if the workspace is twice as tall as it is wide, use
+// the vertical layout. otherwise use the horizontal layout
+@media (max-aspect-ratio: 2/1) {
   body {
     font-size: 12px;
 
@@ -95,7 +97,7 @@ $hover-scrollbar: $gray3;
           height: 100%;
           width: 100%;
 
-          flex-wrap: wrap;
+          flex-direction: column;
           .card {
             width: auto; // allow each card to adjust separately
             height: calc(50% - 5px); // margin under card
@@ -121,10 +123,9 @@ $hover-scrollbar: $gray3;
             }
 
             &.empty {
-              width: 100%;
-              height: auto;
+              width: unset;
+              height: 100%;
             }
-
             margin-bottom: 5px;
             .footer {
               flex-grow: 0.8;
@@ -410,6 +411,9 @@ button {
 #workspace {
   display: flex;
   flex-direction: row;
+  // the whole vp - 2 rows up top and 2 at bottom
+  height: calc(100% - (84px + 13px + 5px));
+  width: 100%; // whole vp
 }
 
 .verticalToolBar {
@@ -477,7 +481,7 @@ button {
 
   &.empty {
     background: grey;
-    height: 200px;
+    //height: 200px;
   }
 
   .stepNumber {
@@ -568,6 +572,7 @@ button {
 #content {
   display: flex;
   flex-direction: row;
+  height: 100%;
 }
 
 /***********************/
@@ -705,7 +710,7 @@ button {
 
 /** only show the meter on the next card when playing back */
 #step {
-  height: calc(100% - 172px);
+  height: 100%;
   width: calc(100% - 40px);
 }
 

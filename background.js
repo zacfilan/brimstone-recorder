@@ -171,7 +171,7 @@ chrome.runtime.onInstalled.addListener(async function (details) {
         let options = await loadOptions(); // users options
         options.mouseWheelTimeout = def.mouseWheelTimeout;
         options.autoPlay = def.autoPlay;
-        await saveOptions(options);
+        await saveOptions(options, false);
       }
 
       break;
