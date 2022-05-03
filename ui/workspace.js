@@ -969,7 +969,8 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
       capture: true,
     });
 
-    chrome.runtime.onMessage.addListener(function (
+    // reflect changes in the the options immediately
+    chrome.runtime.onMessage.addListener(async function (
       request,
       sender,
       sendResponse
@@ -985,6 +986,19 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
             enableConsole();
           } else {
             disableConsole();
+          }
+        }
+        if (request.optionsChanged.hasOwnProperty('autoCorrect')) {
+          enableAutoCorrectCheckbox.checked =
+            request.optionsChanged.autoCorrect;
+        }
+        if (request.optionsChanged.hasOwnProperty('autoPlay')) {
+          enableAutoPlayCheckbox.checked = request.optionsChanged.autoPlay;
+        }
+        if (request.optionsChanged.hasOwnProperty('MAX_VERIFY_TIMEOUT')) {
+          let i = currentStepIndex();
+          if (i >= 0) {
+            await updateStepInView(Test.current.steps[i]);
           }
         }
       }

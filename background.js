@@ -166,7 +166,7 @@ chrome.runtime.onInstalled.addListener(async function (details) {
 
       // on some rare updates we change the default for an option and push it into the users options.
       // users are lazy and may miss changes that improve their use experience.
-      if (version === '1.23.1') {
+      if (version === '1.23.2') {
         let def = new Options();
         let options = await loadOptions(); // users options
         options.mouseWheelTimeout = def.mouseWheelTimeout;
