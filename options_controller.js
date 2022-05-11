@@ -9,6 +9,7 @@ const mouseMoveTimeoutLookup = [500, 250, 100];
 /**
  * local model for the view. initialized with a copy
  * of the persisted options.
+ * @type {Options}
  */
 let options;
 
@@ -32,6 +33,8 @@ async function setModelFromView() {
     userMouseDelayLookup[parseInt(userMouseSpeed.value, 10)];
   options.userKeypressDelay =
     userKeypressDelayLookup[parseInt(userKeypressSpeed.value, 10)];
+  options.clearConsoleBeforeMeasuringMemory =
+    clearConsoleBeforeMeasuringMemory.checked;
   //#endregion playback options
 
   //#region database options
@@ -144,6 +147,8 @@ function setViewFromModel() {
     options.userKeypressDelay
   );
   userMouseSpeed.value = userMouseDelayLookup.indexOf(options.userMouseDelay);
+  clearConsoleBeforeMeasuringMemory.checked =
+    options.clearConsoleBeforeMeasuringMemory;
   //#endregion playback options
 
   //#region database options

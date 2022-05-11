@@ -28,6 +28,27 @@ function _scroll(x, y, top, left) {
 
 /**
  * This function is injected and run in the app
+ *
+ * Measure the heap memory
+ */
+var getMemory = function (clearFirst) {
+  try {
+    if (clearFirst) {
+      console.clear(); // lots of memory leaks come from console messages
+    }
+    window.gc(); // if chrome is started with --js-flags=--expose_gc we can force a GC
+  } catch (e) {}
+  let m = window.performance.memory;
+  console.log(`used ${m.usedJSHeapSize} bytes`);
+  return {
+    jsHeapSizeLimit: m.jsHeapSizeLimit,
+    totalJSHeapSize: m.totalJSHeapSize,
+    usedJSHeapSize: m.usedJSHeapSize,
+  };
+};
+
+/**
+ * This function is injected and run in the app
  * @param {number} x the x coordinate of the select element
  * @param {*} y  the y coordinate of the select element
  * @param {*} value the vaue to set the select element to
@@ -1031,22 +1052,10 @@ export class Player {
    * @returns {number} MBs used in the heap
    */
   async getClientMemoryByChromeApi() {
-    var getMemory = function () {
-      try {
-        // console.clear(); // lots of memory leaks come from console messages
-        window.gc(); // if chrome is started with --js-flags=--expose_gc we can force a GC
-      } catch (e) {}
-      let m = window.performance.memory;
-      console.log(`used ${m.usedJSHeapSize} bytes`);
-      return {
-        jsHeapSizeLimit: m.jsHeapSizeLimit,
-        totalJSHeapSize: m.totalJSHeapSize,
-        usedJSHeapSize: m.usedJSHeapSize,
-      };
-    };
     let frames = await chrome.scripting.executeScript({
       target: { tabId: this.tab.chromeTab.id },
       function: getMemory,
+      args: [options.clearConsoleBeforeMeasuringMemory],
     });
 
     let memory = frames[0].result;

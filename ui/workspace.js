@@ -2436,7 +2436,7 @@ async function setStepContent(step) {
   setToolbarState();
 
   // update the thumb gutter
-  actionGutter.setCurrent(step.curr.index);
+  actionGutter.setCurrentNoScroll(step.curr.index);
 
   if (isPlaying()) {
     let end, current;

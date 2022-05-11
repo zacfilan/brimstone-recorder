@@ -77,6 +77,14 @@ export class ActionGutter {
     }
   }
 
+  setCurrentNoScroll(index) {
+    this.actionGutter.find('button').removeClass('current');
+    let current = this.actionGutter.find(`button[index=${index}]`);
+    if (current.length) {
+      current.addClass('current');
+    }
+  }
+
   setCurrent(index) {
     this.actionGutter.find('button').removeClass('current');
     let current = this.actionGutter.find(`button[index=${index}]`);

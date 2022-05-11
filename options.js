@@ -202,6 +202,13 @@ export class Options {
   clearWorkspaceBeforeRecordingActiveTab = false;
 
   /**
+   * The console can hang onto memory and give false looking memory leaks.
+   * If this option is on then the the console is cleared before we
+   * measure the memory.
+   */
+  clearConsoleBeforeMeasuringMemory = false;
+
+  /**
    * Copy constructor
    * @param {Options} other
    */
