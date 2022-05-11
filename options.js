@@ -206,7 +206,7 @@ export class Options {
    * If this option is on then the the console is cleared before we
    * measure the memory.
    */
-  clearConsoleBeforeMeasuringMemory = false;
+  clearConsoleBeforeMeasuringMemory = true;
 
   /**
    * Copy constructor
