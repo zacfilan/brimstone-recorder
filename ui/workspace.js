@@ -3,7 +3,7 @@
 import { Player } from '../player.js';
 import { Tab } from '../tab.js';
 import * as iconState from '../iconState.js';
-import { Correction, Rectangle } from '../rectangle.js';
+import { BoundingBox, Correction, Rectangle } from '../rectangle.js';
 import {
   sleep,
   downloadObjectAsJson,
@@ -366,6 +366,13 @@ class Workspace {
    * pixel differences.
    *  */
   async undo() {
+    // first click removes rectangles if they exist
+    let rectangles = $('.rectangle');
+    if (rectangles.length) {
+      rectangles.remove();
+      return;
+    }
+
     // we need to purge the acceptablePixelDifferences (and all rectangles that might be drawn presently)
     const { view, action } = getCard('#content .waiting', Test.current);
     action.acceptablePixelDifferences = new Screenshot({
@@ -1048,57 +1055,16 @@ var _lastScreenshot;
 var _lastSavedScreenshot;
 
 /**
- * Click the question mark to create unpredictable regions/corrections.
+ * Click on any correction button
  */
-$('#step').on('click', '#correctAsUnpredictable', async (e) => {
-  e.stopPropagation();
-  await workspace.callMethodByUser(workspace.applyCorrections, e);
-});
-
-/**
- * Click the question mark to create unpredictable regions/corrections.
- */
-$('#step').on('click', '#correctAsAntiAlias', async (e) => {
-  e.stopPropagation();
-  await workspace.callMethodByUser(workspace.applyCorrections, e);
-});
-
-$('#step').on('click', '#correctAsActual', async (e) => {
-  e.stopPropagation();
-  await workspace.callMethodByUser(workspace.applyCorrections, e);
-});
-
-/**
- * Click the magic wand to apply the possible corrections
- */
-$('#step').on('click', '#possibleCorrections', async (e) => {
-  e.stopPropagation();
-  await workspace.callMethodByUser(workspace.applyCorrections, e);
-});
-
-// color the rectangles when we are about to commit them
-$('#step').on('mouseenter', '#correctAsUnpredictable', (e) => {
-  $('.rectangle').attr('type', 'UnpredictableCorrection');
-});
-$('#step').on('mouseenter', '#correctAsActual', (e) => {
-  $('.rectangle').attr('type', 'ActualCorrection');
-});
-$('#step').on('mouseenter', '#correctAsAntiAlias', (e) => {
-  $('.rectangle').attr('type', 'AntiAliasCorrection');
-});
 $('#step').on(
-  'mouseleave',
-  '#correctAsUnpredictable, #correctAsActual',
-  (e) => {
-    $('.rectangle').removeAttr('type');
+  'click',
+  '#correctAsUnpredictable, #correctAsAntiAlias, #correctAsActual, #replaceExpectedWithActual',
+  async (e) => {
+    e.stopPropagation();
+    await workspace.callMethodByUser(workspace.applyCorrections, e);
   }
 );
-
-/**
- * The currently visible corrections that could be applied
- * @type {Correction[]}
- */
-let applicableCorrections;
 
 $('#step').on('mouseenter', '#possibleCorrections', function (e) {
   const { action } = getCard(e.currentTarget, Test.current);
@@ -1126,15 +1092,131 @@ $('#step').on('mouseenter', '#possibleCorrections', function (e) {
      * append this rectangle into the given container
      */
     new Rectangle({
-      x0: c.bounds.x0 * xscale,
-      y0: c.bounds.y0 * yscale,
-      x1: c.bounds.x1 * xscale,
-      y1: c.bounds.y1 * yscale,
+      x0: c.condition.x0 * xscale,
+      y0: c.condition.y0 * yscale,
+      x1: c.condition.x1 * xscale,
+      y1: c.condition.y1 * yscale,
       container: screenshot[0],
       type: c.constructor.name,
+      classes: 'possible',
     });
   });
 });
+
+let suggestionUsedTitleMsg = 'A suggested rectangle is shown.\n\n';
+
+$('#step').on('mouseleave', '#correctionButtons', function (e) {
+  $(this).closest('.card').find('.rectangle.suggestion').remove();
+  $(this)
+    .find('button')
+    .each((index, e) => {
+      e.title = e.title.replace(suggestionUsedTitleMsg, '');
+    });
+  $('.rectangle').removeAttr('type'); // manual rectangles are untyped until they hover over a correction type button again
+});
+
+function buildSuggestionRectangle(e, constructorName) {
+  // when the user hovers over the iron it should help find the next cluster of red pixels and
+  // put a smallish rectangle around it to help the user.
+  const { action } = getCard(e.currentTarget, Test.current);
+  if (
+    !action.numDiffPixels ||
+    $(this).closest('.card').find('.rectangle.manual').length
+  ) {
+    return;
+  }
+
+  let delta = action.pixelDiffScreenshot.png.data;
+  let width = action.pixelDiffScreenshot.png.width;
+  let height = action.pixelDiffScreenshot.png.height;
+
+  let boundingBox = new BoundingBox();
+
+  /** temp one, to see if the pixel will fit or not */
+  let nextBoundingBox = new BoundingBox();
+
+  if (!this.title.startsWith(suggestionUsedTitleMsg)) {
+    this.title = suggestionUsedTitleMsg + this.title;
+  }
+  // scan for red pixels and buid up a rectangle that will cover (some of) them
+  // the rectangle size is bounded.
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      var idx = (action.pixelDiffScreenshot.png.width * y + x) << 2;
+
+      let pixelIsRed =
+        delta[idx + 1] === 0 && // trying to be clever (faster for no real need)
+        delta[idx + 0] == 255 &&
+        delta[idx + 2] === 0 &&
+        delta[idx + 3] === 255;
+      if (pixelIsRed) {
+        nextBoundingBox = new BoundingBox(boundingBox);
+        nextBoundingBox.accomodate({ x, y });
+
+        if (nextBoundingBox.width > options.autoRectangleMaxWidth) {
+          width = x; // we can't go any wider than that from now on.
+        }
+        if (nextBoundingBox.height > options.autoRectangleMaxHeight) {
+          height = y; // we can't go any taller than that from now on.
+          break; // quit this row
+        }
+
+        if (width !== x && height !== y) {
+          // we accept that one
+          boundingBox = nextBoundingBox;
+        }
+        // else we keep the old one and keep looking
+      }
+    }
+  }
+
+  boundingBox.addMargin(5);
+  // the margin can cause the boundingbox to exceed the pixelDiffScreenshot boundary
+  if (boundingBox.x1 >= action.pixelDiffScreenshot.png.width) {
+    boundingBox.width = action.pixelDiffScreenshot.png.width - boundingBox.x0;
+  }
+  if (boundingBox.y1 >= action.pixelDiffScreenshot.png.height) {
+    boundingBox.height = action.pixelDiffScreenshot.png.height - boundingBox.y0;
+  }
+  // (but the pixel itself must fit in there - since we found it in there :) )
+
+  let screenshot = $(this).closest('.card').find('.screenshot'); // FIXME: screenshot size != img size ??
+  screenshot.addClass('relative-position');
+  let image = screenshot.find('img')[0].getBoundingClientRect();
+  let xscale = image.width / action.expectedScreenshot.png.width;
+  let yscale = image.height / action.expectedScreenshot.png.height;
+
+  /**
+   * append this rectangle into the given container
+   */
+  new Rectangle({
+    x0: boundingBox.x0 * xscale,
+    y0: boundingBox.y0 * yscale,
+    x1: boundingBox.x1 * xscale,
+    y1: boundingBox.y1 * yscale,
+    container: screenshot[0],
+    type: $(this).attr('data-constructor'),
+    classes: 'suggestion',
+  });
+}
+
+$('#step').on(
+  'mouseenter',
+  '#correctAsUnpredictable,#correctAsAntiAlias,#correctAsActual',
+  function (e) {
+    let rectangles = $('.rectangle');
+    if (rectangles.length) {
+      rectangles.attr('type', $(this).attr('data-constructor'));
+      if (rectangles.hasClass('suggestion')) {
+        if (!this.title.startsWith(suggestionUsedTitleMsg)) {
+          this.title = suggestionUsedTitleMsg + this.title;
+        }
+      }
+    } else {
+      buildSuggestionRectangle.call(this, e);
+    }
+  }
+);
 
 $('#step').on('mouseleave', '#possibleCorrections', function (e) {
   // when the user hovers over the stamp it should remove/hide the last set of
@@ -1434,23 +1516,30 @@ async function _playSomething() {
         playFrom > 0;
 
       addEventHandlers(); // for debug
-      if (playFrom === 0) {
-        // we are on the first step of some test in the suite. there are two cases.
-        // either way we need to attach the debugger to a tab and get going.
-        // case 1: first step is a goto some url (common case)
-        // case 2: first step isn't a goto (uncommon case. e.g. middle chunk of a larger test)
-        if (!(await startingTab.reuse({ incognito: Test.current.incognito }))) {
-          // reuse if you can
-          await startingTab.create({
-            url: 'about:blank',
-            incognito: Test.current.incognito,
-          }); // if not create
+      if (
+        playFrom === 0 &&
+        Test.current.steps[0].type === 'goto' &&
+        !Test.current.steps[0].url.startsWith('active tab')
+      ) {
+        // we are on the first step of some test in the suite and the first step is a goto some url (common case)
+        // tear down and rebuild the window
+        try {
+          chrome.debugger.onDetach.removeListener(debuggerOnDetach);
+          await detachDebugger(startingTab);
+        } catch (e) {
+          console.log(e.message);
         }
+        chrome.debugger.onDetach.addListener(debuggerOnDetach);
+
+        await startingTab.create({
+          url: 'about:blank',
+          incognito: Test.current.incognito,
+        });
 
         Tab.reset(); // FIXME: how do i deal with multi-recording tests with multiple tabs?!
         startingTab.trackCreated();
       } else {
-        // do not reset we are resuming play from current state
+        // do not change the active tab at all, we are resuming play from current state
 
         // we are resuming play in the middle of some test in the suite. The startingTab needs to already
         // be up (and in the right state) to resume
@@ -1651,6 +1740,30 @@ async function debuggerOnDetach(debuggee, reason) {
 }
 
 chrome.debugger.onDetach.addListener(debuggerOnDetach);
+
+/**
+ * detach the debugger
+ */
+async function detachDebugger(tab) {
+  console.debug(`schedule deattach debugger`);
+  if (typeof tab?.chromeTab?.id !== 'number') {
+    return;
+  }
+  return new Promise(async (resolve, reject) => {
+    await new Promise((_resolve) =>
+      chrome.debugger.detach({ tabId: tab.chromeTab.id }, _resolve)
+    );
+    if (chrome.runtime.lastError?.message) {
+      reject(new Errors.DebuggerAttachError(chrome.runtime.lastError.message));
+      return;
+    } else {
+      // else no error - we detached it.
+      console.debug(`debugger was deattached from tab:${tab.chromeTab.id}`);
+      resolve(); // an attach was required
+      return;
+    }
+  });
+}
 
 /**
  * Hide the cursor in all frames. If this test is so specified.

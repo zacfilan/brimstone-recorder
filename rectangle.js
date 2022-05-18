@@ -45,84 +45,127 @@ class Pixel {
   _bytes = [0, 0, 0, 0];
 }
 
-/**
- * A tuple of an expected and actual pixel.
- */
-class PixelCondition {
-  /**
-   * The pixel from the expected screenshot.
-   * @type {Pixel}
-   */
-  expected;
-  /**
-   * The pixel from the actual screenshot.
-   * @type {Pixel}
-   */
-  actual;
-
-  /**
-   *
-   * @param {PixelCondition} other
-   */
-  constructor(other = {}) {
-    this.expected = other.expected;
-    this.actual = other.actual;
-  }
-}
+var littleEndian = (function () {
+  var buffer = new ArrayBuffer(2);
+  new DataView(buffer).setInt16(0, 256, true /* littleEndian */);
+  // Int16Array uses the platform's endianness.
+  return new Int16Array(buffer)[0] === 256;
+})();
 
 /**
- * A orangle pixel. Used to represent unpredictable pixels.
+ * An orangle pixel. Used to represent unpredictable pixels.
+ *  R    G   B   A
+ * 255, 165, 0 , 255
+ *  ff   a5  00  ff
  */
-const orangePixel = new Pixel(255, 165, 0, 255);
+const orangePixel = littleEndian ? 0xff00a5ff : 0xffa500ff;
+const redPixel = 0xff0000ff; // same little or bug endian
 
 /**
  * A rectangular region described un pixel units
  * */
 export class BoundingBox {
-  /** upper left x-coordinate */
+  /** upper left x-coordinate (inclusive) */
   x0 = 0;
-  /** upper left y-coordinate */
+  /** upper left y-coordinate (inclusive) */
   y0 = 0;
+
   /** the width in pixels of the rectangle */
   width = 0;
+
   /** the height in pixels of the rectangle */
   height = 0;
 
-  /** lower right x-coordinate */
-  get x1() {
-    return this.x0 + this.width;
+  /** number of pixels in bounding box (width*height) */
+  get len() {
+    return this.width * this.height;
   }
 
-  /** lower right y-coordinate */
+  /** lower right x-coordinate (inclusive)*/
+  get x1() {
+    return this.x0 + this.width - 1;
+  }
+
+  /** lower right y-coordinate (inclusive) */
   get y1() {
-    return this.y0 + this.height;
+    return this.y0 + this.height - 1;
   }
 
   constructor(other = {}) {
-    this.x0 = other.x0 || 0;
-    this.y0 = other.y0 || 0;
+    this.x0 = other.x0 === undefined ? Number.MAX_SAFE_INTEGER : other.x0; // set up for accomodate if not specified
+    this.y0 = other.y0 === undefined ? Number.MAX_SAFE_INTEGER : other.y0; // set up for accomodate if not specified
     this.width = other.width || 0;
     this.height = other.height || 0;
+  }
+
+  /**
+   * Reconfigure this bounding box to accomodate the
+   * given pixel
+   * @param {} pixels
+   */
+  accomodate({ x, y }) {
+    if (x < this.x0) {
+      this.x0 = x; // smallest x we see is upper left x coordinate
+    }
+    if (x > this.x1) {
+      this.width = x - this.x0 + 1; // bump up the x1
+    }
+    if (y < this.y0) {
+      this.y0 = y; // smallest y we see is upper left y coordinate
+    }
+    if (y > this.y1) {
+      this.height = y - this.y0 + 1; // bump up the y1
+    }
+    console.log(
+      `${this.width}x${this.height}. ((${this.x0}, ${this.y0} to (${this.x1}, ${this.y1})) last:(${x},${y})`
+    );
+  }
+
+  addMargin(margin) {
+    this.x0 = Math.max(0, this.x0 - margin); // left - don't go negative
+    this.y0 = Math.max(0, this.y0 - margin); // top - don't go negative
+
+    // add some right and bottom margin
+    this.width += margin * 2;
+    this.height += margin * 2;
   }
 }
 
 /**
- * Abstract base class for corrections. A correction has rectangular boundry
- * which defines **where** this correction may be applicable. It also
- * has a boundary for the PNG, which defines the size of the PNGs this
- * correction applies to.
+ * A boundingbox with pixel data in it.
+ */
+class Condition extends BoundingBox {
+  /**
+   * PNG style array/matrix of pixel data.
+   * @type {Uint32Array}
+   */
+  pixels;
+
+  /**
+   *
+   * @param {Condition} other
+   */
+  constructor(other = {}) {
+    super(other);
+    this.pixels = new Uint32Array(other.pixels);
+  }
+}
+
+/**
+ * Abstract base class for corrections. A correction contains
+ * a {@link Condition} which is a subrectangle (within the context of a larger PNG)
+ * of pixels that define when this Correction may be applied.
  *
- * Concrete corrections will implement matches, and apply functions
- * to determine if the correction matches the current action and
- * to apply it (if it does match), respectively.
+ * Concrete corrections will implement an apply functions
+ * to apply this correction in a particular way when it does
+ * match some other action's pixel diff.
  */
 export class Correction {
   /**
-   * The rectangular region this correction applies to.
-   * If falsey, it applies to the whole image.
-   * @type {BoundingBox}
+   * The condition that decides the applicability of this correction.
+   * @type {Condition}
    */
-  bounds;
+  condition;
 
   /**
    * This correction only applys to PNGs of a certain size. This contains the width/height of those PNGs.
@@ -131,13 +174,112 @@ export class Correction {
   applicablePngSize;
 
   /**
-   * @param {object} args named arguments
-   * @param {BoundingBox} args.applicablePngSize the size of the PNG that this correction applies to
-   * @param {BoundingBox} args.bounds the position of this correction within the PNG
+   * the byte offset of the start of this corrections pixels within the
+   * larger PNG.
    */
-  constructor({ applicablePngSize, bounds }) {
-    this.bounds = bounds;
-    this.applicablePngSize = applicablePngSize;
+  get byteOffset() {
+    return (
+      (this.applicablePngSize.width * this.condition.y0 + this.condition.x0) <<
+      2
+    );
+  }
+
+  /**
+   * @param {object} args named arguments
+   * @param {TestAction} args.action the test action we are creating this correction from
+   * @param {Condition} args.condition the position of this correction within the PNG
+   */
+  constructor({ condition, action }) {
+    this.applicablePngSize = new BoundingBox({
+      width: action.expectedScreenshot.png.width,
+      height: action.expectedScreenshot.png.height,
+    });
+    this.condition = new Condition(condition);
+    this._calculateConditionPixels(
+      action.expectedScreenshot.png,
+      action.actualScreenshot.png,
+      action.pixelDiffScreenshot.png
+    );
+  }
+
+  /**
+   * Returns true if this passed in action matches the condition for this correction.
+   * @param {TestAction} action can I apply this correction to this action
+   */
+  matches(action) {
+    let pixelDiffPng = action.pixelDiffScreenshot.png;
+
+    if (pixelDiffPng.width !== this.applicablePngSize.width) {
+      return false;
+    }
+
+    for (let y = 0; y < this.condition.height; ++y) {
+      if (this.condition.y0 + y >= pixelDiffPng.height) {
+        break; // ignore off by one type errors
+      }
+      //console.log(`write row ${y} -> ${this.condition.y0 + y}`);
+      let pixelDiffPngRow = new Uint32Array(
+        pixelDiffPng.data.buffer,
+        ((this.condition.y0 + y) * pixelDiffPng.width) << 2,
+        pixelDiffPng.width
+      );
+      let conditionRowOffset = y * this.condition.width;
+      for (let x = 0; x < this.condition.width; ++x) {
+        if (
+          this.condition.pixels[conditionRowOffset + x] !==
+          pixelDiffPngRow[this.condition.x0 + x]
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+  }
+
+  /**
+   * Build the ({@link Condition.pixels})
+   * from the passed in PNGs. Extracts a PNG from the
+   * deltaPng using the condition dimensions/coordinates.
+   *
+   * @param {PNG} expectedPng the expected screenshot
+   * @param {PNG} actualPng the actual screenshot
+   * @param {PNG} deltaPng the screenshot showing the delta between the the two above. a red pixel is a delta. orange/yellow are unpredictable, greyscale fine.
+   */
+  _calculateConditionPixels(expectedPng, actualPng, deltaPng) {
+    if (
+      !(
+        expectedPng.width === actualPng.width &&
+        actualPng.width === deltaPng.width
+      )
+    ) {
+      throw new Error('Widths do not match!');
+    }
+
+    let p = new Screenshot({
+      png: new PNG({
+        width: this.condition.width,
+        height: this.condition.height,
+      }),
+    });
+
+    this.condition.pixels = new Uint32Array(p.png.data.buffer); //  this.condition.len);
+
+    // extract the rectangle of pixels from the larger PNG by rows
+    for (let y = 0; y < this.condition.height; ++y) {
+      if (this.condition.y0 + y >= deltaPng.height) {
+        break; // ignore off by one type errors
+      }
+      let bigRow = new Uint32Array(
+        deltaPng.data.buffer,
+        ((this.condition.y0 + y) * deltaPng.width) << 2,
+        deltaPng.width
+      );
+      for (let x = 0; x < this.condition.width; ++x) {
+        this.condition.pixels[y * this.condition.width + x] =
+          bigRow[this.condition.x0 + x];
+      }
+    }
   }
 }
 
@@ -152,25 +294,20 @@ Correction.availableInstances = [];
  * @type {Correction[]}
  */
 Correction.applicableInstances = [];
-/** The type of correction that the user makes when the actual pixels are correct. */
 
 /**
- * The type of correction that the user makes when the actual pixels are unpredictable.
+ * The type of correction that the user makes when all the pixels in the rectangle are unpredictable.
  * The user defines a retangular region for the correction, which says that,
  * this region is completely unpredictable run to run. e.g. a date/or time or advertisement div.
  *  */
 export class UnpredictableCorrection extends Correction {
   /**
    * @param {object} args named arguments
-   * @param {BoundingBox} args.bounds the bounds of this correction
+   * @param {Condition} args.condition the condition of this correction
    * @param {TestAction} args.action the action this correction was constructed from
    */
-  constructor({ bounds, action }) {
-    let applicablePngSize = new BoundingBox({
-      width: action.expectedScreenshot.png.width,
-      height: action.expectedScreenshot.png.height,
-    });
-    super({ bounds, applicablePngSize });
+  constructor({ condition, action }) {
+    super({ condition, action });
   }
 
   /**
@@ -191,243 +328,22 @@ export class UnpredictableCorrection extends Correction {
     }
 
     let png = action.acceptablePixelDifferences.png;
-    let ymax = this.bounds.y0 + this.bounds.height;
-    let xmax = this.bounds.x0 + this.bounds.width;
-    for (var y = this.bounds.y0; y <= ymax; y++) {
-      for (var x = this.bounds.x0; x <= xmax; x++) {
+    let ymax = this.condition.y0 + this.condition.height;
+    let xmax = this.condition.x0 + this.condition.width;
+    for (var y = this.condition.y0; y <= ymax; y++) {
+      for (var x = this.condition.x0; x <= xmax; x++) {
         var idx = (this.applicablePngSize.width * y + x) << 2;
-        png.data[idx + 0] = orangePixel._bytes[0];
-        png.data[idx + 1] = orangePixel._bytes[1];
-        png.data[idx + 2] = orangePixel._bytes[2];
-        png.data[idx + 3] = orangePixel._bytes[3];
+        // 0xffa500ff - orange
+        png.data[idx + 0] = 255;
+        png.data[idx + 1] = 165;
+        png.data[idx + 2] = 0;
+        png.data[idx + 3] = 255;
       }
     }
-    if (this.bounds.y0 <= ymax && this.bounds.x0 <= xmax) {
+    if (this.condition.y0 <= ymax && this.condition.x0 <= xmax) {
       // we did poke some data.
       action.acceptablePixelDifferences.pngDataChanged();
     }
-  }
-
-  /**
-   * Does this newer data match our condition?
-   * For this condition to match it simply needs
-   * to have 1 red pixel in the rectangular area.
-   * No other preconditions. These might be too
-   * powerful/general to auto-correct with.
-   * @param {TestAction} action the testaction
-   *
-   */
-  matches(action) {
-    let pngWidth = action.pixelDiffScreenshot.png.width;
-    if (pngWidth != this.applicablePngSize.width) {
-      return false;
-    }
-
-    let delta = action.pixelDiffScreenshot.png.data;
-
-    let ymax = this.bounds.y0 + this.bounds.height;
-    let xmax = this.bounds.x0 + this.bounds.width;
-    for (var y = this.bounds.y0; y <= ymax; y++) {
-      for (var x = this.bounds.x0; x <= xmax; x++) {
-        var idx = (this.applicablePngSize.width * y + x) << 2;
-
-        let newPixelIsRed =
-          delta[idx + 1] === 0 &&
-          delta[idx + 0] == 255 &&
-          delta[idx + 2] === 0 &&
-          delta[idx + 3] === 255;
-        if (newPixelIsRed) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-}
-
-/**
- * Abstract base class, for SpareApplyCorrections.
- * In contrast the to {@link UnpredictableCorrection} which is applied
- * by inserting a whole rectangle of new pixels, SparseApplyCorrections
- * apply just a subset of the pixels in the bounds of the correction.
- * e.g. just those that differ get replaced, one way or another.
- * Concrete classes muse implement  _applyToPixel(pixel, idx)
- * which detemines exactly how to replace the
- */
-export class SparseApplyCorrection extends Correction {
-  /**
-   * A sparse matrix of the expected/actual pixel tuples that
-   *  make up the condition of this correction
-   * The first index is x, the second index is y.
-   *
-   * e.g. pixelCondition[4]
-   *   is a sparse array of the pixels in the vertical line x=4 in this correction.
-   * @type {PixelCondition[][]}
-   */
-  pixelCondition = [];
-
-  /**
-   * The number of the pixels in this correction that currently match
-   * This is used during auto-correction.*/
-  matchingPixelCount = 0;
-
-  /**
-   * @param {object} args named arguments
-   * @param {TestAction} args.action the action to build this correction from
-   * @param {BoundingBox} args.bounds the bounds of the correction
-   */
-  constructor({ action, bounds }) {
-    let applicablePngSize = new BoundingBox({
-      width: action.expectedScreenshot.png.width,
-      height: action.expectedScreenshot.png.height,
-    });
-    super({ bounds, applicablePngSize });
-    this.calculateCondition(
-      action.expectedScreenshot.png,
-      action.actualScreenshot.png,
-      action.pixelDiffScreenshot.png
-    );
-  }
-
-  /**
-   * Build the sparse condition matrix ({@link pixelCondition})
-   * from the passed in PNGs. The condition matrix is built from just
-   * the failing (red) pixels, within the boundary of this condition.
-   * @param {PNG} expectedPng the expected screenshot
-   * @param {PNG} actualPng the actual screenshot
-   * @param {PNG} deltaPng the screenshot showing the delta between the the two above. a red pixel is a delta. orange/yellow are unpredictable, greyscale fine.
-   */
-  calculateCondition(expectedPng, actualPng, deltaPng) {
-    if (
-      !(
-        expectedPng.width === actualPng.width &&
-        actualPng.width === deltaPng.width
-      )
-    ) {
-      throw new Error('Widths do not match!');
-    }
-
-    this.pixelCondition = [];
-    let ymax = this.bounds.y0 + this.bounds.height;
-    let xmax = this.bounds.x0 + this.bounds.width;
-    for (var y = this.bounds.y0; y <= ymax; y++) {
-      for (var x = this.bounds.x0; x <= xmax; x++) {
-        var idx = (this.applicablePngSize.width * y + x) << 2;
-
-        if (
-          deltaPng.data[idx + 0] !== 255 ||
-          deltaPng.data[idx + 1] !== 0 ||
-          deltaPng.data[idx + 2] !== 0 ||
-          deltaPng.data[idx + 3] !== 255
-        ) {
-          continue; // not a failing pixel
-        }
-
-        // a failing pixel
-
-        if (this.pixelCondition[x] === undefined) {
-          this.pixelCondition[x] = [];
-        }
-        let expected = new Pixel(
-          expectedPng.data[idx + 0],
-          expectedPng.data[idx + 1],
-          expectedPng.data[idx + 2],
-          expectedPng.data[idx + 3]
-        );
-        let actual = new Pixel(
-          actualPng.data[idx + 0],
-          actualPng.data[idx + 1],
-          actualPng.data[idx + 2],
-          actualPng.data[idx + 3]
-        );
-        this.pixelCondition[x][y] = new PixelCondition({
-          expected: expected,
-          actual: actual,
-        });
-      }
-    }
-    console.debug(`Handled ${this.numberOfPixelConditions()} red pixels`);
-  }
-
-  /**
-   * Does this newer data match our condition? This means the **whole rectangle** of the
-   * correction condition matches the passed in action.
-   * @param {TestAction} action The test action
-   */
-  matches(action) {
-    let delta = action.pixelDiffScreenshot.png.data;
-    let expected = action.expectedScreenshot.png.data;
-    let actual = action.actualScreenshot.png.data;
-
-    if (action.expectedScreenshot.png.width !== this.applicablePngSize.width) {
-      return false;
-    }
-
-    let ymax = this.bounds.y0 + this.bounds.height;
-    let xmax = this.bounds.x0 + this.bounds.width;
-    let redPixelFound = false;
-    for (var y = this.bounds.y0; y <= ymax; y++) {
-      for (var x = this.bounds.x0; x <= xmax; x++) {
-        var idx = (this.applicablePngSize.width * y + x) << 2;
-
-        let newPixelIsRed =
-          delta[idx + 1] === 0 &&
-          delta[idx + 0] == 255 &&
-          delta[idx + 2] === 0 &&
-          delta[idx + 3] === 255;
-
-        if (newPixelIsRed) {
-          redPixelFound = true;
-        }
-        let ourPixel = this.pixelCondition?.[x]?.[y]; // if this exists, then we think this pixel needs correction
-
-        if (!!ourPixel !== !!newPixelIsRed) {
-          // not same as bools
-          return false; // we don't agree this pixel needs correction.
-        }
-
-        if (!ourPixel && !newPixelIsRed) {
-          continue; // we both agree this pixel doesn't need correction.
-        }
-
-        // we both agree this pixel does need correction
-        // is the pixel condition exactly the same?
-        for (let i = 0; i < 4; ++i) {
-          if (ourPixel.expected._bytes[i] !== expected[idx + i]) {
-            return false;
-          }
-          if (ourPixel.actual._bytes[i] !== actual[idx + i]) {
-            return false;
-          }
-        }
-      }
-    }
-    return redPixelFound;
-  }
-
-  /**
-   * Apply this sparse correction to the expectedScreenshot
-   * PNG of the supplied action.
-   *
-   * Overwrites the expected pixels in this correction
-   * with the actual pixels in this correction.
-   * @param {TestAction} action The PNG to change.
-   */
-  apply(action) {
-    throw new Error('call dervied method!');
-  }
-
-  /**
-   * mostly for debug, but this counts the number of pixels in the sparse array
-   */
-  numberOfPixelConditions() {
-    let count = 0;
-    this.pixelCondition.forEach((vline, x_index) => {
-      vline.forEach((pixel, y_index) => {
-        ++count;
-      });
-    });
-    return count;
   }
 }
 
@@ -435,26 +351,19 @@ export class SparseApplyCorrection extends Correction {
  * Concrete correction. Use to correct, what appear to be anti-aliasing
  * diferences.
  */
-export class AntiAliasCorrection extends SparseApplyCorrection {
+export class AntiAliasCorrection extends Correction {
   /**
    * @param {object} args named arguments
    * @param {TestAction} args.action the action this correction was constructed from
+   * @param {Condition} args.condition the action this correction was constructed from
    */
-  constructor({ bounds, action }) {
-    let applicablePngSize = new BoundingBox({
-      width: action.expectedScreenshot.png.width,
-      height: action.expectedScreenshot.png.height,
-    });
-    super({
-      action: action,
-      bounds: bounds,
-      applicablePngSize,
-    });
+  constructor({ condition, action }) {
+    super({ action, condition });
   }
 
   /**
-   * Poke the pixels in this correction into the acceptable
-   * pixels screenshot as orange pixels.
+   * Poke the corresponding red pixel from the condition as orange
+   * in the action.acceptablePixelDifferences.
    * @param {TestAction} action the action to apply this correction to.
    */
   apply(action) {
@@ -473,18 +382,30 @@ export class AntiAliasCorrection extends SparseApplyCorrection {
     }
 
     let pngChanged = false;
-    // Array.forEach will not call the callback on undefined
-    // elements an array. Hence efficient, for sparse martrix.
-    this.pixelCondition.forEach((vline, x_index) => {
-      vline.forEach((pixel, y_index) => {
-        var idx = (this.applicablePngSize.width * y_index + x_index) << 2;
-        for (let b = 0; b < 4; ++b) {
-          action.acceptablePixelDifferences.png.data[idx + b] =
-            orangePixel._bytes[b];
+    let acceptableDifferencesPng = action.acceptablePixelDifferences.png;
+
+    for (let y = 0; y < this.condition.height; ++y) {
+      if (this.condition.y0 + y >= acceptableDifferencesPng.height) {
+        break; // ignore off by one type errors
+      }
+      //console.log(`write row ${y} -> ${this.condition.y0 + y}`);
+      let acceptableDifferencesRow = new Uint32Array(
+        acceptableDifferencesPng.data.buffer,
+        ((this.condition.y0 + y) * acceptableDifferencesPng.width) << 2,
+        acceptableDifferencesPng.width
+      );
+      let conditionRowOffset = y * this.condition.width;
+      for (let x = 0; x < this.condition.width; ++x) {
+        if (this.condition.pixels[conditionRowOffset + x] == redPixel) {
+          pngChanged = true;
+          acceptableDifferencesRow[this.condition.x0 + x] = orangePixel;
+        } else {
+          acceptableDifferencesRow[this.condition.x0 + x] =
+            this.condition.pixels[conditionRowOffset + x];
         }
-        pngChanged = true;
-      });
-    });
+      }
+    }
+
     if (pngChanged) {
       action.acceptablePixelDifferences.pngDataChanged();
       action.dirty = true;
@@ -496,21 +417,13 @@ export class AntiAliasCorrection extends SparseApplyCorrection {
  * Concrete correction. Used to correct an area by overwriting the
  * expected pixels with the actual pixels.
  */
-export class ActualCorrection extends SparseApplyCorrection {
+export class ActualCorrection extends Correction {
   /**
    * @param {object} args named arguments
    * @param {TestAction} args.action the action this correction was constructed from
    */
-  constructor({ bounds, action }) {
-    let applicablePngSize = new BoundingBox({
-      width: action.expectedScreenshot.png.width,
-      height: action.expectedScreenshot.png.height,
-    });
-    super({
-      action: action,
-      bounds: bounds,
-      applicablePngSize,
-    });
+  constructor({ condition, action }) {
+    super({ action, condition });
   }
 
   /**
@@ -525,10 +438,10 @@ export class ActualCorrection extends SparseApplyCorrection {
 
     let expected = action.expectedScreenshot.png.data;
     let actual = action.actualScreenshot.png.data;
-    let ymax = this.bounds.y0 + this.bounds.height;
-    let xmax = this.bounds.x0 + this.bounds.width;
-    for (var y = this.bounds.y0; y <= ymax; y++) {
-      for (var x = this.bounds.x0; x <= xmax; x++) {
+    let ymax = this.condition.y0 + this.condition.height;
+    let xmax = this.condition.x0 + this.condition.width;
+    for (var y = this.condition.y0; y <= ymax; y++) {
+      for (var x = this.condition.x0; x <= xmax; x++) {
         var idx = (this.applicablePngSize.width * y + x) << 2;
         expected[idx + 0] = actual[idx + 0];
         expected[idx + 1] = actual[idx + 1];
@@ -536,7 +449,7 @@ export class ActualCorrection extends SparseApplyCorrection {
         expected[idx + 3] = actual[idx + 3];
       }
     }
-    if (this.bounds.y0 <= ymax && this.bounds.x0 <= xmax) {
+    if (this.condition.y0 <= ymax && this.condition.x0 <= xmax) {
       // we did poke some data.
       action.expectedScreenshot.pngDataChanged();
     }
@@ -546,7 +459,15 @@ export class ActualCorrection extends SparseApplyCorrection {
 export class Rectangle {
   _coords = [];
 
-  constructor({ x0 = 0, y0 = 0, x1 = 0, y1 = 0, container = null, type = '' }) {
+  constructor({
+    x0 = 0,
+    y0 = 0,
+    x1 = 0,
+    y1 = 0,
+    container = null,
+    type = '',
+    classes = '',
+  }) {
     this._coords = [
       { x: x0, y: y0 },
       { x: x1, y: y1 },
@@ -555,7 +476,7 @@ export class Rectangle {
       type = `type="${type}"`;
     }
 
-    const rectangle = $(`<div class="rectangle" ${type}></div>`)[0];
+    const rectangle = $(`<div class="rectangle ${classes}"${type}></div>`)[0];
     let c = container ?? Rectangle.container;
     c.appendChild(rectangle);
 
@@ -608,6 +529,7 @@ Rectangle.setContainer = function (container, addCallback, delCallback) {
       y0: e.clientY - container.offsetTop,
       x1: e.clientX - container.offsetLeft,
       y1: e.clientY - container.offsetTop,
+      classes: 'manual',
     });
   });
 

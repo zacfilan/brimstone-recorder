@@ -234,13 +234,12 @@ export class Tab {
       url: url, // this better be an URL I can attach a debugger to!
     };
 
-    // does this anyway!
-    // if (removedWindow) {
-    //   createParms.height = removedWindow.height;
-    //   createParms.width = removedWindow.width;
-    //   createParms.top = removedWindow.top;
-    //   createParms.left = removedWindow.left;
-    // }
+    if (removedWindow) {
+      createParms.height = removedWindow.height;
+      createParms.width = removedWindow.width;
+      createParms.top = removedWindow.top;
+      createParms.left = removedWindow.left;
+    }
 
     let chromeWindow = await chrome.windows.create(createParms);
     [this.chromeTab] = await chrome.tabs.query({
