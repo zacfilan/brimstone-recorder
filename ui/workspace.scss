@@ -705,6 +705,10 @@ button {
     }
     display: flex;
     flex-direction: row;
+
+    #correctionButtons {
+      display: flex;
+    }
   }
 }
 

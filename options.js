@@ -209,6 +209,15 @@ export class Options {
   clearConsoleBeforeMeasuringMemory = true;
 
   /**
+   * When hovering over an icon this is the default size max width rectangle it will use
+   */
+  autoRectangleMaxWidth = 100;
+  /**
+   * When hovering over an icon this is the default size max width rectangle it will use
+   */
+  autoRectangleMaxHeight = 100;
+
+  /**
    * Copy constructor
    * @param {Options} other
    */

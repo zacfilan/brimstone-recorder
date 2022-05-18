@@ -1016,6 +1016,12 @@ button img {
   border: 1px solid green;
 }
 
+.card.waiting .actions #correctionButtons {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+
 /** only show the meter on the next card when playing back */
 #step {
   height: 100%;

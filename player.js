@@ -333,6 +333,14 @@ export class Player {
           );
           next._view = constants.view.EDIT;
           bailEarly = true;
+          if (
+            action.tab.height !== next.tab.height ||
+            action.tab.width !== next.tab.width
+          ) {
+            await brimstone.window.alert(
+              'Heads up, the expected viewport size does not match the actual viewport size.\n\nThis normally should not occur. Your recording may be corrupted.'
+            );
+          }
           break;
         case constants.match.CANCEL:
         case constants.match.BREAKPOINT:
