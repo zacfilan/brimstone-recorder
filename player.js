@@ -334,8 +334,10 @@ export class Player {
           next._view = constants.view.EDIT;
           bailEarly = true;
           if (
-            next.actualScreenshot.png.height !== next.tab.height ||
-            next.actualScreenshot.png.width !== next.tab.width
+            next.actualScreenshot.png.height !==
+              next.expectedScreenshot.png.height ||
+            next.actualScreenshot.png.width !==
+              next.expectedScreenshot.png.width
           ) {
             await brimstone.window.alert(
               'Heads up, the expected viewport size does not match the actual viewport size.\n\nThis normally should not occur. Your recording may be corrupted.'
