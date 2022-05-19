@@ -122,6 +122,39 @@ class Workspace {
    */
   nameOfLastUserActionExecuted;
 
+  async clearAllowedDifferences() {
+    let correctedActions = Test.current.steps.filter(
+      (s) => s.acceptablePixelDifferences
+    );
+    if (correctedActions.length) {
+      let ok = await brimstone.window.confirm(
+        `Clear acceptable pixel dfference corrections made from ${correctedActions.length} action(s) in test '${Test.current.filename}'?`
+      );
+      if (ok) {
+        for (let i = 0; i < correctedActions.length; ++i) {
+          let action = correctedActions[i];
+          delete action.acceptablePixelDifferences;
+          action.dirty = true;
+        }
+        delete PlayTree.complete.uniqueZipFilenames[Test.current.filename];
+      }
+    }
+  }
+
+  /**
+   * load every different test in the suite and
+   * then clear the data from it.
+   */
+  async clearAllowedSuiteDifferences() {
+    // create a unique list of zipnode filenames
+    PlayTree.complete.uniqueZipFilenames = {};
+    for (let i = 0; i < zipNodes.length; ++i) {
+      let zipNode = zipNodes[i];
+      PlayTree.complete.uniqueZipFilenames[zipNode._fileHandle.name] = true;
+    }
+    await this.clearAllowedDifferences(); // clear the one we are on right now
+  }
+
   /** go to the first zip in the list */
   async gotoFirstZip() {
     await loadTest(1);
@@ -1403,6 +1436,11 @@ function setToolbarState() {
       if (Test.current.steps.length) {
         $('[data-action="saveZip"]').attr('disabled', false);
         $('[data-action="clearWorkspace"]').attr('disabled', false);
+        $('[data-action="clearAllowedDifferences"]').attr('disabled', false);
+        $('[data-action="clearAllowedSuiteDifferences"]').attr(
+          'disabled',
+          false
+        );
 
         $('.edit.option [data-action]').attr('disabled', false); // everything under edit
         $('[data-action="deleteAction"]').attr('disabled', false); // delete action icon on card
@@ -2475,6 +2513,9 @@ async function loadTest(testNumber) {
     window.document.title = `Brimstone - ${Test.current._playTree.path()}${suite}`;
     await updateStepInView(Test.current.steps[0]);
     setToolbarState();
+    if (PlayTree.complete.uniqueZipFilenames[Test.current.filename]) {
+      await workspace.clearAllowedDifferences();
+    }
     return true;
   } catch (e) {
     if (e instanceof Errors.InvalidVersion) {
@@ -2490,7 +2531,7 @@ async function loadTest(testNumber) {
 
 /** The filehandles of the tests the user loaded. Used for playing back 1 or more tests.
  * This flat list may be larger than 1 if the user multiselected tests and/or selected
- * a playlist. This flattens that all into a sequence of zips tat are to be played.
+ * a playlist. This flattens that all into a sequence of zips that are to be played.
  * The current zipNode being played is in {@link currentTestNumber}-1.
  * @type {PlayTree[]}
  */
@@ -2657,7 +2698,7 @@ async function userEventToAction(userEvent, insert = true) {
   // which has a dependency on this call because it can set the index
   if (insert) {
     Test.current.updateOrAppendAction(testAction);
-    testAction.dirty = true;
+    testAction.dirty = true; // only during recording would we set this to true
   }
   let element = userEvent.boundingClientRect;
 

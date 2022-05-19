@@ -136,10 +136,10 @@ export class BoundingBox {
  */
 class Condition extends BoundingBox {
   /**
-   * PNG style array/matrix of pixel data.
-   * @type {Uint32Array}
+   * Sub - screenshot of the condition extracted from the pixel delta screenshot
+   * @type {Screenshot}
    */
-  pixels;
+  screenshot;
 
   /**
    *
@@ -147,7 +147,7 @@ class Condition extends BoundingBox {
    */
   constructor(other = {}) {
     super(other);
-    this.pixels = new Uint32Array(other.pixels);
+    this.png = new PNG(other.png);
   }
 }
 
@@ -195,7 +195,7 @@ export class Correction {
       height: action.expectedScreenshot.png.height,
     });
     this.condition = new Condition(condition);
-    this._calculateConditionPixels(
+    this._calculateConditionScreenshot(
       action.expectedScreenshot.png,
       action.actualScreenshot.png,
       action.pixelDiffScreenshot.png
@@ -213,6 +213,8 @@ export class Correction {
       return false;
     }
 
+    let pixels = this.condition.screenshot.getPixelsAsUint32Array();
+
     for (let y = 0; y < this.condition.height; ++y) {
       if (this.condition.y0 + y >= pixelDiffPng.height) {
         break; // ignore off by one type errors
@@ -226,19 +228,18 @@ export class Correction {
       let conditionRowOffset = y * this.condition.width;
       for (let x = 0; x < this.condition.width; ++x) {
         if (
-          this.condition.pixels[conditionRowOffset + x] !==
+          pixels[conditionRowOffset + x] !==
           pixelDiffPngRow[this.condition.x0 + x]
         ) {
           return false;
         }
       }
-
-      return true;
     }
+    return true;
   }
 
   /**
-   * Build the ({@link Condition.pixels})
+   * Build the ({@link Condition.screenshot})
    * from the passed in PNGs. Extracts a PNG from the
    * deltaPng using the condition dimensions/coordinates.
    *
@@ -246,7 +247,7 @@ export class Correction {
    * @param {PNG} actualPng the actual screenshot
    * @param {PNG} deltaPng the screenshot showing the delta between the the two above. a red pixel is a delta. orange/yellow are unpredictable, greyscale fine.
    */
-  _calculateConditionPixels(expectedPng, actualPng, deltaPng) {
+  _calculateConditionScreenshot(expectedPng, actualPng, deltaPng) {
     if (
       !(
         expectedPng.width === actualPng.width &&
@@ -256,14 +257,14 @@ export class Correction {
       throw new Error('Widths do not match!');
     }
 
-    let p = new Screenshot({
+    this.condition.screenshot = new Screenshot({
       png: new PNG({
         width: this.condition.width,
         height: this.condition.height,
       }),
     });
 
-    this.condition.pixels = new Uint32Array(p.png.data.buffer); //  this.condition.len);
+    let pixels = this.condition.screenshot.getPixelsAsUint32Array(); //  this.condition.len);
 
     // extract the rectangle of pixels from the larger PNG by rows
     for (let y = 0; y < this.condition.height; ++y) {
@@ -276,8 +277,7 @@ export class Correction {
         deltaPng.width
       );
       for (let x = 0; x < this.condition.width; ++x) {
-        this.condition.pixels[y * this.condition.width + x] =
-          bigRow[this.condition.x0 + x];
+        pixels[y * this.condition.width + x] = bigRow[this.condition.x0 + x];
       }
     }
   }
@@ -383,6 +383,7 @@ export class AntiAliasCorrection extends Correction {
 
     let pngChanged = false;
     let acceptableDifferencesPng = action.acceptablePixelDifferences.png;
+    let pixels = this.condition.screenshot.getPixelsAsUint32Array();
 
     for (let y = 0; y < this.condition.height; ++y) {
       if (this.condition.y0 + y >= acceptableDifferencesPng.height) {
@@ -396,12 +397,12 @@ export class AntiAliasCorrection extends Correction {
       );
       let conditionRowOffset = y * this.condition.width;
       for (let x = 0; x < this.condition.width; ++x) {
-        if (this.condition.pixels[conditionRowOffset + x] == redPixel) {
+        if (pixels[conditionRowOffset + x] == redPixel) {
           pngChanged = true;
           acceptableDifferencesRow[this.condition.x0 + x] = orangePixel;
         } else {
           acceptableDifferencesRow[this.condition.x0 + x] =
-            this.condition.pixels[conditionRowOffset + x];
+            pixels[conditionRowOffset + x];
         }
       }
     }

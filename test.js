@@ -636,6 +636,12 @@ export class PlayTree {
   _zipTest;
 
   /**
+   * The keys provide a "list" of the unique filenames of the ziptests under this tree.
+   * Used by the root node to clear allowed pixel differences of a suite.
+   */
+  uniqueZipFilenames = {};
+
+  /**
    * If this node is for a ziptest the number of steps in this
    * zip test will be stored in here. Used for ETA.
    * @type {number}

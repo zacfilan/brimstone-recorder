@@ -39,6 +39,14 @@ export class Screenshot {
     return this._dataUrl;
   }
 
+  /**
+   * Return a view into the pixel buffer of the png.
+   *
+   */
+  getPixelsAsUint32Array() {
+    return new Uint32Array(this.png.data.buffer);
+  }
+
   set dataUrl(to) {
     this._dataUrl = to;
   }

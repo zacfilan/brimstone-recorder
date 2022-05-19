@@ -334,8 +334,8 @@ export class Player {
           next._view = constants.view.EDIT;
           bailEarly = true;
           if (
-            action.tab.height !== next.tab.height ||
-            action.tab.width !== next.tab.width
+            next.actualScreenshot.png.height !== next.tab.height ||
+            next.actualScreenshot.png.width !== next.tab.width
           ) {
             await brimstone.window.alert(
               'Heads up, the expected viewport size does not match the actual viewport size.\n\nThis normally should not occur. Your recording may be corrupted.'
@@ -829,6 +829,7 @@ export class Player {
         let correctionApplied = false;
         Correction.availableInstances.forEach((correction) => {
           if (options.autoCorrect && correction.matches(nextStep)) {
+            // console.log('autocorrect', correction.condition.screenshot.dataUrl); // great for seeing the correction applied
             correction.apply(nextStep);
             nextStep.dirty = true;
             correctionApplied = true;
