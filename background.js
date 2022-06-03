@@ -125,18 +125,30 @@ async function actionOnClickedHandler(tab) {
   let width = result?.window?.width ?? 640;
   let left = result?.window?.left;
   let top = result?.window?.top;
-  let window = await chrome.windows.create({
-    url: chrome.runtime.getURL(
-      `ui/workspace.html?parent=${currentWindow.id}&tab=${tab.id}`
-    ),
-    type: 'popup',
-    focused: true,
-    width,
-    height,
-    top,
-    left,
-  });
-
+  let window;
+  try {
+    window = await chrome.windows.create({
+      url: chrome.runtime.getURL(
+        `ui/workspace.html?parent=${currentWindow.id}&tab=${tab.id}`
+      ),
+      type: 'popup',
+      focused: true,
+      width,
+      height,
+      top,
+      left,
+    });
+  } catch (e) {
+    // if the last location was on some other monitor you docked with then undocked you might not be able to position it there.
+    window = await chrome.windows.create({
+      url: chrome.runtime.getURL(
+        `ui/workspace.html?parent=${currentWindow.id}&tab=${tab.id}`
+      ),
+      type: 'popup',
+      focused: true,
+    });
+    await windowsOnBoundsChangedHandler(window);
+  }
   // keep track of the brimstone window id, and the tab in it between invocations of this worker (i.e. multiple clicks of icon)
   await chrome.storage.local.set({
     workspace: { windowId: window.id, tabId: window.tabs[0].id },
