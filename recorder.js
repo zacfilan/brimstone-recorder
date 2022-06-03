@@ -315,9 +315,6 @@ class Recorder {
      */
     this.mousePhase = null;
 
-    /** used to passively monitor events */
-    this._debugMode = false;
-
     this.removeEventListeners();
 
     /**
@@ -521,7 +518,7 @@ class Recorder {
   }
 
   /**
-   * Enqueue a message to send to the bristone workspace over the recording channel port.
+   * Enqueue a message to send to the brimstone workspace over the recording channel port.
    *
    * If there is nothing pending it will be immediated transmitted.
    *
@@ -713,7 +710,7 @@ class Recorder {
     return msg;
   }
 
-  /** Add event listeners to the window, some events will be passed*/
+  /** Add event listeners to the window, some events will be passed */
   addEventListeners(...only) {
     //console.debug('removing + adding event listeners');
     Recorder.events
@@ -723,6 +720,9 @@ class Recorder {
           capture: true,
           passive: false,
         });
+        // see passive for wheel etc. https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+        // capture/bubbling phases: https://javascript.info/bubbling-and-capturing
+        // i use capture, to still be able to intercept user actions prior to elements that register their own handlers (which might stop bubbling).
         window.addEventListener(event, this, { capture: true, passive: false });
       });
   }
@@ -854,12 +854,12 @@ class Recorder {
     this.event = e;
     let msg;
 
-    if (this._debugMode) {
+    if (this.options.debugRecorder) {
       return this.propagate(e); // for debugging
     }
 
     console.debug(`${e.type} ${e.brimstoneClass} SEEN`, e);
-    // This message can't be folded into the swtich below, we receive it for any user action currently being recorded.
+    // This message can't be folded into the switch below, we receive it for any user action currently being recorded.
     if (e.type === 'message') {
       /**
        * A child (possibly x-origin) frame needs to know its
@@ -911,7 +911,8 @@ class Recorder {
         e.type === 'keydown' ||
         e.type === 'keyup' ||
         e.type === 'wheel' ||
-        e.type === 'scroll'
+        e.type === 'scroll' ||
+        e.type === 'keypress'
       ) {
         // expected - these will be processed by the big recorder swtich
       } else {
@@ -1020,18 +1021,9 @@ class Recorder {
           return this.propagate(e); // just watch/record them
         }
       case 'keyup':
-        this.handleKey(e);
-        return this.cancel(e);
       case 'keydown':
-        this.mouseDown = false; // FIXME: WTF? cancel mousemove recording in process
-        if (e.repeat) {
-          return;
-        }
-
-        this.handleKey(e);
-        return this.cancel(e);
       case 'keypress':
-        return this.cancel(e);
+        return this.handleKey(e);
       case 'contextmenu':
       case 'dblclick':
         if (this.mouseMovePending) {
@@ -1213,28 +1205,42 @@ class Recorder {
   /**
    * Start/Continue an observed sequence of user key events to some element.
    *
-   * Send a properly formatted keys message to the extension to implement
-   * that. On the first keydown we take a screenshot, before we simulate.
-   * We also schedule a callback in the future to send the record message
-   * for the aggregate keystrokes.
+   * simulate everything https://github.com/zacfilan/brimstone-recorder/wiki/Developer-Guide#option-0-simulate-everything
+   * except for [Enter] which has a weird bug I can't figure out https://github.com/zacfilan/brimstone-recorder/issues/237
    *
-   * This should work very miuch like mousemove recording, except we simulate the keystrokes to
-   * give fast feedback to the user in the app.
    *
    */
   handleKey(e) {
-    this.mouseDown = false; // FIXME: WTF? cancel mousemove recording in process
+    this.queueKeyAction(e);
+    if (e.key === 'Enter') {
+      return this.propagate(e); // explicitly generate the (char action) aka (keypress event)
+    }
+    this.playKeyAction(e);
+    return this.cancel(e);
+  }
 
+  /**
+   * push into keyeventqueue and (re)schedule a future record action for simulated key actions
+   * @param {Event} e
+   * @returns
+   */
+  queueKeyAction(e) {
+    this.mouseDown = false; // FIXME: WTF? cancel mousemove recording in process
     if (e.repeat) {
       return;
     }
-    let record = false;
     this.keyEventQueue.push(e); // throw the key event on the end, simulate immediately, and record it later.
     if (this.keyEventQueue.length == 1) {
       this.setCursorCssTo(this.keyboardCursor);
     }
     this._scheduleRecordKeySequence();
+  }
 
+  /**
+   * Simulate the user action associated with the given event
+   * @param {Event} e
+   */
+  playKeyAction(e) {
     let rect = e.target.getBoundingClientRect();
     this.pushMessage({
       type: e.type, // simulate the down or the up in the order they are queued
@@ -1257,7 +1263,6 @@ class Recorder {
       },
     });
   }
-
   /**
    * The RECORDER will handle this event. It will (try to) cancel it. Try to prevent the application from seeing it. Not bubbled etc.
    *
@@ -1275,7 +1280,8 @@ class Recorder {
     e.preventDefault();
     e.stopImmediatePropagation();
     e.stopPropagation();
-    return false;
+    // obsolete? - https://developer.mozilla.org/en-US/docs/Web/API/Event/returnValue
+    return false; // default action should not occur
   }
 
   /**
@@ -1287,9 +1293,12 @@ class Recorder {
       `EVENT ${e.type} ${e.brimstoneClass} *propagated frameId:${this._frameId} ${window.location.href}`,
       e
     );
+    // obsolete - https://developer.mozilla.org/en-US/docs/Web/API/Event/returnValue
+    //return true; // defaullt action can occur
   }
 } // end class Recorder
 
+// https://developer.mozilla.org/en-US/docs/Web/Events#event_listing
 Recorder.events = [
   // comments describe what is done when recording, not handling 'simulated' events.
   // simulated events all bubble directly to the app.
@@ -1310,7 +1319,10 @@ Recorder.events = [
   'focus', // blocked. it changes styles. e.g. border.
   'focusin', // blocked. it changes styles. e.g. border.
   'blur', // blocked. it changes styles. e.g. border.
-  'submit', // blocked. this can submit a form and start a navigation and I can't have that until I am simulating.
+
+  // https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/submit_event
+  'submit', // should i block and queue this? type something then *keydown* <Enter> can submit a form and start a navigation. the form is being submitted empty somehow.
+
   'invalid', // blocked. ''
   'change', // blocked. it changes styles. e.g. (x) on a combobox.
 

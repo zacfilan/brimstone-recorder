@@ -101,3 +101,14 @@ export class DebuggerAttachError extends Error {
     super(msg || 'Cannot attach the debugger.');
   }
 }
+
+/**
+ * An error that indicates that we were unable to connect to the frame for messages passing.
+ */
+export class ConnectionError extends Error {
+  constructor(msg) {
+    super(
+      msg || 'Could not establish connection. Receiving end does not exist.'
+    );
+  }
+}

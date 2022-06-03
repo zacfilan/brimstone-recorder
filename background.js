@@ -26,24 +26,30 @@ async function tabsOnActivatedHandler(activeInfo) {
  * Pay attention to tabs being removed.
  * */
 async function tabsOnRemovedHandler(tabId, removeInfo) {
-  // If it was the tab we used to open the workspace, then we need to close the workspace window.
+  // If it was the brimstone workspace that the user closed we should clean up.
+  // 1) If we are playing we should close the app window too.
+  // 2) If we are recording we should close the app window too.
+  // 3) else we should reset the extension icon to the inactive state
   //console.debug('tab removed ', tabId, removeInfo);
-  let workspace = await getWorkspaceInfo();
-  if (tabId === workspace?.tabId) {
-    await Promise.all([
-      chrome.action.setIcon({ path: 'images/grey_b_32.png' }),
-      chrome.action.setTitle({ title: 'Brimstone is not active.' }),
-    ]);
 
-    // disconnect the handlers
-    chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
-    chrome.windows.onBoundsChanged.removeListener(
-      windowsOnBoundsChangedHandler
-    );
-    chrome.windows.onCreated.removeListener(windowsOnCreatedHandler);
-    chrome.tabs.onCreated.removeListener(tabsOnCreatedHandler);
-    chrome.tabs.onRemoved.removeListener(tabsOnRemovedHandler);
-    chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
+  if (removeInfo.isWindowClosing) {
+    let workspace = await getWorkspaceInfo();
+    if (tabId === workspace?.tabId) {
+      await Promise.all([
+        chrome.action.setIcon({ path: 'images/grey_b_32.png' }),
+        chrome.action.setTitle({ title: 'Brimstone is not active.' }),
+      ]);
+
+      // disconnect the handlers
+      chrome.windows.onRemoved.removeListener(windowsOnRemovedHandler);
+      chrome.windows.onBoundsChanged.removeListener(
+        windowsOnBoundsChangedHandler
+      );
+      chrome.windows.onCreated.removeListener(windowsOnCreatedHandler);
+      chrome.tabs.onCreated.removeListener(tabsOnCreatedHandler);
+      chrome.tabs.onRemoved.removeListener(tabsOnRemovedHandler);
+      chrome.tabs.onActivated.removeListener(tabsOnActivatedHandler);
+    }
   }
 }
 
@@ -132,7 +138,7 @@ async function actionOnClickedHandler(tab) {
   });
 
   // keep track of the brimstone window id, and the tab in it between invocations of this worker (i.e. multiple clicks of icon)
-  chrome.storage.local.set({
+  await chrome.storage.local.set({
     workspace: { windowId: window.id, tabId: window.tabs[0].id },
   });
 

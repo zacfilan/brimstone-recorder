@@ -888,6 +888,11 @@ async function errorHandler(e) {
     case Errors.TestSaveError:
       await brimstone.window.alert(e.stack);
       break;
+    case Errors.ConnectionError:
+      await brimstone.window.alert(
+        `Brimstone can't connect to a frame in the current tab. This can happen if there are advertisement frames in the tab. If this is the case use a strong ad blocker!\n\nYou may also need to configure your ad blocker to block everything, including "acceptable ads".`
+      );
+      break;
     default:
       await brimstone.window.error(e);
       break;
@@ -1000,9 +1005,9 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
         event.returnValue = `🙋❓ File '${Test.current.filename}' has unsaved changes.\n\nExit without saving?`;
 
         event.preventDefault();
-        return event.returnValue;
+        return event.returnValue; // the confirm will be displayed
       }
-      return false;
+      return false; // the confirm will not be displayed
     };
 
     window.addEventListener('beforeunload', beforeUnloadListener, {
@@ -2431,6 +2436,12 @@ async function recordSomething(promptForUrl) {
     if (e instanceof Errors.NoActiveTab) {
       infobar.setText(`❌ recording canceled - ${e?.message ?? ''}`);
     } else {
+      if (
+        e.message ===
+        'Could not establish connection. Receiving end does not exist.'
+      ) {
+        throw new Errors.ConnectionError();
+      }
       throw e;
     }
   }

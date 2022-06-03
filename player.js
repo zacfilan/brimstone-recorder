@@ -403,46 +403,46 @@ export class Player {
     }
   }
 
+  /**
+   * Perform a user char action. this will produce
+   * a keypress event back in the DOM.
+   * @param {*} action
+   */
   async keypress(action) {
     // simulate a keypress https://chromedevtools.github.io/devtools-protocol/1-3/Input/#method-dispatchKeyEvent
-    let keycode = action.event.keyCode;
+    let modifiers = 0;
+    let event = action.event;
+    let keycode = event.keyCode;
 
-    await this.debuggerSendCommand('Input.dispatchKeyEvent', {
-      type: 'keyDown',
-      code: action.event.code,
-      key: action.event.key,
-      windowsVirtualKeyCode: keycode,
-      nativeVirtualKeyCode: keycode,
-    });
-    // FIXME: Verify that [ENTER] prints correctly when in a textarea
-    // https://stackoverflow.com/questions/1367700/whats-the-difference-between-keydown-and-keypress-in-net
-    var printable =
-      (keycode > 47 && keycode < 58) || // number keys
-      keycode == 32 ||
-      keycode == 13 || // spacebar & return key(s) (if you want to allow carriage returns)
-      (keycode > 64 && keycode < 91) || // letter keys
-      (keycode > 95 && keycode < 112) || // numpad keys
-      (keycode > 185 && keycode < 193) || // ;=,-./` (in order)
-      (keycode > 218 && keycode < 223); // [\]' (in order)
-    if (printable) {
-      let msg = {
-        type: 'char',
-        code: action.event.code,
-        key: action.event.key,
-        text: keycode == 13 ? '\r' : action.event.key,
-        unmodifiedtext: action.event.key,
-        windowsVirtualKeyCode: keycode,
-        nativeVirtualKeyCode: keycode,
-      };
-      await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
+    modifiers |= event.altKey ? 1 : 0;
+    modifiers |= event.ctrlKey ? 2 : 0;
+    modifiers |= event.metaKey ? 4 : 0;
+    modifiers |= event.shiftKey ? 8 : 0;
+
+    if (modifiers === 0 || modifiers === 8) {
+      // FIXME: Verify that [ENTER] prints correctly when in a textarea
+      // https://stackoverflow.com/questions/1367700/whats-the-difference-between-keydown-and-keypress-in-net
+      var printable =
+        (keycode > 47 && keycode < 58) || // number keys
+        keycode == 32 || // spacebar
+        keycode == 13 || // return key(s) (if you want to allow carriage returns)
+        (keycode > 64 && keycode < 91) || // letter keys
+        (keycode > 95 && keycode < 112) || // numpad keys
+        (keycode > 185 && keycode < 193) || // ;=,-./` (in order)
+        (keycode > 218 && keycode < 223); // [\]' (in order)
+      if (printable) {
+        let msg = {
+          type: 'char',
+          code: action.event.code,
+          key: action.event.key,
+          text: keycode == 13 ? '\r' : action.event.key,
+          unmodifiedtext: action.event.key,
+          windowsVirtualKeyCode: keycode,
+          nativeVirtualKeyCode: keycode,
+        };
+        await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
+      }
     }
-    await this.debuggerSendCommand('Input.dispatchKeyEvent', {
-      type: 'keyUp',
-      code: action.event.code,
-      key: action.event.key,
-      windowsVirtualKeyCode: action.event.keyCode,
-      nativeVirtualKeyCode: action.event.keyCode,
-    });
   }
 
   async wait(action) {
@@ -636,13 +636,16 @@ export class Player {
     }
 
     // used in conjustion with the inscript focus to hit escape on the SELECT.
-    await this.keypress({
+    let escapeKey = {
       event: {
         keyCode: 27,
         code: 'Escape',
         key: 'Escape',
       },
-    });
+    };
+
+    await this.keydown(escapeKey);
+    await this.keyup(escapeKey);
   }
 
   // FIXME: I don't think I ever record this event, so no need to play it
@@ -665,6 +668,10 @@ export class Player {
     }
   }
 
+  /**
+   * will perform a keydown action and a keypress(char) action for any printable key other than Enter.
+   * @param {*} action
+   */
   async keydown(action) {
     let modifiers = 0;
     let event = action.event;
@@ -683,38 +690,21 @@ export class Player {
       windowsVirtualKeyCode: keycode,
       nativeVirtualKeyCode: keycode,
     });
-
-    if (modifiers === 0 || modifiers === 8) {
-      // FIXME: Verify that [ENTER] prints correctly when in a textarea
-      // https://stackoverflow.com/questions/1367700/whats-the-difference-between-keydown-and-keypress-in-net
-      var printable =
-        (keycode > 47 && keycode < 58) || // number keys
-        keycode == 32 ||
-        keycode == 13 || // spacebar & return key(s) (if you want to allow carriage returns)
-        (keycode > 64 && keycode < 91) || // letter keys
-        (keycode > 95 && keycode < 112) || // numpad keys
-        (keycode > 185 && keycode < 193) || // ;=,-./` (in order)
-        (keycode > 218 && keycode < 223); // [\]' (in order)
-      if (printable) {
-        let msg = {
-          type: 'char',
-          code: event.code,
-          key: event.key,
-          text: keycode == 13 ? '\r' : event.key,
-          unmodifiedtext: event.key,
-          windowsVirtualKeyCode: keycode,
-          nativeVirtualKeyCode: keycode,
-        };
-        await this.debuggerSendCommand('Input.dispatchKeyEvent', msg);
-      }
+    if (event.key !== 'Enter' && (modifiers === 0 || modifiers === 8)) {
+      this.keypress(action);
     }
   }
 
+  /**
+   * For each keyevent (keydown, keyup, and possibly keypress only for 'Enter')
+   * in the array generate the corresponding user action.
+   * @param {*} action
+   */
   async keys(action) {
     for (let i = 0; i < action.event.length; ++i) {
       let event = action.event[i];
       // simulate slower typing
-      if (options.userKeypressDelay) {
+      if (options.userKeypressDelay && event.type === 'keydown') {
         await sleep(options.userKeypressDelay);
       }
       await this[event.type]({ event }); // pretend it is a distinct action
