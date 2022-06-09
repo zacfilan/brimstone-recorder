@@ -1828,6 +1828,25 @@ async function hideCursor() {
 }
 
 /**
+ * Show the cursor in all frames. If this test is so specified.
+ */
+async function showCursor() {
+  if (Test.current.hideCursor) {
+    try {
+      await chrome.tabs.sendMessage(Tab.active.chromeTab.id, {
+        func: 'showCursor',
+      });
+    } catch (e) {
+      // i can't sendmessage to about:blank which makes no sense
+      // since i inject my recorder into it
+      // i.e. "match_about_blank": true is manifest
+      // trying to be clever enough to detect this isn't worth it
+      console.warn('unable to send a showCursor message to active tab');
+    }
+  }
+}
+
+/**
  * this is called (at least once) for *every* frame in details.tabId.
  *
  * every navigation in the main frame of the tab will result in any previously
@@ -2462,6 +2481,7 @@ async function _stopPlaying() {
   $('#playButton').removeClass('active');
   player.stopPlaying();
   removeEventHandlers();
+  await showCursor();
 }
 
 /**

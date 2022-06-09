@@ -384,7 +384,7 @@ class Recorder {
     this.waitActionDetectionTimeout = null;
     this.waitActionDetectionTimeout = setTimeout(
       () => this.recordWaitAction(),
-      1000
+      1173 // just drift and don't line go in phase with common intervals like 1 second
     );
   }
 
@@ -423,7 +423,13 @@ class Recorder {
         break;
       case 'hideCursor':
         this.injectCssNode();
+        this.showCaret(); // insure we only add the transparent line once
         this.hideCaret();
+        sendResponse();
+        break;
+      case 'showCursor':
+        this.injectCssNode();
+        this.showCaret(); // insure we only add the transparent line once
         sendResponse();
         break;
       case 'loadOptions':
@@ -558,6 +564,10 @@ class Recorder {
   tx() {
     if (this.messageQueue.length) {
       let msg = this.messageQueue[0];
+      if (msg.type === 'pollscreen') {
+        this.injectCssNode();
+        this.hideCaret();
+      }
       this._postMessage(msg);
       return true;
     }
@@ -595,6 +605,7 @@ class Recorder {
             if (msg.args !== 'pollscreen') {
               this.pushMessage({ type: 'pollscreen' });
             } else {
+              this.showCaret();
               this.scheduleWaitActionDetection(); // the queue is empty right now, if it is still empty in 1 sec take a picture
             }
           }
@@ -766,6 +777,15 @@ class Recorder {
   hideCaret() {
     let css = document.getElementById('brimstone-recorder-css');
     css.innerText += 'body {caret-color: transparent;}';
+  }
+
+  /** The caret is the blinky "cursor" in a text input. In contrast the "cursor" is the mouse cursor. */
+  showCaret() {
+    let css = document.getElementById('brimstone-recorder-css');
+    css.innerText = css.innerText.replace(
+      /body \{caret-color: transparent;\}/g,
+      ''
+    );
   }
 
   /** the mousecursor */
