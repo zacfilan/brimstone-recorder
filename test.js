@@ -1591,6 +1591,7 @@ export class TestAction {
     switch (view) {
       case constants.view.DYNAMIC:
       case constants.view.EXPECTED:
+      case constants.view.ACTION:
         ss = this.expectedScreenshot;
         break;
       case constants.view.EDIT:
