@@ -136,10 +136,24 @@ export class Options {
   captureScreenshotAsDataUrlForRecordingTimeout = 5000;
 
   /**
-   * How long we wait between back-to-bck attempts to capture a
+   * How long we wait between back-to-back attempts to capture a
    * screenshot of the correct size during record.
    */
   captureScreenshotAsDataUrlForRecordingRetryTimeout = 500;
+
+  /**
+   * How low should we wait for an overlay specfied with
+   * {@link waitForCssElementsToNotExistBeforeDriving} before
+   * we declare an error. In milliseconds.
+   */
+  maxTimeToWaitForOverlaysToBeRemoved = 3000;
+
+  /**
+   * How often do we submit the function to see if the overlay
+   * specified by {@link waitForCssElementsToNotExistBeforeDriving}
+   * has disappeared. In ms.
+   */
+  pollPeriodForOverlayToBeRemoved = 200;
 
   /**
    * Automatically apply "actual" type corrections.
@@ -216,6 +230,12 @@ export class Options {
    * When hovering over an icon this is the default size max width rectangle it will use
    */
   autoRectangleMaxHeight = 100;
+
+  /**
+   * If there is an (even invisible to the eye) overlay that is used to catch all actions, we need to wait for it
+   * to NOT be in the DOM before we try and submit actions.
+   */
+  waitForCssElementsToNotExistBeforeDriving = '';
 
   /**
    * Copy constructor

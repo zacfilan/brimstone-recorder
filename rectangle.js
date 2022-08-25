@@ -116,9 +116,9 @@ export class BoundingBox {
     if (y > this.y1) {
       this.height = y - this.y0 + 1; // bump up the y1
     }
-    console.log(
-      `${this.width}x${this.height}. ((${this.x0}, ${this.y0} to (${this.x1}, ${this.y1})) last:(${x},${y})`
-    );
+    // console.log(
+    //   `${this.width}x${this.height}. ((${this.x0}, ${this.y0} to (${this.x1}, ${this.y1})) last:(${x},${y})`
+    // );
   }
 
   addMargin(margin) {

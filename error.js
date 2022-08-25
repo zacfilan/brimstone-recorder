@@ -112,3 +112,12 @@ export class ConnectionError extends Error {
     );
   }
 }
+
+/**
+ * An error that indicats that the user supplied some bad CSS
+ */
+export class CssError extends Error {
+  constructor(msg) {
+    super(msg || 'CSS Error');
+  }
+}

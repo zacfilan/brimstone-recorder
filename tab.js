@@ -239,6 +239,9 @@ export class Tab {
       createParms.width = removedWindow.width;
       createParms.top = removedWindow.top;
       createParms.left = removedWindow.left;
+      // console.log(
+      //   `create window postion:(${window.top},${window.left} size:${window.width}x${window.height})`
+      // );
     }
 
     let chromeWindow = await chrome.windows.create(createParms);
