@@ -25,8 +25,7 @@ const leftArrow =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Pro 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. --><path d="M224 480c-8.188 0-16.38-3.125-22.62-9.375l-192-192c-12.5-12.5-12.5-32.75 0-45.25l192-192c12.5-12.5 32.75-12.5 45.25 0s12.5 32.75 0 45.25L77.25 256l169.4 169.4c12.5 12.5 12.5 32.75 0 45.25C240.4 476.9 232.2 480 224 480z"/></svg>';
 
 const noImageAvailableDataUrl =
-  'data:image/png;base64,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';
-
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKAQMAAAC3/F3+AAAABlBMVEX///+AgIBizNOVAAAAAXRSTlMAQObYZgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAAtJREFUCJljYMAHAAAeAAHu9nAhAAAAAElFTkSuQmCC';
 /**
  * A ziptest instance is a recording of user actions that can be played back
  * and verified.
@@ -931,6 +930,8 @@ export const constants = {
     NOTRUN: 'notrun',
     /** play stopped just prior to this action actully playing because of a breakpoint */
     BREAKPOINT: 'breakpoint',
+    /** action was not played because the wrong element would recieve the there was an overlay present (timeout) */
+    WRONG_ELEMENT: 'wrongElement',
   },
 };
 
@@ -1501,7 +1502,6 @@ export class TestAction {
       }
     }
   }
-
   /**
    * Return a card, this could be the first or second card in the step
    * */

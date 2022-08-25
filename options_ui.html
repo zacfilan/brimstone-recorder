@@ -113,6 +113,14 @@
                     </label>
                 </td>
             </tr>
+            <tr>
+                <td>
+                    CSS for elements that must NOT be in DOM to perform actions. (e.g. overlays)
+                </td>
+                <td>
+                    <input type="text" id="waitForCssElementsToNotExistBeforeDriving"></input>
+                </td>
+            </tr>
         </table>
     </details>
     <details>
@@ -391,10 +399,28 @@ screenshot of the correct size during recording.">
                         Capture Screenshot as Data Url f Recording Retry Timeout
                     </td>
                     <td>
-                        <input type="number" min="0" max="5000"
+                        <input type="number" min="0" max="45000"
                             id="captureScreenshotAsDataUrlForRecordingRetryTimeout"></input>
                     </td>
                 </tr>
+                <tr title="How often do we submit the function to see if the overlay has disappeared. In ms.">
+                    <td>
+                        Wait For Overlay Gone Poll Period
+                    </td>
+                    <td>
+                        <input type="number" min="0" max="5000"
+                            id="maxTimeToWaitForOverlaysToBeRemoved"></input>
+                    </td>
+                </tr>
+                <tr title="How low should we wait for an overlay to disappear before we declare an error. In ms.">
+                   <td>
+                       Wait For Overlay Gone Timeout
+                   </td>
+                   <td>
+                       <input type="number" min="0" max="5000"
+                           id="pollPeriodForOverlayToBeRemoved"></input>
+                   </td>
+               </tr>
             </table>
         </details>
     </details>

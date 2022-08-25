@@ -91,7 +91,7 @@ async function windowsOnBoundsChangedHandler(window) {
       },
     });
     // console.log(
-    //   `saved window postion:(${window.top},${window.left} size:${window.width}x${window.height}`
+    //   `saved window postion:(x:${window.left}, y:${window.top} size:${window.width}x${window.height})`
     // );
   }
 }

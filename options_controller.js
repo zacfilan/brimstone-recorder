@@ -35,6 +35,8 @@ async function setModelFromView() {
     userKeypressDelayLookup[parseInt(userKeypressSpeed.value, 10)];
   options.clearConsoleBeforeMeasuringMemory =
     clearConsoleBeforeMeasuringMemory.checked;
+  options.waitForCssElementsToNotExistBeforeDriving =
+    waitForCssElementsToNotExistBeforeDriving.value;
   //#endregion playback options
 
   //#region database options
@@ -94,6 +96,12 @@ async function setModelFromView() {
   options.captureScreenshotAsDataUrlForRecordingRetryTimeout = parseInt(
     captureScreenshotAsDataUrlForRecordingRetryTimeout.value
   );
+  options.pollPeriodForOverlayToBeRemoved = parseInt(
+    pollPeriodForOverlayToBeRemoved.value
+  );
+  options.maxTimeToWaitForOverlaysToBeRemoved = parseInt(
+    maxTimeToWaitForOverlaysToBeRemoved
+  );
   //#endregion timeouts
 
   //#endregion developer options
@@ -149,6 +157,8 @@ function setViewFromModel() {
   userMouseSpeed.value = userMouseDelayLookup.indexOf(options.userMouseDelay);
   clearConsoleBeforeMeasuringMemory.checked =
     options.clearConsoleBeforeMeasuringMemory;
+  waitForCssElementsToNotExistBeforeDriving.value =
+    options.waitForCssElementsToNotExistBeforeDriving;
   //#endregion playback options
 
   //#region database options
@@ -202,6 +212,12 @@ function setViewFromModel() {
 
   captureScreenshotAsDataUrlForRecordingRetryTimeout.value =
     options.captureScreenshotAsDataUrlForRecordingRetryTimeout;
+
+  pollPeriodForOverlayToBeRemoved.value =
+    options.pollPeriodForOverlayToBeRemoved;
+
+  maxTimeToWaitForOverlaysToBeRemoved.value =
+    options.maxTimeToWaitForOverlaysToBeRemoved;
   //#endregion timeouts
   //#endregion developer options
 

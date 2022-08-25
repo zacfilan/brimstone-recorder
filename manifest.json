@@ -1,10 +1,11 @@
 {
   "name": "Brimstone",
   "description": "Record and play Brimstone pixel-perfect webpage automation tests",
-  "version": "1.24.2",
+  "version": "1.24.3",
   "manifest_version": 3,
   "background": {
-    "service_worker": "background.js", "type": "module"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "permissions": [
     "storage",
@@ -13,10 +14,7 @@
     "webNavigation",
     "debugger"
   ],
-  "host_permissions": [
-    "*://*/",
-    "<all_urls>"
-  ],
+  "host_permissions": ["*://*/", "<all_urls>"],
   "action": {
     "default_icon": {
       "32": "images/grey_b_32.png"
@@ -29,13 +27,9 @@
   "options_page": "options_ui.html",
   "content_scripts": [
     {
-      "matches": [
-        "<all_urls>"
-      ],
+      "matches": ["<all_urls>"],
       "all_frames": true,
-      "js": [
-        "recorder.js"
-      ],
+      "js": ["recorder.js"],
       "run_at": "document_start",
       "match_about_blank": true
     }

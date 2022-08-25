@@ -4,7 +4,7 @@ import { Screenshot } from './ui/screenshot.js';
 
 const PNG = png.PNG;
 import { Tab } from './tab.js';
-import { sleep, brimstone, progressIndicator } from './utilities.js';
+import { sleep, brimstone, progressIndicator, pollFor } from './utilities.js';
 import { options, loadOptions, Options } from './options.js';
 import { Test, constants, TestAction } from './test.js';
 import * as Errors from './error.js';
@@ -69,6 +69,19 @@ function _changeSelectValue(x, y, value) {
     select.focus(); // used in conjunction with the keypres escape to close the shadow DOM
   } catch (e) {
     return e.message;
+  }
+}
+
+/**
+ * This function is injected and run in the app.
+ * It returns true if css DOES NOT match any element in the DOM.
+ * Returns false if css matches an element in the DOM.
+ */
+function elementsNotExist(css) {
+  try {
+    return !document.querySelector(css); // as boolean
+  } catch (e) {
+    return `bad css to look for overlays: ${css}`;
   }
 }
 
@@ -204,6 +217,42 @@ export class Player {
   }
 
   /**
+   * Wait until some elements are NOT in the DOM.
+   * @param {string} css
+   * @returns true when the elements are NOT present, false when they are present
+   */
+  async waitForElementsToNotExist(css) {
+    let tabId = this.tab.chromeTab.id;
+
+    /**
+     * The polling function. This will return true if the CSS does NOT
+     * match any element in the DOM.
+     *
+     * False if the CSS does match an element in the DOM.
+     * @returns
+     */
+    async function executeElementsNotExistScript() {
+      let frames = await chrome.scripting.executeScript({
+        target: { tabId: tabId /*, frameIds: frameIds*/ },
+        function: elementsNotExist,
+        args: [css],
+      });
+      let result = frames[0].result;
+      if (typeof result === 'string') {
+        throw new Errors.CssError(result);
+      }
+      return result;
+    }
+
+    return await pollFor(
+      true,
+      executeElementsNotExistScript,
+      options.maxTimeToWaitForOverlaysToBeRemoved,
+      options.pollPeriodForOverlayToBeRemoved
+    );
+  }
+
+  /**
    * Play the current set of actions. This allows actions to be played one
    * at a time or in chunks.
    *
@@ -220,12 +269,13 @@ export class Player {
     await loadOptions();
     let actions = test.steps; // short alias
 
-    if (options.maxNumberOfActionsToPrehydrate)
+    if (options.maxNumberOfActionsToPrehydrate) {
       await this._hydrate(
         actions,
         startIndex,
         startIndex + options.maxNumberOfActionsToPrehydrate
       );
+    }
 
     // start timer
     let start;
@@ -235,10 +285,12 @@ export class Player {
      * the wallclock time of the current action
      */
     let eta;
-    for (let i = startIndex; i < actions.length - 1; ++i) {
+    let action;
+    let i = startIndex;
+    for (i = startIndex; i < actions.length - 1; ++i) {
       eta = performance.now();
 
-      let action = actions[i];
+      action = actions[i];
       action._view = constants.view.EXPECTED;
 
       // free up memory from clean steps we've played.
@@ -266,97 +318,103 @@ export class Player {
       if (action.breakPoint && !(i === startIndex && firstTest)) {
         // the action has a breakpoint we do nothing and leave immediately
         next._match = constants.match.BREAKPOINT;
+        next._view = constants.view.EXPECTED;
+        break;
+      }
+
+      // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
+      // performed this action, we just need to put the mouse in the correct spot and
+      // do the screen verification again
+      if (resume && i === startIndex && action.type !== 'mousemove') {
+        // not needed? it is already in the right spot?
+        //await this.mousemove(this.mouseLocation);
       } else {
-        // if we are resume(ing) the first action, we are picking up from an error state, meaning we already
-        // performed this action, we just need to put the mouse in the correct spot and
-        // do the screen verification again
-        if (resume && i === startIndex && action.type !== 'mousemove') {
-          // not needed? it is already in the right spot?
-          //await this.mousemove(this.mouseLocation);
-        } else {
-          // drive the action
-          action.tab.chromeTab = this.tab.chromeTab; // just for debugging
-          if (action != 'keys' && options.userMouseDelay) {
-            console.log(
-              `[step:${action.index + 1} tab:${action.tab.id}] wait ${
-                options.userMouseDelay
-              }ms before playing`
-            );
-            await sleep(options.userMouseDelay);
-          }
+        // drive the action
+        action.tab.chromeTab = this.tab.chromeTab; // just for debugging
+        if (action != 'keys' && options.userMouseDelay) {
           console.log(
-            `[step:${action.index + 1} tab:${action.tab.id}] begin play "${
-              action.description
-            }"`
+            `[step:${action.index + 1} tab:${action.tab.id}] wait ${
+              options.userMouseDelay
+            }ms before playing`
           );
-          await this[action.type](action); // really perform this in the browser (this action may start some navigations)
-          console.log(
-            `[step:${action.index + 1} tab:${action.tab.id}] end   play "${
-              action.description
-            }"`
-          );
-        }
-        delete action.pixelDiffScreenshot; // save a lttle memory. I don't need to hang onto calculatable previous step data
-
-        // grep for FOCUS ISSUE for details
-        if (i === startIndex && action.type === 'goto') {
-          await this.mousemove({ x: 0, y: 0 });
-          await this.mousemove({ x: -1, y: -1 });
+          await sleep(options.userMouseDelay);
         }
 
-        start = performance.now();
-        if (!mustVerifyScreenshot) {
-          next._match = constants.view.PASS;
-        } else {
-          await this.verifyScreenshot({ step: next });
+        if (
+          // optionally wait for overlays (and such) to _NOT_ be in the DOM
+          action.type !== 'goto' &&
+          options.waitForCssElementsToNotExistBeforeDriving &&
+          !(await this.waitForElementsToNotExist(
+            options.waitForCssElementsToNotExistBeforeDriving
+          ))
+        ) {
+          next._match = constants.match.WRONG_ELEMENT;
+          next._view = constants.view.EXPECTED;
+          break;
         }
-        stop = performance.now();
 
-        action.latency = Math.round(stop - start); // in ms
-
-        // clear out old data
-        next.latency = 0;
-        next.memoryUsed = 0;
+        console.log(
+          `[step:${action.index + 1} tab:${action.tab.id}] begin play "${
+            action.description
+          }"`
+        );
+        await this[action.type](action); // really perform this in the browser (this action may start some navigations)
+        console.log(
+          `[step:${action.index + 1} tab:${action.tab.id}] end   play "${
+            action.description
+          }"`
+        );
       }
+      delete action.pixelDiffScreenshot; // save a lttle memory. I don't need to hang onto calculatable previous step data
+
+      // grep for FOCUS ISSUE for details
+      if (i === startIndex && action.type === 'goto') {
+        await this.mousemove({ x: 0, y: 0 });
+        await this.mousemove({ x: -1, y: -1 });
+      }
+
+      start = performance.now();
+      if (!mustVerifyScreenshot) {
+        next._match = constants.view.PASS;
+      } else {
+        await this.verifyScreenshot({ step: next });
+      }
+      stop = performance.now();
+
+      action.latency = Math.round(stop - start); // in ms
+
+      // clear out old data
+      next.latency = 0;
+      next.memoryUsed = 0;
       action._view = constants.view.EXPECTED;
-      let bailEarly = false;
-      switch (next._match) {
-        case constants.match.PASS:
-        case constants.match.ALLOW:
-          console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
-          next._view = constants.view.EXPECTED;
-          action.memoryUsed = await this.getClientMemoryByChromeApi();
-          break; // keep on chugging
-        case constants.match.FAIL:
-          console.debug(
-            `\t\tscreenshots still unmatched after ${stop - start}ms`
+
+      if (next._match === constants.match.FAIL) {
+        console.debug(
+          `\t\tscreenshots still unmatched after ${stop - start}ms`
+        );
+        if (
+          next.actualScreenshot.png.height !==
+            next.expectedScreenshot.png.height ||
+          next.actualScreenshot.png.width !== next.expectedScreenshot.png.width
+        ) {
+          await brimstone.window.alert(
+            'Heads up, the expected viewport size does not match the actual viewport size.\n\nThis normally should not occur. Your recording may be corrupted.'
           );
-          next._view = constants.view.EDIT;
-          bailEarly = true;
-          if (
-            next.actualScreenshot.png.height !==
-              next.expectedScreenshot.png.height ||
-            next.actualScreenshot.png.width !==
-              next.expectedScreenshot.png.width
-          ) {
-            await brimstone.window.alert(
-              'Heads up, the expected viewport size does not match the actual viewport size.\n\nThis normally should not occur. Your recording may be corrupted.'
-            );
-          }
-          break;
-        case constants.match.CANCEL:
-        case constants.match.BREAKPOINT:
-          this._stopPlaying = false;
-          next._view = constants.view.EXPECTED;
-          bailEarly = true;
-          break;
+        }
+        next._view = constants.view.EDIT;
+        break;
       }
+      if (next._match === constants.match.CANCEL) {
+        next._view = constants.view.EXPECTED;
+        break;
+      }
+
+      console.debug(`\t\tscreenshot verified in ${stop - start}ms`);
+      next._view = constants.view.EXPECTED;
+      action.memoryUsed = await this.getClientMemoryByChromeApi();
 
       if (this.onAfterPlay) {
         await this.onAfterPlay(action);
-      }
-      if (bailEarly) {
-        break;
       }
       eta = performance.now() - eta;
       this._expectedActionPlayTime = Math.floor(
@@ -364,6 +422,15 @@ export class Player {
           (this._playStreak + 1)
       );
       ++this._playStreak;
+    } // end of for loop
+
+    if (i < actions.length - 1) {
+      // we broke out of the loop early
+      action._view = constants.view.EXPECTED;
+      this._stopPlaying = false;
+      if (this.onAfterPlay) {
+        await this.onAfterPlay(action);
+      }
     }
 
     return next.index;

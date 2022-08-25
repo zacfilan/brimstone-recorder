@@ -224,3 +224,31 @@ export function interpolate(opts = { template: '', model: undefined }) {
     return resolver;
   });
 }
+
+/**
+ * This will execute the given function every
+ * pollPeriod ms until it returns the expected
+ * value or times out.
+ * @param {*} expectedReturnValue
+ * @param {*} pollingFunction
+ * @param {*} timeout
+ * @param {*} pollPeriod
+ */
+export async function pollFor(
+  expectedReturnValue,
+  pollingFunction,
+  timeout,
+  pollPeriod
+) {
+  let start = performance.now();
+  let actual;
+  do {
+    actual = await pollingFunction();
+    if (expectedReturnValue == actual) {
+      break;
+    }
+    await sleep(pollPeriod);
+  } while (performance.now() - start < timeout);
+
+  return actual;
+}

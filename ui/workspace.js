@@ -945,6 +945,10 @@ let jsonEditor;
       disableConsole(); // can be reenabled in the debugger later
     }
 
+    console.log(
+      `created workspace window:(x:${window.screenX}, y:${window.screenY} size:${window.outerWidth}x${window.outerHeight})`
+    );
+
     enableAutoCorrectCheckbox.checked = options.autoCorrect;
     enableAutoPlayCheckbox.checked = options.autoPlay;
 
@@ -1668,6 +1672,19 @@ async function _playSomething() {
         case constants.match.BREAKPOINT:
           infobar.setText(
             `✋ user defined breakpoint hit, step ${indexOfNext} not executed`
+          );
+        case constants.match.WRONG_ELEMENT:
+          infobar.setText(
+            `❌ The wrong element would receive the action, step ${indexOfNext} not executed`
+          );
+          await brimstone.window.alert(
+            `You have configured that elements matching CSS '${
+              options.waitForCssElementsToNotExistBeforeDriving
+            }' must NOT be in the DOM as a precondition to play an action. But a matching element still exists in the DOM after ${(
+              options.maxTimeToWaitForOverlaysToBeRemoved / 1000
+            ).toFixed(
+              1
+            )} seconds.\n\nYou can either increase the timeout, alter the CSS, or disable the check.`
           );
           break;
         default:
