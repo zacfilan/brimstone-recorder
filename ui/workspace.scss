@@ -36,101 +36,98 @@ $hover-scrollbar: $gray3;
   color: inherit;
 }
 
-// if the workspace is twice as tall as it is wide, use
-// the vertical layout. otherwise use the horizontal layout
-@media (max-aspect-ratio: 2/1) {
-  body {
+// the vertical layout
+body.vertical {
+  font-size: 12px;
+
+  #topbar {
+    flex-wrap: wrap;
+    #navigation {
+      width: 100%;
+      order: 3;
+      svg {
+        height: 15px; // smaller
+        width: 15px;
+      }
+    }
+
     font-size: 12px;
+    #menus {
+      order: 1;
+      width: 50%;
+    }
 
-    #topbar {
-      flex-wrap: wrap;
-      #navigation {
-        width: 100%;
-        order: 3;
-        svg {
-          height: 15px; // smaller
-          width: 15px;
-        }
+    #right {
+      width: 50%;
+      order: 2;
+      .label {
+        width: 30px;
+        overflow: hidden;
       }
+    }
+  }
 
-      font-size: 12px;
-      #menus {
-        order: 1;
-        width: 50%;
-      }
-
-      #right {
-        width: 50%;
-        order: 2;
-        .label {
-          width: 30px;
-          overflow: hidden;
+  #workspace {
+    .verticalToolBar {
+      svg {
+        height: 15px; // smaller
+        width: 15px;
+        &.emblem {
+          height: 11px;
+          width: 11px;
+          bottom: 2px;
+          right: 2px;
         }
       }
     }
 
-    #workspace {
-      .verticalToolBar {
-        svg {
-          height: 15px; // smaller
-          width: 15px;
-          &.emblem {
-            height: 11px;
-            width: 11px;
-            bottom: 2px;
-            right: 2px;
-          }
-        }
-      }
+    // the whole vp - 2 rows up top and 2 at bottom
+    height: calc(100% - (84px + 31px + 13px + 5px));
+    width: 100%; // whole vp
 
-      // the whole vp - 2 rows up top and 2 at bottom
-      height: calc(100% - (84px + 31px + 13px + 5px));
-      width: 100%; // whole vp
+    #step {
+      // same as parent
+      height: 100%;
+      width: 100%;
 
-      #step {
+      #content {
         // same as parent
         height: 100%;
         width: 100%;
 
-        #content {
-          // same as parent
-          height: 100%;
-          width: 100%;
-
-          flex-direction: column;
-          .card {
-            width: auto; // allow each card to adjust separately
-            height: calc(50% - 5px); // margin under card
-            padding: 0;
-            .title {
-              flex-grow: 1; // take it all bro
-              .text {
-                padding: 6px;
-              }
+        flex-direction: column;
+        .card {
+          width: auto; // allow each card to adjust separately
+          height: calc(50% - 5px); // margin under card
+          //padding: 0;
+          .title {
+            flex-grow: 1; // take it all bro
+            .text {
+              padding: 6px;
             }
+          }
 
-            .screenshot {
-              height: calc(100% - 60px);
-              width: fit-content;
-              img {
-                height: 100%;
-                width: auto; // ...preserve the aspect ratio'
-              }
-            }
-
-            &.action .action {
-              font-size: 12px;
-            }
-
-            &.empty {
-              width: unset;
+          .screenshot {
+            height: calc(100% - 60px);
+            width: fit-content;
+            img {
               height: 100%;
+              width: auto; // ...preserve the aspect ratio'
             }
-            margin-bottom: 5px;
-            .footer {
-              flex-grow: 0.8;
-              padding: 0 5px;
-            }
+          }
+
+          &.action .action {
+            font-size: 12px;
+          }
+
+          &.empty {
+            width: unset;
+            height: 100%;
+          }
+          margin-bottom: 5px;
+          .footer {
+            flex-grow: 0.8;
+            padding: 0 5px;
           }
         }
       }
@@ -427,14 +424,23 @@ button {
 /*********************/
 /* common to cards   */
 /*********************/
+$card-border-width: 1px;
+$card-padding-width: 0px;
+$card-border-and-pad: ($card-border-width + $card-padding-width) * 2;
 .card {
-  padding: 1em;
-  width: 50%;
+  //padding: 1em;
+
+  width: calc(
+    50% - $card-border-and-pad
+  ); // i want to give the card 50% of the space but that doesn't include the boarder and pad of the card which must also be removed
+  // 1,12 12,1
+  min-width: calc(50% - $card-border-and-pad);
+
   display: flex;
   flex-direction: column;
-  margin-right: 1em;
+  //margin-right: 5px;
   border-radius: 0.6em;
-  border: 1px solid;
+  border: $card-border-width solid;
   background: $card-background;
 
   .screenshot {
@@ -713,9 +719,10 @@ button {
 }
 
 /** only show the meter on the next card when playing back */
+$vertical-toobar-width: 32px;
 #step {
   height: 100%;
-  width: calc(100% - 40px);
+  width: calc(100% - $vertical-toobar-width);
 }
 
 @keyframes opacity2 {

@@ -1,40 +1,28 @@
 .modal#promptModal, .modal#confirmModal, .modal#promptModal, .modal#alertModal {
   color: black;
   height: 80%;
-  display: -webkit-box;
-  display: -ms-flexbox;
   display: flex;
   font-size: 14px;
 }
-
 .modal#promptModal input, .modal#confirmModal input, .modal#promptModal input, .modal#alertModal input {
   width: 100%;
 }
-
 .modal#promptModal .content-wrapper, .modal#confirmModal .content-wrapper, .modal#promptModal .content-wrapper, .modal#alertModal .content-wrapper {
   height: 100%;
   overflow: auto;
 }
-
 .modal#promptModal #title, .modal#confirmModal #title, .modal#promptModal #title, .modal#alertModal #title {
   font-size: 15px;
   margin-bottom: 12px;
 }
-
 .modal#promptModal #message, .modal#confirmModal #message, .modal#promptModal #message, .modal#alertModal #message {
   margin-bottom: 0.6em;
 }
-
 .modal#promptModal #buttons, .modal#confirmModal #buttons, .modal#promptModal #buttons, .modal#alertModal #buttons {
-  display: -webkit-box;
-  display: -ms-flexbox;
   display: flex;
-  -webkit-box-pack: end;
-      -ms-flex-pack: end;
-          justify-content: end;
+  justify-content: end;
   margin-top: 2em;
 }
-
 .modal#promptModal a.button, .modal#confirmModal a.button, .modal#promptModal a.button, .modal#alertModal a.button {
   margin-left: 1em;
   background-color: #1a73e8;
@@ -49,11 +37,9 @@
   font-size: 14px;
   cursor: pointer;
 }
-
 .modal#promptModal a.button:hover, .modal#confirmModal a.button:hover, .modal#promptModal a.button:hover, .modal#alertModal a.button:hover {
   opacity: 0.5;
 }
-
 .modal#promptModal a.button.cancel, .modal#confirmModal a.button.cancel, .modal#promptModal a.button.cancel, .modal#alertModal a.button.cancel {
   background-color: white;
   color: #1a73e8;
@@ -61,5 +47,4 @@
 
 .blocker {
   background: rgba(128, 128, 128, 0.75);
-}
-/*# sourceMappingURL=modal.css.map */
+}/*# sourceMappingURL=modal.css.map */

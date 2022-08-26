@@ -243,6 +243,41 @@ class Workspace {
     );
   }
 
+  togglePageOrientation() {
+    let c = $('.card.waiting .screenshot')[0]?.getBoundingClientRect();
+    if (!c) {
+      return;
+    }
+    console.log('----\nBEGIN');
+    console.log(`card is ${c.width}x${c.height}`);
+    console.log(`window is ${window.outerWidth}x${window.outerHeight}`);
+    //c.height += (1 + 12) * 2; // border and padding
+    //c.width += (1 + 12) * 2; // border and padding
+
+    if ($('body').hasClass('vertical')) {
+      // we are vertical but the user thinks it might look better to go horizontal
+      // we need to increase the width by the current cardsize
+      console.log('vertical -> horizontal');
+      window.resizeTo(
+        window.outerWidth + c.width,
+        window.outerHeight - c.height
+      );
+    } else {
+      console.log('horizontal -> vertical');
+      window.resizeTo(
+        window.outerWidth - c.width,
+        window.outerHeight + c.height
+      );
+    }
+    $('body').toggleClass('vertical');
+    setTimeout(() => {
+      c = $('.card.waiting .screenshot')[0].getBoundingClientRect();
+      console.log('END');
+      console.log(`card is ${c.width}x${c.height}`);
+      console.log(`window is ${window.outerWidth}x${window.outerHeight}`);
+    }, 10);
+  }
+
   /**
    * Prompt the user to select tests from the filesystem.
    * This will build, among other data structures {@link zipNodes}. */
@@ -1396,6 +1431,7 @@ function setToolbarState() {
   $('.help.option [data-action]').attr('disabled', false);
   $('[data-action="openOptions"]').attr('disabled', false);
   $('[data-action="exit"]').attr('disabled', false);
+  $('#togglePageOrientation').attr('disabled', false);
 
   $('[data-action="gotoFirstZip"]').attr('disabled', currentTestNumber <= 1);
   $('[data-action="gotoPrevZip"]').attr('disabled', currentTestNumber <= 1);
@@ -1480,6 +1516,8 @@ function setToolbarState() {
     }
   }
 }
+
+$('#togglePageOrientation').on('click', workspace.togglePageOrientation);
 
 $('[data-action="openOptions"]').on('click', workspace.openOptions);
 
