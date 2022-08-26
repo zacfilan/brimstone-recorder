@@ -124,7 +124,7 @@ body.vertical {
             width: unset;
             height: 100%;
           }
-          margin-bottom: 5px;
+          //margin-bottom: 5px;
           .footer {
             flex-grow: 0.8;
             padding: 0 5px;
@@ -424,23 +424,20 @@ button {
 /*********************/
 /* common to cards   */
 /*********************/
-$card-border-width: 1px;
-$card-padding-width: 0px;
-$card-border-and-pad: ($card-border-width + $card-padding-width) * 2;
 .card {
   //padding: 1em;
 
   width: calc(
-    50% - $card-border-and-pad
+    50% - 2px
   ); // i want to give the card 50% of the space but that doesn't include the boarder and pad of the card which must also be removed
   // 1,12 12,1
-  min-width: calc(50% - $card-border-and-pad);
+  min-width: calc(50% - 2px);
 
   display: flex;
   flex-direction: column;
-  //margin-right: 5px;
+  //margin-right: 1em;
   border-radius: 0.6em;
-  border: $card-border-width solid;
+  border: 1px solid;
   background: $card-background;
 
   .screenshot {
@@ -719,10 +716,9 @@ $card-border-and-pad: ($card-border-width + $card-padding-width) * 2;
 }
 
 /** only show the meter on the next card when playing back */
-$vertical-toobar-width: 32px;
 #step {
   height: 100%;
-  width: calc(100% - $vertical-toobar-width);
+  width: calc(100% - 32px);
 }
 
 @keyframes opacity2 {

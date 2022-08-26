@@ -241,7 +241,6 @@ body.vertical #workspace #step #content {
 body.vertical #workspace #step #content .card {
   width: auto;
   height: calc(50% - 5px);
-  margin-bottom: 5px;
 }
 body.vertical #workspace #step #content .card .title {
   flex-grow: 1;
