@@ -28,6 +28,8 @@ import * as BDS from './brimstoneDataService.js';
 import { infobar } from './infobar/infobar.js';
 import { ActionGutter } from './actionGutter/actionGutter.js';
 
+let verticalLayout = false;
+
 /** used by the action gutter callbacks to keep it clean */
 let seqNum = 0;
 // instantiate some components
@@ -248,34 +250,37 @@ class Workspace {
     if (!c) {
       return;
     }
-    console.log('----\nBEGIN');
-    console.log(`card is ${c.width}x${c.height}`);
-    console.log(`window is ${window.outerWidth}x${window.outerHeight}`);
-    //c.height += (1 + 12) * 2; // border and padding
+    // console.log('----\nBEGIN');
+    // console.log(`card is ${c.width}x${c.height}`);
+    // console.log(`window is ${window.outerWidth}x${window.outerHeight}`);
+    // //c.height += (1 + 12) * 2; // border and padding
     //c.width += (1 + 12) * 2; // border and padding
 
     if ($('body').hasClass('vertical')) {
       // we are vertical but the user thinks it might look better to go horizontal
       // we need to increase the width by the current cardsize
-      console.log('vertical -> horizontal');
+      //      console.log('vertical -> horizontal');
       window.resizeTo(
         window.outerWidth + c.width,
         window.outerHeight - c.height
       );
+      $('body').removeClass('vertical');
+      verticalLayout = false;
     } else {
       console.log('horizontal -> vertical');
       window.resizeTo(
         window.outerWidth - c.width,
         window.outerHeight + c.height
       );
+      $('body').addClass('vertical');
+      verticalLayout = true;
     }
-    $('body').toggleClass('vertical');
-    setTimeout(() => {
-      c = $('.card.waiting .screenshot')[0].getBoundingClientRect();
-      console.log('END');
-      console.log(`card is ${c.width}x${c.height}`);
-      console.log(`window is ${window.outerWidth}x${window.outerHeight}`);
-    }, 10);
+    // setTimeout(() => {
+    //   c = $('.card.waiting .screenshot')[0].getBoundingClientRect();
+    //   console.log('END');
+    //   console.log(`card is ${c.width}x${c.height}`);
+    //   console.log(`window is ${window.outerWidth}x${window.outerHeight}`);
+    // }, 10);
   }
 
   /**
@@ -1087,6 +1092,41 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
         }
       }
       sendResponse(true);
+    });
+
+    let throttled = false;
+    const trigger = 2;
+    function checkAspect() {
+      let r = window.outerWidth / window.outerHeight;
+      //console.log(`${r} ${verticalLayout}`);
+      if (verticalLayout) {
+        if (r > trigger) {
+          // 4 times wider than tall, is "real horizontal", and currently vertical
+          verticalLayout = false;
+          $('body').removeClass('vertical');
+        }
+      } else {
+        if (r < 1 / trigger) {
+          // 4 times taller than wide and we are currently horizontal
+          verticalLayout = true;
+          $('body').addClass('vertical');
+        }
+      }
+      // when the user makes it "real vertical" go vertical if it isn't yet
+      // when the user makes it "real horizontal" go horzontail if it isn't yet
+    }
+    window.addEventListener('resize', function () {
+      // only run if we're not throttled
+      if (!throttled) {
+        // actual callback action
+        checkAspect();
+        // we're throttled!
+        throttled = true;
+        // set a timeout to un-throttle
+        setTimeout(function () {
+          throttled = false;
+        }, 100);
+      }
     });
   }
 )();
