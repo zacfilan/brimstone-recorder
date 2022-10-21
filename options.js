@@ -238,6 +238,13 @@ export class Options {
   waitForCssElementsToNotExistBeforeDriving = '';
 
   /**
+   * Actually it is the local debugging port. This is a direct line to use the CDP
+   * in this browser in the cases where chrome.debugger.sendMessge fails (i'm looking
+   * at you Browser.getVersion).
+   */
+  remoteDebuggingPort;
+
+  /**
    * Copy constructor
    * @param {Options} other
    */

@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+    "donjayamanne.githistory",
+    "glenn2223.live-sass",
+    "syler.sass-indented",
+    "gruntfuggly.todo-tree",
+    "esbenp.prettier-vscode"
+  ]
+}

@@ -1,6 +1,6 @@
 'use strict';
 
-import { extensionInfo } from '../brimstoneDataService.js';
+import * as extensionInfo from '../extensionInfo.js';
 
 class InfoBar {
   setText(infobarText) {
@@ -13,7 +13,17 @@ class InfoBar {
         infobarText = 'ready';
       }
     }
-    this.setHtml(extensionInfo.version + ' ' + infobarText);
+    let chromeIcon = `chrome${
+      extensionInfo.chromeVersion.includes('beta') ? '_beta' : ''
+    }_icon.png`;
+    let title = extensionInfo.chromeVersion;
+    this.setHtml(`
+      <div class="text">${extensionInfo.version} ${infobarText}</div>
+      <div title="${title}" class="right">
+        <img src="/images/${chromeIcon}">
+        <div class="text">${extensionInfo.chromeBuild}</div>
+      </div>
+      `);
   }
 
   setHtml(html) {

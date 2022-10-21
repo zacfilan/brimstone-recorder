@@ -1,35 +1,6 @@
 import { options } from '../options.js';
 import { constants } from '../test.js';
-
-class ExtensionInfo {
-  /** ***This manifest*** version of brimstone-recorder,
-   * this may be diferent than the version a test was recorded by.
-   * See {@link ExtensionInfo.version}. */
-  _brimstoneVersion = 'v' + chrome.runtime.getManifest().version;
-
-  /** The chrome version comes from the useragent string */
-  chromeVersion = /Chrome\/([0-9.]+)/.exec(navigator.userAgent)[1];
-
-  /** Development or normal? */
-  _info = '';
-
-  /**
-   * The dev-aware version of this extension.
-   * e.g. "dev1.11.1" or "v2.32.5"
-   *
-   * *so dev versions compare
-   * "higher" than all non-dev versions.*
-   * */
-  get version() {
-    return (
-      (this._info.installType === 'development' ? 'de' : ' ') +
-      this._brimstoneVersion
-    );
-  }
-}
-
-export let extensionInfo = new ExtensionInfo();
-
+import * as extensionInfo from './extensionInfo.js';
 function padDigits(len, num) {
   return num.toString().padStart(len, '0');
 }

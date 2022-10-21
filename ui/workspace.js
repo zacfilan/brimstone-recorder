@@ -27,6 +27,7 @@ import { MenuController } from './menu_controller.js';
 import * as BDS from './brimstoneDataService.js';
 import { infobar } from './infobar/infobar.js';
 import { ActionGutter } from './actionGutter/actionGutter.js';
+import * as extensionInfo from './extensionInfo.js';
 
 let verticalLayout = false;
 
@@ -246,7 +247,7 @@ class Workspace {
   }
 
   togglePageOrientation() {
-    let c = $('.card.waiting .screenshot')[0]?.getBoundingClientRect();
+    let c = $('.card')[1]?.getBoundingClientRect();
     if (!c) {
       return;
     }
@@ -985,6 +986,8 @@ let jsonEditor;
       disableConsole(); // can be reenabled in the debugger later
     }
 
+    await extensionInfo.initialize();
+
     console.log(
       `created workspace window:(x:${window.screenX}, y:${window.screenY} size:${window.outerWidth}x${window.outerHeight})`
     );
@@ -1031,7 +1034,6 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
       await chrome.windows.remove(w.id);
     }
     setToolbarState();
-    BDS.extensionInfo._info = await chrome.management.getSelf();
     infobar.setText();
     /**
      * We cannot use anything here that is asynchronous, because, "whatever". :(
@@ -1624,8 +1626,8 @@ async function _playSomething() {
       Test.current.lastRun.name = Test.current.filename;
       Test.current.lastRun.startingServer =
         Test.current.startingServer || Test.current.steps[0].url;
-      Test.current.lastRun.brimstoneVersion = BDS.extensionInfo.version;
-      Test.current.lastRun.chromeVersion = BDS.chromeVersion;
+      Test.current.lastRun.brimstoneVersion = extensionInfo.version();
+      Test.current.lastRun.chromeVersion = extensionInfo.chromeVersion;
 
       let testActions = Test.current.steps;
       player.onBeforePlay = updateStepInView;
