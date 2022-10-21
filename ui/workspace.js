@@ -1626,7 +1626,7 @@ async function _playSomething() {
       Test.current.lastRun.name = Test.current.filename;
       Test.current.lastRun.startingServer =
         Test.current.startingServer || Test.current.steps[0].url;
-      Test.current.lastRun.brimstoneVersion = extensionInfo.version();
+      Test.current.lastRun.brimstoneVersion = extensionInfo.version;
       Test.current.lastRun.chromeVersion = extensionInfo.chromeVersion;
 
       let testActions = Test.current.steps;

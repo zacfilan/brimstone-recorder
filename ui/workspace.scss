@@ -98,7 +98,8 @@ body.vertical {
         flex-direction: column;
         .card {
           width: auto; // allow each card to adjust separately
-          height: calc(50% - 5px); // margin under card
+          height: calc(50% - 12px); // margin under card
+          margin-bottom: 10px;
           //padding: 0;
           .title {
             flex-grow: 1; // take it all bro
@@ -127,7 +128,6 @@ body.vertical {
           //margin-bottom: 5px;
           .footer {
             flex-grow: 0.8;
-            padding: 0 5px;
           }
         }
       }
@@ -428,10 +428,11 @@ button {
   //padding: 1em;
 
   width: calc(
-    50% - 2px
+    50% - 12px
   ); // i want to give the card 50% of the space but that doesn't include the boarder and pad of the card which must also be removed
   // 1,12 12,1
-  min-width: calc(50% - 2px);
+  min-width: calc(50% - 12px);
+  margin-right: 10px;
 
   display: flex;
   flex-direction: column;
@@ -552,6 +553,7 @@ button {
     button {
       margin: 0;
     }
+    padding: 0 5px;
   }
 }
 
