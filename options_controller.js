@@ -62,6 +62,7 @@ async function setModelFromView() {
     mouseWheelTimeoutLookup[parseInt(mouseWheelTimeout.value, 10)];
   options.clearWorkspaceBeforeRecordingActiveTab =
     clearWorkspaceBeforeRecordingActiveTab.checked;
+  options.remoteDebuggingPort = parseInt(remoteDebuggingPort.value);
   //#endregion recording options
 
   //#region developer options
@@ -185,6 +186,7 @@ function setViewFromModel() {
   );
   clearWorkspaceBeforeRecordingActiveTab.checked =
     options.clearWorkspaceBeforeRecordingActiveTab;
+  remoteDebuggingPort.value = options.remoteDebuggingPort;
   //#endregion recording options
 
   //#region developer options

@@ -241,6 +241,15 @@
                     </label>
                 </td>
             </tr>
+            <tr>
+                <td>
+                    Debugging Port. To use this you must launch chrome with --remote-debugging-port=\<port\>. This is used to bypass a bug with the chrome.debugger.api and allow us to
+                    get better chrome version info to store in the recorded test. Legal values are [9000,9999].
+                </td>
+                <td>
+                    <input type="number" min="9000" max="9999" id="remoteDebuggingPort"></input>
+                </td>
+            </tr>
         </table>
     </details>
 
