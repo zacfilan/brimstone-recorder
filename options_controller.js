@@ -51,7 +51,11 @@ async function setModelFromView() {
   options.closeOldTestWindowOnCreate = closeOldTestWindowOnCreate.checked;
   options.confirmToDelete = confirmToDelete.checked;
   options.warnOnVersionMismatch = warnOnVersionMismatch.checked;
-
+  options.windowTop = parseInt(windowTop.value);
+  options.windowLeft = parseInt(windowLeft.value);
+  options.windowWidth = parseInt(windowWidth.value);
+  options.windowHeight = parseInt(windowHeight.value);
+  options.verticalLayout = verticalLayout.checked;
   //#endregion general options
 
   //#region recording options
@@ -174,6 +178,11 @@ function setViewFromModel() {
   closeOldTestWindowOnCreate.checked = options.closeOldTestWindowOnCreate;
   confirmToDelete.checked = options.confirmToDelete;
   warnOnVersionMismatch.checked = options.warnOnVersionMismatch;
+  windowTop.value = options.windowTop;
+  windowLeft.value = options.windowLeft;
+  windowWidth.value = options.windowWidth;
+  windowHeight.value = options.windowHeight;
+  verticalLayout.checked = options.verticalLayout;
   //#endregion general options
 
   //#region recording options

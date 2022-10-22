@@ -29,8 +29,6 @@ import { infobar } from './infobar/infobar.js';
 import { ActionGutter } from './actionGutter/actionGutter.js';
 import * as extensionInfo from './extensionInfo.js';
 
-let verticalLayout = false;
-
 /** used by the action gutter callbacks to keep it clean */
 let seqNum = 0;
 // instantiate some components
@@ -246,7 +244,7 @@ class Workspace {
     );
   }
 
-  togglePageOrientation() {
+  async togglePageOrientation() {
     let c = $('.card')[1]?.getBoundingClientRect();
     if (!c) {
       return;
@@ -266,7 +264,9 @@ class Workspace {
         window.outerHeight - c.height
       );
       $('body').removeClass('vertical');
-      verticalLayout = false;
+      await saveOptions({
+        verticalLayout: false,
+      });
     } else {
       console.log('horizontal -> vertical');
       window.resizeTo(
@@ -274,7 +274,9 @@ class Workspace {
         window.outerHeight + c.height
       );
       $('body').addClass('vertical');
-      verticalLayout = true;
+      await saveOptions({
+        verticalLayout: true,
+      });
     }
     // setTimeout(() => {
     //   c = $('.card.waiting .screenshot')[0].getBoundingClientRect();
@@ -973,6 +975,9 @@ let jsonEditor;
 (
   async function main() {
     await loadOptions();
+    if (options.verticalLayout) {
+      $('body').addClass('vertical');
+    }
     if (options.developerMode) {
       window.alert(
         `🐞🔨 Developer mode enabled. I suggest you attach the debugger with ctrl+shift+i. Then hit [OK] once devtools is open.`
@@ -1096,11 +1101,10 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
       sendResponse(true);
     });
 
-    let throttled = false;
     const trigger = 2;
     function checkAspect() {
       let r = window.outerWidth / window.outerHeight;
-      //console.log(`${r} ${verticalLayout}`);
+      let verticalLayout = options.verticalLayout;
       if (verticalLayout) {
         if (r > trigger) {
           // 4 times wider than tall, is "real horizontal", and currently vertical
@@ -1114,22 +1118,59 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
           $('body').addClass('vertical');
         }
       }
+      return verticalLayout;
       // when the user makes it "real vertical" go vertical if it isn't yet
       // when the user makes it "real horizontal" go horzontail if it isn't yet
     }
-    window.addEventListener('resize', function () {
-      // only run if we're not throttled
-      if (!throttled) {
-        // actual callback action
-        checkAspect();
-        // we're throttled!
+
+    let throttled = false; // we are ignoring requests
+    let locked = false; // we are processing a request currently
+    let lastEventReceived = 0; // time stamp of the most recent time we got an event
+    let lastEventCompleted = 0; // time stamp of the event we completed
+    function handleResizeEvent() {
+      if (!throttled && !locked) {
+        locked = true;
         throttled = true;
-        // set a timeout to un-throttle
-        setTimeout(function () {
-          throttled = false;
-        }, 100);
+        lastEventCompleted = lastEventReceived;
+        let verticalLayout = checkAspect(); // might toggle the aspect ratio (which would generate another resize event)
+        let options = {
+          windowTop: window.screenY,
+          windowLeft: window.screenX,
+          windowWidth: window.outerWidth,
+          windowHeight: window.outerHeight,
+          verticalLayout: verticalLayout,
+        };
+        console.log(
+          `windows resize: ${options.windowWidth}x${options.windowHeight} @ ${options.windowLeft},${options.windowTop}\n`
+        );
+
+        (async () => {
+          await saveOptions(options);
+          locked = false;
+
+          if (lastEventCompleted !== lastEventReceived) {
+            lastEventReceived = performance.now(); // assign it a new sequence number
+            // an event came in after this one, so let's handle it in a moment
+            throttled = false;
+            setTimeout(handleResizeEvent, 100);
+          } else {
+            // set a timeout to un-throttle
+            setTimeout(() => {
+              throttled = false;
+              if (lastEventCompleted !== lastEventReceived) {
+                lastEventReceived = performance.now(); // assign it a new sequence number
+                // an event came in after this one, so let's handle it in a moment
+                handleResizeEvent();
+              }
+            }, 100);
+          }
+        })();
+      } else {
+        lastEventReceived = performance.now(); // a resize happened this timestamp that we didn't handle
       }
-    });
+    }
+
+    window.addEventListener('resize', handleResizeEvent);
   }
 )();
 

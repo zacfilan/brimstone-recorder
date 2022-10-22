@@ -245,6 +245,28 @@ export class Options {
   remoteDebuggingPort;
 
   /**
+   * where to open the brimstone window: top
+   */
+  windowTop;
+  /**
+   * where to open the brimstone window: left
+   */
+  windowLeft;
+  /**
+   * where to open the brimstone window: width
+   */
+  windowWidth;
+  /**
+   * where to open the brimstone window: height
+   */
+  windowHeight;
+
+  /**
+   * Is the window using a vertical layout?
+   */
+  verticalLayout = false;
+
+  /**
    * Copy constructor
    * @param {Options} other
    */

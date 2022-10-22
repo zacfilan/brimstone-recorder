@@ -1,4 +1,4 @@
-import { Options, loadOptions, saveOptions } from './options.js';
+import { Options, loadOptions, saveOptions, options } from './options.js';
 
 /**
  * Get the Brimstone workspace windowId and tabId, if it is open.
@@ -75,24 +75,16 @@ function windowsOnCreatedHandler(window) {
 }
 
 /**
- * Pay attention to window move/resize events, so we can preserve
- * the bounds of the workspace window.
+ * Pay attention to window MOVE window events
+ * the resize ones are already handled in workspace.js
  * */
 async function windowsOnBoundsChangedHandler(window) {
   let workspace = await getWorkspaceInfo();
   if (window.id === workspace.windowId) {
-    // If I resize it remember where it is/was/will be next time
-    await chrome.storage.local.set({
-      window: {
-        top: window.top,
-        left: window.left,
-        width: window.width,
-        height: window.height,
-      },
+    await saveOptions({
+      windowTop: window.top,
+      windowLeft: window.left,
     });
-    // console.log(
-    //   `saved window postion:(x:${window.left}, y:${window.top} size:${window.width}x${window.height})`
-    // );
   }
 }
 
@@ -118,13 +110,7 @@ async function actionOnClickedHandler(tab) {
 
   // else, create the brimstone workspace window, with remembered size/position data, or defaults
   let currentWindow = await chrome.windows.getCurrent();
-  let result = await new Promise((resolve) =>
-    chrome.storage.local.get('window', resolve)
-  );
-  let height = result?.window?.height ?? 480;
-  let width = result?.window?.width ?? 640;
-  let left = result?.window?.left;
-  let top = result?.window?.top;
+  let options = await loadOptions();
   let window;
   try {
     window = await chrome.windows.create({
@@ -133,10 +119,10 @@ async function actionOnClickedHandler(tab) {
       ),
       type: 'popup',
       focused: true,
-      width,
-      height,
-      top,
-      left,
+      width: options.windowWidth,
+      height: options.windowHeight,
+      top: options.windowTop,
+      left: options.windowLeft,
     });
   } catch (e) {
     // if the last location was on some other monitor you docked with then undocked you might not be able to position it there.
@@ -147,7 +133,13 @@ async function actionOnClickedHandler(tab) {
       type: 'popup',
       focused: true,
     });
-    await windowsOnBoundsChangedHandler(window);
+    // use these new ones for next time
+    await saveOptions({
+      windowTop: window.top,
+      windowLeft: window.left,
+      windowHeight: window.height,
+      windowWidth: window.width,
+    });
   }
   // keep track of the brimstone window id, and the tab in it between invocations of this worker (i.e. multiple clicks of icon)
   await chrome.storage.local.set({
