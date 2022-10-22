@@ -1077,24 +1077,39 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
           : 'message from the extension'
       );
       if (request.optionsChanged) {
-        if (request.optionsChanged.hasOwnProperty('developerMode')) {
-          if (request.optionsChanged.developerMode) {
-            enableConsole();
-          } else {
-            disableConsole();
-          }
-        }
-        if (request.optionsChanged.hasOwnProperty('autoCorrect')) {
-          enableAutoCorrectCheckbox.checked =
-            request.optionsChanged.autoCorrect;
-        }
-        if (request.optionsChanged.hasOwnProperty('autoPlay')) {
-          enableAutoPlayCheckbox.checked = request.optionsChanged.autoPlay;
-        }
-        if (request.optionsChanged.hasOwnProperty('MAX_VERIFY_TIMEOUT')) {
-          let i = currentStepIndex();
-          if (i >= 0) {
-            await updateStepInView(Test.current.steps[i]);
+        for (const [option, value] of Object.entries(request.optionsChanged)) {
+          switch (option) {
+            case 'windowLeft':
+              window.moveTo(value, window.screenTop);
+              break;
+            case 'windowTop':
+              window.moveTo(window.screenLeft, value);
+              break;
+            case 'windowWidth':
+              window.resizeTo(value, window.outerHeight);
+              break;
+            case 'windowHeight':
+              window.resizeTo(window.outerWidth, value);
+              break;
+            case 'developerMode':
+              if (value) {
+                enableConsole();
+              } else {
+                disableConsole();
+              }
+              break;
+            case 'autoCorrect':
+              enableAutoCorrectCheckbox.checked = value;
+              break;
+            case 'autoPlay':
+              enableAutoPlayCheckbox.checked = value;
+              break;
+            case 'MAX_VERIFY_TIMEOUT':
+              let i = currentStepIndex();
+              if (i >= 0) {
+                await updateStepInView(Test.current.steps[i]);
+              }
+              break;
           }
         }
       }
