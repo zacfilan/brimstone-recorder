@@ -1,5 +1,5 @@
 import { options } from '../options.js';
-
+import { brimstone } from '../utilities.js';
 /**
  * The dev-aware version of this extension.
  * e.g. "dev1.11.1" or "v2.32.5"
@@ -57,34 +57,42 @@ async function tryToUpdateToDetailedChromeVersion() {
   if (!options.remoteDebuggingPort) {
     return;
   }
+  // the user specified the port in the options, but they may not have enabled the command line switch
+  try {
+    let [data, versions] = await Promise.all([
+      browserGetVersion(options.remoteDebuggingPort),
+      $.get('http://omahaproxy.appspot.com/history'),
+    ]);
 
-  let [data, versions] = await Promise.all([
-    browserGetVersion(options.remoteDebuggingPort),
-    $.get('http://omahaproxy.appspot.com/history'),
-  ]);
-
-  chromeBuild = data.result.product.match(/([\d\.]+)/)[1];
-  let myOs = data.result.userAgent.match(/\(([^\)]+)\)/)[1];
-  versions = versions.split(/\n/);
-  let myVersionInfo;
-  for (let versionStr of versions) {
-    let versionInfo = versionStr.split(','); // short os, channel, version, date
-    if (chromeBuild === versionInfo[2]) {
-      // the channel is the same for all OS
-      myVersionInfo = versionInfo;
-      break;
+    chromeBuild = data.result.product.match(/([\d\.]+)/)[1];
+    let myOs = data.result.userAgent.match(/\(([^\)]+)\)/)[1];
+    versions = versions.split(/\n/);
+    let myVersionInfo;
+    for (let versionStr of versions) {
+      let versionInfo = versionStr.split(','); // short os, channel, version, date
+      if (chromeBuild === versionInfo[2]) {
+        // the channel is the same for all OS
+        myVersionInfo = versionInfo;
+        break;
+      }
     }
-  }
-  if (myVersionInfo) {
-    let [os, channel] = myVersionInfo;
-    chromeVersion = `Version ${chromeBuild} (Official Build)`;
+    if (myVersionInfo) {
+      let [os, channel] = myVersionInfo;
+      chromeVersion = `Version ${chromeBuild} (Official Build)`;
 
-    if (channel !== 'stable') {
-      chromeVersion += ` (${channel})`;
-    }
+      if (channel !== 'stable') {
+        chromeVersion += ` (${channel})`;
+      }
 
-    if (myOs.includes('64')) {
-      chromeVersion += ` (64-bit)`;
+      if (myOs.includes('64')) {
+        chromeVersion += ` (64-bit)`;
+      }
     }
+  } catch (e) {
+    await brimstone.window.alert(
+      `I tried to get a more specific version of the chrome build number via the remote debugging port for you. But I could not contact the remote debugging port. If you enable a remote debugging port in options, make sure you launch chrome with --remote-debugging-port=<port>. Where <port> is the value you put in the options.
+
+  Falling back to less specific chrome build version.`
+    );
   }
 }

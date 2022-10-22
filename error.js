@@ -121,3 +121,12 @@ export class CssError extends Error {
     super(msg || 'CSS Error');
   }
 }
+
+export class RemoteDebuggingPort extends Error {
+  constructor(msg) {
+    super(
+      msg ||
+        'Could not contact the local remote debugging port. If you enable a remote debnugging port in options, make sure you launch chrome with --remote-debugging-port=<port>'
+    );
+  }
+}
