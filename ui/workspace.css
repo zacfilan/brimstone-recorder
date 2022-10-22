@@ -175,6 +175,10 @@
   margin-left: 0.6em;
 }
 
+#editDifferencesButton {
+  color: orange;
+}
+
 *::-webkit-scrollbar {
   width: 13px; /* width of the entire scrollbar */
   height: 13px;

@@ -9,6 +9,10 @@ $scrollbar-track: $gray5;
 $scrollbar: $gray4;
 $hover-scrollbar: $gray3;
 
+#editDifferencesButton {
+  color: orange;
+}
+
 * {
   &::-webkit-scrollbar {
     width: 13px; /* width of the entire scrollbar */
