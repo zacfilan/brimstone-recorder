@@ -175,8 +175,12 @@
   margin-left: 0.6em;
 }
 
-#editDifferencesButton {
+.card.allow #editDifferencesButton {
   color: orange;
+}
+
+.card.fail #editDifferencesButton {
+  color: red;
 }
 
 *::-webkit-scrollbar {
