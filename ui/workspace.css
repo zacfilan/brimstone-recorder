@@ -170,6 +170,7 @@
   height: 22px;
 }
 #infobar svg {
+  height: 22px;
   -webkit-animation: opacity2 3s infinite;
           animation: opacity2 3s infinite;
   margin-left: 0.6em;

@@ -130,3 +130,9 @@ export class RemoteDebuggingPort extends Error {
     );
   }
 }
+
+export class DebuggerSendCommandIsHung extends Error {
+  constructor(msg) {
+    super(msg || 'chrome.debugger.sendCommand is hung');
+  }
+}

@@ -1000,16 +1000,26 @@ export class Player {
       `begin debugger send command tabId:${this.tab.id} ${method}`,
       commandParams
     );
-    let result = await new Promise((resolve) =>
+
+    // I have seen this senCommand hang when there is a navigation on the tab just after this sendCommand is made.
+    // there with no indication of the failure :(
+    // So I will add a hang detect to break it.
+    let result = Promise.race([
       chrome.debugger.sendCommand(
         { tabId: this.tab.chromeTab.id },
         method,
-        commandParams,
-        resolve
-      )
-    );
+        commandParams
+      ),
+      new Promise((resolve, reject) =>
+        // treat the timeout the same as if the debugger had detacted, this should trigger some retry
+        setTimeout(() => {
+          reject(new Errors.DebuggerSendCommandIsHung());
+        }, 3000)
+      ),
+    ]);
     let message = chrome.runtime.lastError?.message;
     if (message) {
+      console.warn(`an error was thrown during debugger command: ${message}`);
       if (
         message.includes('Detached while') ||
         message.includes('Debugger is not attached')
@@ -1041,13 +1051,16 @@ export class Player {
       try {
         return await this._debuggerSendCommandRaw(method, commandParams); // the debugger method may be a getter of some kind.
       } catch (e) {
+        console.warn(
+          `${e.message} while running debugger cmd ${method}:`,
+          commandParams,
+          e
+        );
         lastException = e;
-        if (lastException instanceof Errors.DebuggerDetached) {
-          console.warn(
-            `got exception while running debugger cmd ${method}:`,
-            commandParams,
-            e
-          );
+        if (
+          lastException instanceof Errors.DebuggerDetached ||
+          lastException instanceof Errors.DebuggerSendCommandIsHung
+        ) {
           if (await this.attachDebugger({ tab: this.tab })) {
             await this.tab.resizeViewport();
           }
@@ -1056,11 +1069,6 @@ export class Player {
             await sleep(options.debuggerSendCommandOnPlayRetryTimeout);
           }
         } else {
-          console.warn(
-            `got exception while running debugger cmd ${method}:`,
-            commandParams,
-            e
-          );
           throw lastException;
         }
       }

@@ -2,6 +2,12 @@ import { sleep } from './utilities.js';
 import * as Errors from './error.js';
 import { loadOptions } from './options.js';
 
+/**
+ * Resolves promise _chromeTabStatusResolved when the tab transitions to complete
+ * @param {*} tabId
+ * @param {*} changeInfo
+ * @param {*} tab
+ */
 function tabsOnUpdatedHandler(tabId, changeInfo, tab) {
   console.debug(
     `tab ${this.id} tab update handler called: w/tab tabId:${tabId} winId:${tab.windowId} is updated.`,
@@ -250,14 +256,17 @@ export class Tab {
       windowId: chromeWindow.id,
     });
 
-    /*  
+    if (this.chromeTab.status === 'loading') {
+      // we need to wait for it
+      /*  
          creating the chrome window only starts the tab navigation
          to the url. I can't leave here until that navigation completes.                
          set up some handlers and promise scaffolding to detect when that happens
         */
-    chrome.tabs.onUpdated.removeListener(this.tabsOnUpdatedHandler);
-    chrome.tabs.onUpdated.addListener(this.tabsOnUpdatedHandler);
-    await this.chromeTabStatusIsCompleted();
+      chrome.tabs.onUpdated.removeListener(this.tabsOnUpdatedHandler);
+      chrome.tabs.onUpdated.addListener(this.tabsOnUpdatedHandler);
+      await this.chromeTabStatusIsCompleted();
+    }
 
     this.url = url;
   }

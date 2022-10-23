@@ -5,3 +5,6 @@ ui/colors.css.map
 modal/modal.css
 modal/modal.css.map
 modal/modal.css
+node_modules/
+package-lock.json
+package.json

@@ -3,27 +3,43 @@
 import * as extensionInfo from '../extensionInfo.js';
 
 class InfoBar {
-  setText(infobarText) {
-    if (!infobarText) {
-      if ($('#recordButton').hasClass('active')) {
-        infobarText = '<span class="pulse">🔴</span> recording...';
-      } else if ($('#playButton').hasClass('active')) {
-        infobarText = '🟢 playing...';
-      } else {
-        infobarText = 'ready';
-      }
-    }
+  setText(...items) {
     let chromeIcon = `chrome${
       extensionInfo.chromeVersion.includes('beta') ? '_beta' : ''
     }_icon.png`;
+    let html = `<div class="text">${extensionInfo.version}</div>`;
+
+    if (items.length === 0) {
+      let item = '';
+      if ($('#recordButton').hasClass('active')) {
+        html += `
+          <span class="pulse">🔴</span>
+          <div class="text">recording...</div>
+          `;
+      } else if ($('#playButton').hasClass('active')) {
+        html += '🟢 playing...';
+      } else {
+        html += '<div class="text">ready</div>';
+      }
+    } else {
+      for (let item of items) {
+        if (typeof item === 'string') {
+          html += `<div class="text">${item}</div>`;
+        } else if (item?.html) {
+          html += item?.html;
+        }
+      }
+    }
+
     let title = extensionInfo.chromeVersion;
-    this.setHtml(`
-      <div class="text">${extensionInfo.version} ${infobarText}</div>
-      <div title="${title}" class="right">
-        <img src="/images/${chromeIcon}">
-        <div class="text">${extensionInfo.chromeBuild}</div>
-      </div>
-      `);
+    html += `
+    <div title="${title}" class="right">
+      <img src="/images/${chromeIcon}">
+      <div class="text">${extensionInfo.chromeBuild}</div>
+    </div>
+    `;
+
+    this.setHtml(html);
   }
 
   setHtml(html) {

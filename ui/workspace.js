@@ -2078,7 +2078,7 @@ async function startRecorders() {
   );
 
   port.onMessage.addListener(onMessageHandler);
-  infobar.setText('recording');
+  infobar.setText();
   await captureScreenshotAsDataUrlForRecording(); // grab the first screenshot
 }
 
@@ -2476,7 +2476,7 @@ async function recordSomething(promptForUrl) {
       // to work around this i do this preamble on record (when first action is goto) and play when first action is goto.
       await player.mousemove({ x: 0, y: 0 });
       await player.mousemove({ x: -1, y: -1 });
-      infobar.setText('🔴 recording');
+      infobar.setText();
     } else {
       // we are going to start recording *the* active tab at the current url.
       if (!startingTab.chromeTab) {
@@ -2540,9 +2540,9 @@ async function recordSomething(promptForUrl) {
         insertIndex = index + 1;
         startingTab.virtualId = Test.current.steps[insertIndex].tab.virtualId;
         actionGutter.clean();
-        infobar.setText('🔴 recording (for insert)');
+        infobar.setText();
       } else {
-        infobar.setText('🔴 recording (active tab)');
+        infobar.setText();
       }
 
       // we are recording a fresh test starting with the active tab.
