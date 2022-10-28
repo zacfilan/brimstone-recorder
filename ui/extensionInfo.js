@@ -65,26 +65,38 @@ async function tryToUpdateToDetailedChromeVersion() {
     ]);
 
     chromeBuild = data.result.product.match(/([\d\.]+)/)[1];
-    let myOs = data.result.userAgent.match(/\(([^\)]+)\)/)[1];
+    let myOsString = data.result.userAgent
+      .match(/\(([^\)]+)\)/)[1]
+      .toLowerCase();
+    let myOs;
+    if (myOsString.includes('windows')) {
+      if (myOsString.includes('64')) {
+        myOs = 'win64';
+      } else {
+        myOs = 'win';
+      }
+    } else if (myOsString.includes('mac')) {
+      myOs = 'mac';
+    } else if (myOsString.includes('linux')) {
+      myOs = 'linux';
+    }
     versions = versions.split(/\n/);
-    let myVersionInfo;
+    let myChannel;
     for (let versionStr of versions) {
-      let versionInfo = versionStr.split(','); // short os, channel, version, date
-      if (chromeBuild === versionInfo[2]) {
-        // the channel is the same for all OS
-        myVersionInfo = versionInfo;
+      let [os, channel, versionInfo] = versionStr.split(','); // short os, channel, version, date
+      if (chromeBuild === versionInfo && os === myOs) {
+        myChannel = channel;
         break;
       }
     }
-    if (myVersionInfo) {
-      let [os, channel] = myVersionInfo;
+    if (myChannel) {
       chromeVersion = `Version ${chromeBuild} (Official Build)`;
 
-      if (channel !== 'stable') {
-        chromeVersion += ` (${channel})`;
+      if (myChannel !== 'stable') {
+        chromeVersion += ` (${myChannel})`;
       }
 
-      if (myOs.includes('64')) {
+      if (myOsString.includes('64')) {
         chromeVersion += ` (64-bit)`;
       }
     }

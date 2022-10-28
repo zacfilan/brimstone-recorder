@@ -1110,6 +1110,9 @@ On that page please flip the switch, "Allow in Incognito" so it\'s blue, and reo
                 await updateStepInView(Test.current.steps[i]);
               }
               break;
+            case 'verticalLayout':
+              workspace.togglePageOrientation();
+              break;
           }
         }
       }
