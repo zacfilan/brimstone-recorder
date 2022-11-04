@@ -142,6 +142,12 @@ export class Options {
   captureScreenshotAsDataUrlForRecordingRetryTimeout = 500;
 
   /**
+   * Allow for hang detection on debugger commands.
+   * Probably obsolete.
+   */
+  sendDebuggerCommandTimeout = 0;
+
+  /**
    * How low should we wait for an overlay specfied with
    * {@link waitForCssElementsToNotExistBeforeDriving} before
    * we declare an error. In milliseconds.
@@ -335,8 +341,7 @@ export async function saveOptions(newOptions, message = true) {
       try {
         await chrome.runtime.sendMessage({ optionsChanged });
       } catch (e) {
-        console.log('ouch');
-        // it's possible the extension is not up, just the options page
+        // it's possible the only one side is up
       }
     }
   }

@@ -105,7 +105,10 @@ async function setModelFromView() {
     pollPeriodForOverlayToBeRemoved.value
   );
   options.maxTimeToWaitForOverlaysToBeRemoved = parseInt(
-    maxTimeToWaitForOverlaysToBeRemoved
+    maxTimeToWaitForOverlaysToBeRemoved.value
+  );
+  options.sendDebuggerCommandTimeout = parseInt(
+    sendDebuggerCommandTimeout.value
   );
   //#endregion timeouts
 
@@ -229,6 +232,8 @@ function setViewFromModel() {
 
   maxTimeToWaitForOverlaysToBeRemoved.value =
     options.maxTimeToWaitForOverlaysToBeRemoved;
+
+  sendDebuggerCommandTimeout.value = options.sendDebuggerCommandTimeout;
   //#endregion timeouts
   //#endregion developer options
 

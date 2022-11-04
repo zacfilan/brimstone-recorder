@@ -39,7 +39,7 @@ async function browserGetVersion(port) {
   let ws = new WebSocket(metaData[0].webSocketDebuggerUrl);
   await new Promise((resolve) => (ws.onopen = resolve));
   let response = new Promise((resolve) => (ws.onmessage = resolve));
-  ws.send(JSON.stringify({ id: 1, method: 'Browser.getVersion' }));
+  ws.send(JSON.stringify({ id: 919197200, method: 'Browser.getVersion' })); // use a huge id to (maybe?) avoid conflicts
   let event = await response;
   ws.close();
 

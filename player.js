@@ -908,7 +908,16 @@ export class Player {
       await sleep(options.verifyScreenshotRetryComparisonTimeout);
     }
 
-    // The screenshots apparently don't match
+    // The screenshots apparently don't match.
+    nextStep._match = constants.match.FAIL;
+
+    // we can get out of the above loop without actually doing the comparison
+    // if the attempt to take the screenshot keeps failing
+    if (!nextStep.actualScreenshot) {
+      throw new Error('Unable to take screenshot');
+    }
+
+    // one last chance to see if the actual screen shot (which exists) really doesn't match expected
     if (!attemptAutocorrect) {
       // do a final (complete) check to get all different data, i.e. don't fastFail out of the diff
       nextStep.calculatePixelDiff({ fastFail: false });
@@ -916,14 +925,6 @@ export class Player {
         // the loop timed out just as the screen got in the correct state.
         return;
       }
-    }
-
-    // The screenshots really don't match.
-    nextStep._match = constants.match.FAIL;
-
-    // we can get out of the above loop without actually doing the comparison, if taking the screenshot keeps failing.
-    if (!nextStep.actualScreenshot) {
-      throw new Error('Unable to create screenshot');
     }
   }
 
@@ -1001,22 +1002,45 @@ export class Player {
       commandParams
     );
 
-    // I have seen this senCommand hang when there is a navigation on the tab just after this sendCommand is made.
-    // there with no indication of the failure :(
-    // So I will add a hang detect to break it.
-    let result = Promise.race([
-      chrome.debugger.sendCommand(
+    let result;
+    if (options.sendDebuggerCommandTimeout) {
+      // This promise race stuff is (I think) dead code at this point.
+      // History: See extensionInfo.js::browserGetVersion. I wanted to access Browser.getVersion, but it doesn't work.
+      // So I added a workaround to manually send the command to --remote-debugging-port=<options port>
+      // But I used id 1, on the command. I *think* this id confused a subsequent debugger.sendCommand
+      // (to get a screenshot) to appear to hang. Hence I added hang detection, which was probably a mistake.
+      // Anyway, I moved the port to something big, which is very unlikely to conflict.
+      // (I doubt I'll run a test with 9 million commands). This code is left around since it's a neat
+      // example of hang detection.
+      let timeoutId;
+      result = await Promise.race([
+        chrome.debugger.sendCommand(
+          { tabId: this.tab.chromeTab.id },
+          method,
+          commandParams
+        ),
+        new Promise((resolve, reject) => {
+          // treat the timeout the same as if the debugger had detacted, this should trigger some retry
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            console.warn(
+              `the send command ${method} timed out after ${(
+                options.sendDebuggerCommandTimeout / 1000
+              ).toFixed(1)}s, forcing a reject`
+            );
+            reject(new Errors.DebuggerSendCommandIsHung());
+          }, options.sendDebuggerCommandTimeout);
+        }),
+      ]);
+      clearTimeout(timeoutId);
+    } else {
+      result = await chrome.debugger.sendCommand(
         { tabId: this.tab.chromeTab.id },
         method,
         commandParams
-      ),
-      new Promise((resolve, reject) =>
-        // treat the timeout the same as if the debugger had detacted, this should trigger some retry
-        setTimeout(() => {
-          reject(new Errors.DebuggerSendCommandIsHung());
-        }, 3000)
-      ),
-    ]);
+      );
+    }
+
     let message = chrome.runtime.lastError?.message;
     if (message) {
       console.warn(`an error was thrown during debugger command: ${message}`);

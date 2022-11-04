@@ -1283,7 +1283,7 @@ export class TestAction {
    * in this action. This is what is shown in the EDIT view.
    *
    * @param {Object} obj Destructured arguments
-   * @param {boolean} obj.fastFail - Should we fast fail the pixel diff?
+   * @param {boolean} obj.fastFail - Should we fast fail the pixel diff? If we just want to know if the images differ we can bail early, as soon as we see one different pixel.
    * */
   calculatePixelDiff({ fastFail = false } = {}) {
     let { numUnusedMaskedPixels, numDiffPixels, numMaskedPixels, diffPng } =
