@@ -20,7 +20,8 @@
       font-size: 15px;
       margin-bottom: 12px;
     }
-    #message {
+    #message,
+    .message {
       margin-bottom: 0.6em;
     }
     #buttons {
@@ -49,6 +50,10 @@
     a.button.cancel {
       background-color: white;
       color: #1a73e8;
+    }
+    input[type='number'] {
+      width: 4em;
+      text-align: right;
     }
   }
 }

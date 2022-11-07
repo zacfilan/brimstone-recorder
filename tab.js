@@ -110,16 +110,45 @@ export class Tab {
   }
 
   /**
+   * Will attempt to get the distance structure from the active tab.
+   * Checks for pixel scaling and zoom issues, corrects what it can.
+   * @returns the distance structure
+   * @throws ZoomError or PixleScalingError
+   */
+  async measureViewport() {
+    // empirically, it needs to be visible/focused to work
+    await chrome.windows.update(this.chromeTab.windowId, { focused: true });
+
+    let viewPort;
+    if (options.autoZoomTo100) {
+      console.debug(`tab:${this.id} set zoom to 1`);
+      // set the _chrome_ tab zoom to 1
+      await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
+    }
+    if (1 != (await chrome.tabs.getZoom(this.chromeTab.id))) {
+      // option was off and chrome zoom is in effect, or the option was on an reset chrome zoom failed. Either way we quit.
+      throw new Errors.ZoomError();
+    }
+
+    viewPort = await this.getViewport(); // get viewport data
+    if (viewPort.devicePixelRatio !== 1) {
+      // this must be window manager device/monitor scaling, I cannot reset that from javascript.
+      throw new Errors.PixelScalingError();
+    }
+    return viewPort;
+  }
+
+  /**
    * Resize the viewport of this tab to match its width and height properties.
+   * Will throw ResizeViewportError, ZoomError or PixleScaling Error
    * */
   async resizeViewport() {
+    let distance = await this.measureViewport();
     if (!this.height || !this.width) {
       return;
     }
 
     let options = await loadOptions();
-    // empirically, it needs to be visible to work
-    await chrome.windows.update(this.chromeTab.windowId, { focused: true });
 
     console.debug(
       `tab:${this.id} resize viewport to ${this.width}x${this.height} requested`
@@ -127,28 +156,9 @@ export class Tab {
     let lastError = new Errors.ResizeViewportError();
 
     let i = 0;
-    let distance;
     let matched = 0;
     for (i = 0; i < 10; i++) {
-      if (i) {
-        await sleep(options.resizeViewportRetryTimeout); // we get once chance to be fast
-      }
-
       try {
-        if (options.autoZoomTo100) {
-          console.debug(`tab:${this.id} set zoom to 1`);
-          await chrome.tabs.setZoom(this.chromeTab.id, 1); // reset the zoom to 1, in the tab we are recording. // FIXME: at somepoint in the future MAYBE I will support record and playback in a certain zoom, but right now it's a hassle because of windows display scaling.
-        }
-        distance = await this.getViewport(); // get viewport data
-
-        if (1 != (await chrome.tabs.getZoom(this.chromeTab.id))) {
-          throw (lastError = new Errors.ZoomError()); // this must be windows scaling, I cannot reset that.
-        }
-
-        if (distance.devicePixelRatio !== 1) {
-          throw (lastError = new Errors.PixelScalingError());
-        }
-
         if (
           distance.innerHeight != this.height ||
           distance.innerWidth != this.width
@@ -167,7 +177,12 @@ export class Tab {
             break;
           }
         }
+        if (i) {
+          await sleep(options.resizeViewportRetryTimeout); // we get once chance to be fast
+        }
+        distance = await this.getViewport();
       } catch (e) {
+        lastError = e;
         console.warn(e);
         continue;
       }
@@ -238,11 +253,11 @@ export class Tab {
       focused: false, // keep focus off omni bar when we open a new incognito window
       incognito: incognito, // if true this will create the window "You've gone Incognito"
       url: url, // this better be an URL I can attach a debugger to!
+      height: this.height,
+      width: this.width,
     };
 
     if (removedWindow) {
-      createParms.height = removedWindow.height;
-      createParms.width = removedWindow.width;
       createParms.top = removedWindow.top;
       createParms.left = removedWindow.left;
       // console.log(
@@ -324,6 +339,7 @@ export class Tab {
         active: true,
         windowId: chromeWindow.id,
       });
+
       if (url) {
         this.url = url;
         // this better be a URL that I can attach a debugger to !
@@ -337,7 +353,11 @@ export class Tab {
           chrome.webNavigation.onCompleted.removeListener(navCommit);
           resolveNavigationPromise(details);
         });
-        await chrome.tabs.update(this.chromeTab.id, { url: url });
+        await chrome.tabs.update(this.chromeTab.id, {
+          url: url,
+          height: this.height,
+          width: this.width,
+        });
         await navPromise; // the above nav is really done.
       } else if (this.chromeTab.url.startsWith('chrome://')) {
         // e.g. chrome://newtab

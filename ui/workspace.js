@@ -857,6 +857,44 @@ class Workspace {
     return userButtonPress;
   }
 
+  async recordModal(defaultUrl, defaultWidth, defaultHeight) {
+    let userButtonPress = new Promise((resolve) => {
+      this._modalClosed = resolve;
+    });
+
+    let cs = $('#promptModal').html(`
+    <div id="title">Brimstone</div>
+    <div id="message">🙋 Where to? <br> Enter URL to start recording from.</div>
+    <input type="text" value="${defaultUrl}"></input>
+    <br><br>
+    <div class="message"> 🙋 How big? <br> Set the recording viewport desired pixel [width] x [height]. </div>
+    <input id="width" type="number" value=${defaultWidth}>x<input id="height" type="number" value=${defaultHeight}></div>
+    <div id="buttons">
+      <a class="button ok" href="#" rel="modal:close">OK</a>
+      <a class="button cancel" href="#" rel="modal:close">Cancel</a>
+    </div>`);
+
+    cs.find('.ok')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed({
+          url: cs.find('input:text').val(),
+          width: parseInt(cs.find('#width').val()),
+          height: parseInt(cs.find('#height').val()),
+        });
+      });
+
+    cs.find('.cancel')
+      .off('click')
+      .on('click', () => {
+        this._modalClosed('');
+      });
+
+    cs.modal();
+    cs.find('input[type="text"]').focus().select();
+    return userButtonPress;
+  }
+
   async enableAutoPlayCheckbox(e) {
     $('.card.edit')
       .find('button[autoplay]')
@@ -894,7 +932,7 @@ async function errorHandler(e) {
   switch (e.constructor) {
     case Errors.PixelScalingError:
       workspaceWindow = await brimstone.window.alert(
-        `Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded must be in an unscaled display, for the entire recording.\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`
+        `Pixel scaling detected. Brimstone cannot reliably compare scaled pixels. The Chrome window being recorded (or played) must be in an unscaled display, for the entire recording (or play session).\n\nSet your windows monitor display scale to 100%, or put Chrome in an unscaled display. Restart Chrome, try again.\n\nWorkspace will close when you hit [OK].`
       );
       try {
         await chrome.windows.remove(workspaceWindow.id);
@@ -2424,13 +2462,19 @@ async function recordSomething(promptForUrl) {
 
     if (promptForUrl) {
       let defaultUrl = options?.url ?? '';
-      url = await workspace.promptModal(
-        'Where to? Type or paste URL to start recording from.',
-        defaultUrl
+      let defaultWidth = (startingTab?.width ?? 1024) || 1024;
+      let defaultHeight = (startingTab?.height ?? 768) || 768;
+      let recordRequest = await workspace.recordModal(
+        defaultUrl,
+        defaultWidth,
+        defaultHeight
       );
-      if (!url) {
+      if (!recordRequest?.url) {
         return; // they bailed
       }
+      startingTab.width = recordRequest.width;
+      startingTab.height = recordRequest.height;
+      let url = recordRequest.url;
       if (url.startsWith('chrome')) {
         alert(
           'Recording chrome:// urls is not currently supported.\n\nTo record first navigate to where you want to start recording from. Then hit the record button.'
@@ -2456,10 +2500,11 @@ async function recordSomething(promptForUrl) {
       Tab.reset(); // FIXME: multi-tab multi-recording tests
       startingTab.trackCreated();
       Tab.active = startingTab;
+      Tab.active.width = recordRequest.width;
+      Tab.active.height = recordRequest.height;
 
-      if (await player.attachDebugger({ tab: Tab.active })) {
-        await Tab.active.resizeViewport();
-      }
+      await player.attachDebugger({ tab: Tab.active });
+      await Tab.active.resizeViewport();
 
       await prepareToRecord();
       button.addClass('active');
@@ -2529,9 +2574,8 @@ async function recordSomething(promptForUrl) {
           throw new Errors.ReuseTestWindow();
         }
 
-        if (await player.attachDebugger({ tab: Tab.active })) {
-          await Tab.active.resizeViewport();
-        }
+        await player.attachDebugger({ tab: Tab.active });
+        await Tab.active.resizeViewport();
 
         await prepareToRecord();
         button.addClass('active');
@@ -2545,13 +2589,12 @@ async function recordSomething(promptForUrl) {
         actionGutter.clean();
         infobar.setText();
       } else {
+        // there are no steps in memory - starting an immediate recording.
         infobar.setText();
       }
 
-      // we are recording a fresh test starting with the active tab.
-      // there is no test loaded in memory. recording starts at
-      // step 1 (index 0)
-
+      // we are recording a test starting with the active tab.
+      // fallthrough - FIXME: there is some duplication here in one of the paths
       Test.current = new Test();
       startingTab.trackCreated();
       Tab.active = startingTab;
@@ -2572,9 +2615,8 @@ async function recordSomething(promptForUrl) {
         throw new Errors.ReuseTestWindow();
       }
 
-      if (await player.attachDebugger({ tab: Tab.active })) {
-        await Tab.active.resizeViewport();
-      }
+      await player.attachDebugger({ tab: Tab.active });
+      await Tab.active.resizeViewport();
 
       await prepareToRecord();
       button.addClass('active');

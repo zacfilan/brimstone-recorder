@@ -66,7 +66,11 @@
   font-size: 15px;
   margin-bottom: 12px;
 }
-.modal#promptModal #message, .modal#confirmModal #message, .modal#promptModal #message, .modal#alertModal #message {
+.modal#promptModal #message,
+.modal#promptModal .message, .modal#confirmModal #message,
+.modal#confirmModal .message, .modal#promptModal #message,
+.modal#promptModal .message, .modal#alertModal #message,
+.modal#alertModal .message {
   margin-bottom: 0.6em;
 }
 .modal#promptModal #buttons, .modal#confirmModal #buttons, .modal#promptModal #buttons, .modal#alertModal #buttons {
@@ -94,6 +98,10 @@
 .modal#promptModal a.button.cancel, .modal#confirmModal a.button.cancel, .modal#promptModal a.button.cancel, .modal#alertModal a.button.cancel {
   background-color: white;
   color: #1a73e8;
+}
+.modal#promptModal input[type=number], .modal#confirmModal input[type=number], .modal#promptModal input[type=number], .modal#alertModal input[type=number] {
+  width: 4em;
+  text-align: right;
 }
 
 .blocker {
@@ -170,7 +178,7 @@
   height: 22px;
 }
 #infobar svg {
-  height: 22px;
+  height: 18px;
   -webkit-animation: opacity2 3s infinite;
           animation: opacity2 3s infinite;
   margin-left: 0.6em;
