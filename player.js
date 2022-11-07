@@ -871,6 +871,12 @@ export class Player {
         }
         nextStep.actualScreenshot = await this._takeScreenshot();
       } catch (e) {
+        if (
+          e instanceof Errors.PixelScalingError ||
+          e instanceof Errors.ZoomError
+        ) {
+          throw e;
+        }
         console.debug(e);
         badTab = true;
         // give other async'ed control paths a chance to run. configureForAction above can be trying to wait for a different tab to become active.
