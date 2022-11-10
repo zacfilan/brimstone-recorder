@@ -1850,6 +1850,7 @@ async function _playSomething() {
           infobar.setText(
             `✋ user defined breakpoint hit, step ${indexOfNext} not executed`
           );
+          break;
         case constants.match.WRONG_ELEMENT:
           infobar.setText(
             `❌ The wrong element would receive the action, step ${indexOfNext} not executed`

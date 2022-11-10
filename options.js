@@ -14,14 +14,16 @@ export class Options {
   pixelMatchThreshhold = 0.2; // different screens seem to render a little different...
 
   /** delay in ms before a mouse mouse is played.
-   * simulates slower typing
-   * 2000 500 0 seem pretty good
+   * slows down the player to better simulate a human.
+   *
+   * max:2000 avg:500 min:0
    */
   userMouseDelay = 0;
 
   /** delay in ms before key action is played
-   * simulates slower typing
-   * 100 50 0 seem pretty good
+   * simulates slower typing human.
+   *
+   * max:100 avg:50 min:0 seem pretty good
    */
   userKeypressDelay = 0;
 

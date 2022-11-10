@@ -398,7 +398,7 @@ export class Player {
           next.actualScreenshot.png.width !== next.expectedScreenshot.png.width
         ) {
           await brimstone.window.alert(
-            'Heads up, the expected viewport size does not match the actual viewport size.\n\nThis normally should not occur. Your recording may be corrupted.'
+            'Heads up, the expected viewport size does not match the actual viewport size.\n\nDid you remove the debugger banner as suggested by adding the\n--silent-debugger-extension-api\ncommand line argument?\n\nIf not, do so and try again. Else you can mark the actual as expected.'
           );
         }
         next._view = constants.view.EDIT;
@@ -1002,64 +1002,64 @@ export class Player {
    * @throws {Error} on unknown errors
    */
   async _debuggerSendCommandRaw(method, commandParams) {
-    await this._debuggerAttached;
-    console.debug(
-      `begin debugger send command tabId:${this.tab.id} ${method}`,
-      commandParams
-    );
+    try {
+      await this._debuggerAttached;
+      console.debug(
+        `begin debugger send command tabId:${this.tab.id} ${method}`,
+        commandParams
+      );
 
-    let result;
-    if (options.sendDebuggerCommandTimeout) {
-      // This promise race stuff is (I think) dead code at this point.
-      // History: See extensionInfo.js::browserGetVersion. I wanted to access Browser.getVersion, but it doesn't work.
-      // So I added a workaround to manually send the command to --remote-debugging-port=<options port>
-      // But I used id 1, on the command. I *think* this id confused a subsequent debugger.sendCommand
-      // (to get a screenshot) to appear to hang. Hence I added hang detection, which was probably a mistake.
-      // Anyway, I moved the port to something big, which is very unlikely to conflict.
-      // (I doubt I'll run a test with 9 million commands). This code is left around since it's a neat
-      // example of hang detection.
-      let timeoutId;
-      result = await Promise.race([
-        chrome.debugger.sendCommand(
+      let result;
+      if (options.sendDebuggerCommandTimeout) {
+        // This promise race stuff is (I think) dead code at this point.
+        // History: See extensionInfo.js::browserGetVersion. I wanted to access Browser.getVersion, but it doesn't work.
+        // So I added a workaround to manually send the command to --remote-debugging-port=<options port>
+        // But I used id 1, on the command. I *think* this id confused a subsequent debugger.sendCommand
+        // (to get a screenshot) to appear to hang. Hence I added hang detection, which was probably a mistake.
+        // Anyway, I moved the port to something big, which is very unlikely to conflict.
+        // (I doubt I'll run a test with 9 million commands). This code is left around since it's a neat
+        // example of hang detection.
+        let timeoutId;
+        result = await Promise.race([
+          chrome.debugger.sendCommand(
+            { tabId: this.tab.chromeTab.id },
+            method,
+            commandParams
+          ),
+          new Promise((resolve, reject) => {
+            // treat the timeout the same as if the debugger had detacted, this should trigger some retry
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+              console.warn(
+                `the send command ${method} timed out after ${(
+                  options.sendDebuggerCommandTimeout / 1000
+                ).toFixed(1)}s, forcing a reject`
+              );
+              reject(new Errors.DebuggerSendCommandIsHung());
+            }, options.sendDebuggerCommandTimeout);
+          }),
+        ]);
+        clearTimeout(timeoutId);
+      } else {
+        result = await chrome.debugger.sendCommand(
           { tabId: this.tab.chromeTab.id },
           method,
           commandParams
-        ),
-        new Promise((resolve, reject) => {
-          // treat the timeout the same as if the debugger had detacted, this should trigger some retry
-          clearTimeout(timeoutId);
-          timeoutId = setTimeout(() => {
-            console.warn(
-              `the send command ${method} timed out after ${(
-                options.sendDebuggerCommandTimeout / 1000
-              ).toFixed(1)}s, forcing a reject`
-            );
-            reject(new Errors.DebuggerSendCommandIsHung());
-          }, options.sendDebuggerCommandTimeout);
-        }),
-      ]);
-      clearTimeout(timeoutId);
-    } else {
-      result = await chrome.debugger.sendCommand(
-        { tabId: this.tab.chromeTab.id },
-        method,
-        commandParams
-      );
-    }
-
-    let message = chrome.runtime.lastError?.message;
-    if (message) {
+        );
+      }
+      console.debug(`end   debugger send command ${method}`, commandParams);
+      return result; // the debugger method may be a getter of some kind.
+    } catch (e) {
+      let message = e?.message || '??';
       console.warn(`an error was thrown during debugger command: ${message}`);
       if (
         message.includes('Detached while') ||
         message.includes('Debugger is not attached')
       ) {
-        throw new Errors.DebuggerDetached(message);
+        throw new Errors.DebuggerDetached(message); // reshape the Error
       }
-      throw new Error(message);
+      throw e; // rethrow
     }
-    console.debug(`end   debugger send command ${method}`, commandParams);
-    return result; // the debugger method may be a getter of some kind.
   }
 
   /**
